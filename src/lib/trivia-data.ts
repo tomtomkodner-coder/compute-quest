@@ -1,125 +1,112 @@
-export type Difficulty = "קל" | "בינוני" | "קשה";
-
 export interface Question {
   q: string;
   options: string[];
-  correct: number; // index in original options
-  difficulty: Difficulty;
-  topic: string;
+  correct: number;
   fact?: string;
 }
 
 export const QUESTIONS: Question[] = [
   {
-    q: "מי המציא את המחשב הראשון Z1?",
-    options: ["אלן טיורינג", "קונראד צוזה", "ביל גייטס", "סטיב ג'ובס"],
+    q: "מי בנה את המחשב הראשון Z1?",
+    options: ["אלן טיורינג", "קונראד צוזה", "ביל גייטס", "צ׳ארלס באבג׳"],
     correct: 1,
-    difficulty: "קל",
-    topic: "Z1",
-    fact: "קונראד צוזה בנה את ה-Z1 בסלון של ההורים שלו בברלין!",
+    fact: "קונראד צוזה בנה את ה-Z1 בסלון של הוריו בברלין.",
   },
   {
-    q: "באיזו שנה נבנה המחשב Z1?",
-    options: ["1936", "1938", "1945", "1950"],
+    q: "באיזו שנה הושלם המחשב Z1?",
+    options: ["1928", "1938", "1948", "1958"],
     correct: 1,
-    difficulty: "בינוני",
-    topic: "Z1",
-    fact: "ה-Z1 הושלם בשנת 1938 והיה מחשב מכני לחלוטין.",
   },
   {
-    q: "מה הייתה הטכנולוגיה המרכזית של ה-ENIAC?",
-    options: ["טרנזיסטורים", "שפופרות ואקום", "מעגלים משולבים", "ממסרים מגנטיים"],
-    correct: 1,
-    difficulty: "בינוני",
-    topic: "ENIAC",
-    fact: "ENIAC השתמש ב-17,468 שפופרות ואקום ושקל כ-30 טונות!",
-  },
-  {
-    q: "כמה שקל בערך מחשב ה-ENIAC?",
-    options: ["3 טון", "10 טון", "30 טון", "100 טון"],
+    q: "מאיזו מדינה הגיע קונראד צוזה?",
+    options: ["ארצות הברית", "אנגליה", "גרמניה", "צרפת"],
     correct: 2,
-    difficulty: "קשה",
-    topic: "ENIAC",
   },
   {
-    q: "באיזו מדינה נולד קונראד צוזה?",
-    options: ["ארה״ב", "אנגליה", "גרמניה", "צרפת"],
+    q: "מה היה ה-Z1 ביסודו?",
+    options: ["מחשב חשמלי", "מחשב מכני לחלוטין", "מחשב קוונטי", "מחשב טרנזיסטורים"],
+    correct: 1,
+    fact: "ה-Z1 פעל באמצעות חלקים מכניים נעים, ללא טרנזיסטורים.",
+  },
+  {
+    q: "באיזו טכנולוגיה השתמש המחשב ENIAC?",
+    options: ["טרנזיסטורים", "שפופרות ואקום", "מעגלים משולבים", "מנועי קיטור"],
+    correct: 1,
+  },
+  {
+    q: "מהו ההבדל המרכזי בין מחשבי פעם להיום?",
+    options: [
+      "פעם היו זולים יותר",
+      "פעם היו קטנים יותר",
+      "פעם היו ענקיים ואיטיים, היום קטנים ומהירים",
+      "אין הבדל משמעותי",
+    ],
     correct: 2,
-    difficulty: "קל",
-    topic: "קונראד צוזה",
   },
   {
-    q: "מה היה המקצוע המקורי של קונראד צוזה?",
-    options: ["מתמטיקאי", "מהנדס בניין", "פיזיקאי", "מורה"],
-    correct: 1,
-    difficulty: "קשה",
-    topic: "קונראד צוזה",
-    fact: "צוזה היה מהנדס בניין שהשתעמם מחישובים ידניים — אז המציא מחשב!",
-  },
-  {
-    q: "איזה משחק מחשב יצא בשנת 1972 ונחשב לאחד הראשונים?",
-    options: ["Mario", "Pong", "Tetris", "Pac-Man"],
-    correct: 1,
-    difficulty: "קל",
-    topic: "משחקי מחשב",
-  },
-  {
-    q: "מתי יצא המשחק האייקוני Pac-Man?",
-    options: ["1978", "1980", "1985", "1990"],
-    correct: 1,
-    difficulty: "בינוני",
-    topic: "משחקי מחשב",
-  },
-  {
-    q: "מה משמעות ראשי התיבות VR?",
-    options: ["Video Reality", "Virtual Reality", "Visual Resolution", "Vector Render"],
-    correct: 1,
-    difficulty: "קל",
-    topic: "VR",
-  },
-  {
-    q: "איזו חברה השיקה את משקפי ה-Oculus Rift?",
-    options: ["Sony", "Microsoft", "Meta (Facebook)", "Apple"],
-    correct: 2,
-    difficulty: "בינוני",
-    topic: "VR",
-  },
-  {
-    q: "כמה זיכרון RAM היה למחשב הביתי הראשון לעומת היום?",
-    options: ["1KB מול 16GB", "4KB מול 32GB", "16KB מול 64GB", "64KB מול 128GB"],
-    correct: 1,
-    difficulty: "קשה",
-    topic: "פעם והיום",
-  },
-  {
-    q: "מה היה גודל המסך הממוצע של מחשב פעם?",
-    options: ["שחור-לבן 12 אינץ׳", "צבעוני 24 אינץ׳", "OLED 32 אינץ׳", "4K 27 אינץ׳"],
+    q: "כמה שטח תפס בערך המחשב ENIAC?",
+    options: ["חדר שלם", "מגירה", "כיס", "מזוודה"],
     correct: 0,
-    difficulty: "קל",
-    topic: "פעם והיום",
   },
   {
-    q: "מי נחשב לאבי האינטרנט (WWW)?",
-    options: ["סטיב ג'ובס", "טים ברנרס-לי", "מארק צוקרברג", "לארי פייג'"],
+    q: "מהו אחד ממשחקי המחשב הראשונים אי פעם?",
+    options: ["Fortnite", "Pong", "Minecraft", "Roblox"],
     correct: 1,
-    difficulty: "בינוני",
-    topic: "אינטרנט",
-    fact: "טים ברנרס-לי המציא את ה-WWW בשנת 1989 ב-CERN.",
   },
   {
-    q: "באיזו שנה הומצא העכבר למחשב?",
-    options: ["1964", "1972", "1981", "1990"],
+    q: "מה היה אופי הגרפיקה במשחקי מחשב פעם?",
+    options: ["תלת-ממד מציאותי", "פיקסלים פשוטים בשני ממדים", "אנימציה תלת-ממדית מתקדמת", "וידאו חי"],
+    correct: 1,
+  },
+  {
+    q: "מה משמעות הקיצור VR?",
+    options: ["Video Recording", "Virtual Reality", "Visual Range", "Very Real"],
+    correct: 1,
+  },
+  {
+    q: "מה מאפשרים משקפי VR לשחקן?",
+    options: [
+      "לראות סרטים בלבד",
+      "להרגיש כאילו הוא נמצא בתוך העולם של המשחק",
+      "לדבר עם חברים בטלפון",
+      "להאזין למוזיקה",
+    ],
+    correct: 1,
+  },
+  {
+    q: "איזה תחום צפוי להשפיע מאוד על עתיד המחשבים והמשחקים?",
+    options: ["בינה מלאכותית", "מכונות כתיבה", "פקסים", "טייפים"],
     correct: 0,
-    difficulty: "קשה",
-    topic: "אינטרנט",
   },
   {
-    q: "איזו שפת תכנות פיתח צוזה למחשבים שלו?",
-    options: ["Fortran", "Plankalkül", "COBOL", "Basic"],
+    q: "במה התפתחו משחקי המחשב מאז ימי ה-Pong?",
+    options: [
+      "נשארו כמעט אותו דבר",
+      "הפכו לפשוטים יותר",
+      "הפכו ריאליסטיים, מקוונים ועתירי גרפיקה",
+      "ירדו באיכות",
+    ],
+    correct: 2,
+  },
+  {
+    q: "מה משותף לכל המחשבים, מ-Z1 ועד היום?",
+    options: [
+      "כולם עובדים על קיטור",
+      "כולם מבצעים חישובים לפי הוראות",
+      "כולם בגודל זהה",
+      "כולם משחקים משחקים בלבד",
+    ],
     correct: 1,
-    difficulty: "קשה",
-    topic: "קונראד צוזה",
-    fact: "Plankalkül הייתה אחת משפות התכנות הראשונות אי פעם!",
+  },
+  {
+    q: "מהי המסקנה המרכזית על התפתחות המחשבים?",
+    options: [
+      "המחשבים עצרו להתפתח",
+      "המחשבים מתפתחים במהירות ומשנים את חיינו",
+      "המחשבים נעלמים מהעולם",
+      "המחשבים פחות חשובים היום",
+    ],
+    correct: 1,
   },
 ];
 
@@ -136,21 +123,25 @@ export interface PreparedQuestion {
   q: string;
   options: string[];
   correctIndex: number;
-  difficulty: Difficulty;
-  topic: string;
   fact?: string;
 }
 
+let lastFirstQ: string | null = null;
 export function prepareGame(): PreparedQuestion[] {
-  return shuffleArray(QUESTIONS).map((q) => {
+  let shuffled = shuffleArray(QUESTIONS);
+  // Avoid the same first question two games in a row
+  if (lastFirstQ && shuffled[0].q === lastFirstQ && shuffled.length > 1) {
+    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  }
+  lastFirstQ = shuffled[0].q;
+
+  return shuffled.map((q) => {
     const indexed = q.options.map((opt, i) => ({ opt, isCorrect: i === q.correct }));
-    const shuffled = shuffleArray(indexed);
+    const shuffledOpts = shuffleArray(indexed);
     return {
       q: q.q,
-      options: shuffled.map((s) => s.opt),
-      correctIndex: shuffled.findIndex((s) => s.isCorrect),
-      difficulty: q.difficulty,
-      topic: q.topic,
+      options: shuffledOpts.map((s) => s.opt),
+      correctIndex: shuffledOpts.findIndex((s) => s.isCorrect),
       fact: q.fact,
     };
   });
@@ -159,10 +150,10 @@ export function prepareGame(): PreparedQuestion[] {
 export const LEADERBOARD = [
   { name: "אילאיי ציונסקי המלך 👑", score: 14820, level: "אגדה" },
   { name: "תום קודנר", score: 12450, level: "מאסטר" },
-  { name: "Mr.Z1", score: 11380, level: "מאסטר" },
-  { name: "יובל שנירררר", score: 10920, level: "פרו" },
+  { name: "יובל שנירררר", score: 11380, level: "מאסטר" },
+  { name: "דניאל הפרו", score: 10920, level: "פרו" },
   { name: "דור האקר", score: 9870, level: "פרו" },
   { name: "גיא בר שדה", score: 8640, level: "פרו" },
-  { name: "VR Master", score: 7530, level: "מתקדם" },
-  { name: "Retro Gamer", score: 6420, level: "מתקדם" },
+  { name: "מלך ה־Z1", score: 7530, level: "מתקדם" },
+  { name: "אלוף המחשבים", score: 6420, level: "מתקדם" },
 ];
