@@ -1,7 +1,8 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
-@import url("https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap");
+@import "@fontsource-variable/heebo/index.css";
+@import "@fontsource-variable/heebo/wght.css";
 
 @custom-variant dark (&:is(.dark *));
 
