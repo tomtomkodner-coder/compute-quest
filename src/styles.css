@@ -67,6 +67,7 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    font-family: "Heebo Variable", "Heebo", system-ui, -apple-system, "Segoe UI Hebrew", "Arial Hebrew", sans-serif !important;
   }
 
   html, body {
@@ -74,11 +75,11 @@
   }
 
   html {
-    font-family: "Heebo", system-ui, sans-serif;
+    font-family: "Heebo Variable", "Heebo", system-ui, sans-serif;
   }
 
   body {
-    font-family: "Heebo", system-ui, sans-serif;
+    font-family: "Heebo Variable", "Heebo", system-ui, sans-serif;
     background:
       radial-gradient(1200px 600px at 10% -10%, oklch(0.42 0.18 285 / 0.5), transparent 60%),
       radial-gradient(900px 500px at 110% 110%, oklch(0.4 0.18 225 / 0.4), transparent 60%),
