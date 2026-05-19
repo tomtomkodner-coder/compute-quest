@@ -3,6 +3,7 @@ import confetti from "canvas-confetti";
 import {
   Crown, Trophy, Medal, Zap, Flame, Timer, Volume2, VolumeX,
   Sparkles, Award, RotateCw, Play, Check, X, ChevronLeft, User,
+  SkipForward, DoorOpen, Trash2, ShieldCheck, Home,
 } from "lucide-react";
 import {
   prepareGame,
@@ -12,11 +13,15 @@ import {
   savePlayerName,
   isNameClean,
   sanitizeName,
+  qualifiesForLeaderboard,
+  isAdmin,
+  removeFromLeaderboard,
   type PreparedQuestion,
   type LeaderEntry,
 } from "@/lib/trivia-data";
 import {
-  sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic,
+  sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, sfxSkip,
+  startMusic, stopMusic, setMuted as setSoundMuted,
 } from "@/lib/sound";
 
 type Screen = "start" | "name" | "playing" | "end";
@@ -47,26 +52,30 @@ export function TriviaGame() {
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIME);
   const [selected, setSelected] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMutedState] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
-  const [savedThisRound, setSavedThisRound] = useState(false);
+  const [finalScore, setFinalScore] = useState(0);
+  const [didQualify, setDidQualify] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   const current = questions[idx];
 
-  // טען שם שמור מה־localStorage
   useEffect(() => {
     const saved = loadPlayerName();
     if (saved) setPlayerName(saved);
   }, []);
 
+  // Timer — תלוי ב־idx וב־locked. ניקוי מובטח.
   useEffect(() => {
-    if (screen !== "playing" || locked) return;
+    if (screen !== "playing") return;
+    if (locked) return;
+    if (!questions[idx]) return;
     setTimeLeft(QUESTION_TIME);
     timerRef.current = window.setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
-          handleAnswer(-1);
+          // קוראים ל־handleAnswer דרך setTimeout כדי להימנע מסטייט סטייל
+          window.setTimeout(() => handleAnswer(-1), 0);
           return 0;
         }
         if (t <= 5 && !muted) sfxTick();
@@ -74,10 +83,13 @@ export function TriviaGame() {
       });
     }, 1000);
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, screen]);
+  }, [idx, screen, locked]);
 
   useEffect(() => () => stopMusic(), []);
 
@@ -100,32 +112,39 @@ export function TriviaGame() {
     setCorrectCount(0);
     setSelected(null);
     setLocked(false);
-    setSavedThisRound(false);
+    setFinalScore(0);
+    setDidQualify(false);
     setScreen("playing");
     if (!muted) startMusic();
   }
 
   function handleAnswer(choice: number) {
     if (locked) return;
+    const q = questions[idx];
+    if (!q) return;
     setLocked(true);
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setSelected(choice);
-    const isCorrect = choice === current.correctIndex;
+    const isCorrect = choice === q.correctIndex;
 
+    let gained = 0;
     if (isCorrect) {
       if (!muted) sfxCorrect();
-      const points = calcPoints(current.hard, timeLeft, combo + 1);
-      setScore((s) => s + points);
-      setXp((x) => x + (current.hard ? 100 : 50) + combo * 15);
+      gained = calcPoints(q.hard, timeLeft, combo + 1);
+      setScore((s) => s + gained);
+      setXp((x) => x + (q.hard ? 100 : 50) + combo * 15);
       setCombo((c) => {
         const next = c + 1;
         setMaxCombo((m) => Math.max(m, next));
         return next;
       });
       setCorrectCount((c) => c + 1);
-      if (combo + 1 >= 3 || current.hard) {
+      if (combo + 1 >= 3 || q.hard) {
         confetti({
-          particleCount: current.hard ? 100 : 60,
+          particleCount: q.hard ? 100 : 60,
           spread: 75,
           origin: { y: 0.5 },
           colors: ["#a78bfa", "#60a5fa", "#22d3ee", "#f472b6", "#fbbf24"],
@@ -137,9 +156,9 @@ export function TriviaGame() {
     }
 
     const willEnd = idx + 1 >= questions.length;
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (willEnd) {
-        endGame(isCorrect);
+        endGame(score + gained);
       } else {
         setIdx((i) => i + 1);
         setSelected(null);
@@ -148,16 +167,36 @@ export function TriviaGame() {
     }, 2600);
   }
 
-  function endGame(lastCorrect: boolean) {
-    setScreen("end");
-    stopMusic();
-    const total = correctCount + (lastCorrect ? 1 : 0);
-    // שמירה ל־localStorage כדי שהשם יופיע בטבלת השיאים תמיד
-    if (!savedThisRound && playerName) {
-      saveScore(playerName, score + (lastCorrect ? calcPoints(current.hard, timeLeft, combo + 1) : 0));
-      setSavedThisRound(true);
+  function skipQuestion() {
+    if (locked) return;
+    if (!muted) sfxSkip();
+    setCombo(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-    if (total >= questions.length * 0.6) {
+    const willEnd = idx + 1 >= questions.length;
+    if (willEnd) {
+      endGame(score);
+    } else {
+      setIdx((i) => i + 1);
+      setSelected(null);
+      setLocked(false);
+    }
+  }
+
+  function endGame(totalScore: number) {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    stopMusic();
+    setFinalScore(totalScore);
+    const qualifies = qualifiesForLeaderboard(totalScore) && !!playerName;
+    setDidQualify(qualifies);
+    if (qualifies) saveScore(playerName, totalScore);
+    setScreen("end");
+    if (totalScore > 0 && correctCount >= questions.length * 0.6) {
       if (!muted) sfxWin();
       confetti({
         particleCount: 220, spread: 160, origin: { y: 0.35 },
@@ -170,9 +209,20 @@ export function TriviaGame() {
     }
   }
 
+  function quitToHome() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    stopMusic();
+    setScreen("start");
+  }
+
   function toggleMute() {
-    if (muted) startMusic(); else stopMusic();
-    setMuted(!muted);
+    const next = !muted;
+    setMutedState(next);
+    setSoundMuted(next);
+    if (!next && screen === "playing") startMusic();
   }
 
   if (screen === "start")
@@ -199,18 +249,30 @@ export function TriviaGame() {
   if (screen === "end")
     return (
       <EndScreen
-        score={score}
+        score={finalScore}
         correct={correctCount}
-        total={questions.length}
+        total={questions.length || TOTAL}
         maxCombo={maxCombo}
         xp={xp}
         playerName={playerName}
+        qualified={didQualify}
         onRestart={() => startGame(playerName)}
         onHome={() => setScreen("start")}
         muted={muted}
         onToggleMute={toggleMute}
       />
     );
+
+  // Guard — אם איכשהו אין שאלה, חזור לדף הבית במקום לקרוס
+  if (!current) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <button onClick={quitToHome} className="btn-primary px-6 py-3 rounded-2xl">
+          חזרה לדף הבית
+        </button>
+      </div>
+    );
+  }
 
   const progress = ((idx + (locked ? 1 : 0)) / questions.length) * 100;
   const timePct = (timeLeft / QUESTION_TIME) * 100;
@@ -220,9 +282,9 @@ export function TriviaGame() {
 
   return (
     <div className="relative min-h-screen flex flex-col">
-      <div className="relative z-10 mx-auto max-w-3xl w-full px-4 pt-5 sm:pt-8 pb-6">
-        {/* Top HUD — מתעדכן בזמן אמת */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
+      <div className="relative z-10 mx-auto max-w-3xl w-full px-4 pt-5 sm:pt-8 pb-4">
+        {/* Top HUD */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
           <HudCard
             icon={<Zap className="w-4 h-4" />}
             label="ניקוד"
@@ -245,27 +307,44 @@ export function TriviaGame() {
             progress={lvlProgress}
             bump={xp}
           />
-          <div className="flex items-center gap-2 justify-end sm:justify-center">
-            <button
-              onClick={toggleMute}
-              className="glass rounded-xl px-3 h-11 flex items-center gap-2 text-sm font-medium hover:scale-[1.03] transition"
-              aria-label="השתק"
-            >
-              {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-              <span className="hidden sm:inline">{muted ? "מושתק" : "מוזיקה"}</span>
-            </button>
-          </div>
+          <button
+            onClick={toggleMute}
+            className="glass rounded-2xl px-3 h-full flex items-center justify-center gap-2 text-sm font-semibold hover:scale-[1.03] transition"
+            aria-label="השתק"
+          >
+            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+            <span className="hidden sm:inline">{muted ? "מושתק" : "סאונד"}</span>
+          </button>
+        </div>
+
+        {/* פעולות זריזות: דלג / סיים */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={skipQuestion}
+            disabled={locked}
+            className="flex-1 glass rounded-2xl px-3 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 hover:scale-[1.02] transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <SkipForward className="w-4 h-4" />
+            דלג על השאלה
+          </button>
+          <button
+            onClick={quitToHome}
+            className="flex-1 glass rounded-2xl px-3 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 hover:scale-[1.02] transition text-rose-300"
+          >
+            <DoorOpen className="w-4 h-4" />
+            סיום וחזרה לדף הבית
+          </button>
         </div>
 
         {/* Progress + name */}
-        <div className="mb-3 flex items-center justify-between text-xs sm:text-sm font-semibold text-muted-foreground">
+        <div className="mb-2 flex items-center justify-between text-xs sm:text-sm font-semibold text-muted-foreground">
           <span>שאלה {idx + 1} מתוך {questions.length}</span>
           <span className="flex items-center gap-1.5">
             <User className="w-3.5 h-3.5" />
             {playerName || "אורח"}
           </span>
         </div>
-        <div className="h-2 bg-white/5 rounded-full overflow-hidden mb-4">
+        <div className="h-2 bg-white/5 rounded-full overflow-hidden mb-3">
           <div
             className="h-full bg-gradient-to-l from-[var(--brand-2)] to-[var(--brand)] transition-all duration-500"
             style={{ width: `${progress}%` }}
@@ -273,7 +352,7 @@ export function TriviaGame() {
         </div>
 
         {/* Timer */}
-        <div className="mb-5 flex items-center gap-3">
+        <div className="mb-4 flex items-center gap-3">
           <Timer className={`w-5 h-5 shrink-0 ${timeLeft <= 5 ? "text-rose-400" : "text-[var(--brand-2)]"}`} />
           <div className="flex-1 h-2.5 bg-white/5 rounded-full overflow-hidden">
             <div
@@ -291,9 +370,8 @@ export function TriviaGame() {
         </div>
       </div>
 
-      {/* תוכן השאלה — ממורכז לאמצע המסך */}
+      {/* שאלה ממורכזת */}
       <div className="relative z-10 mx-auto max-w-3xl w-full px-4 flex-1 flex flex-col justify-center pb-10">
-        {/* Question Card */}
         <div key={idx} className="glass-strong rounded-3xl p-6 sm:p-8 mb-5 animate-slide-up shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs sm:text-sm font-semibold text-muted-foreground">
@@ -349,10 +427,10 @@ export function TriviaGame() {
           })}
         </div>
 
-        {/* בוקס תוצאה + הסבר */}
+        {/* בוקס תוצאה + הסבר — מופיע מיד, נשאר עד מעבר השאלה */}
         {locked && (
-          <div className="mt-5 animate-slide-up">
-            <div className="text-center mb-3">
+          <div className="mt-5 animate-fade-in" dir="rtl">
+            <div className="text-center mb-3 animate-slide-up">
               {isCorrect ? (
                 <p className="text-xl sm:text-2xl font-bold text-emerald-400">
                   ✓ תשובה נכונה! +{pointsGained.toLocaleString()} נקודות
@@ -360,15 +438,18 @@ export function TriviaGame() {
                 </p>
               ) : (
                 <p className="text-lg sm:text-xl font-bold text-rose-400">
-                  התשובה הנכונה: <span className="text-foreground">{current.options[current.correctIndex]}</span>
+                  {selected === -1 ? "⌛ נגמר הזמן!" : "✗ לא נכון."}
+                  <span className="block text-sm text-muted-foreground font-medium mt-1">
+                    התשובה הנכונה: <span className="text-foreground font-bold">{current.options[current.correctIndex]}</span>
+                  </span>
                 </p>
               )}
             </div>
-            <div className="glass-strong rounded-2xl p-4 sm:p-5 border border-white/10">
+            <div className="glass-strong rounded-2xl p-4 sm:p-5 border border-white/10 animate-slide-up">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-[var(--brand-2)]" />
-                <span className="text-xs sm:text-sm font-bold text-[var(--brand-2)]">
-                  הסבר קצר
+                <Sparkles className={`w-4 h-4 ${isCorrect ? "text-emerald-400" : "text-rose-400"}`} />
+                <span className={`text-xs sm:text-sm font-bold ${isCorrect ? "text-emerald-400" : "text-rose-400"}`}>
+                  {isCorrect ? "למה זה נכון?" : "למה זה לא?"}
                 </span>
               </div>
               <p className="text-sm sm:text-base leading-relaxed text-foreground/90">
@@ -389,7 +470,6 @@ function HudCard({
   icon: React.ReactNode; label: string; value: string; accent: string;
   progress?: number; bump?: number;
 }) {
-  // אנימציית "פעימה" קלה כשהערך משתנה
   const [pulse, setPulse] = useState(false);
   const prev = useRef(bump);
   useEffect(() => {
@@ -430,7 +510,7 @@ function NameScreen({
   function submit() {
     const clean = sanitizeName(name);
     if (!isNameClean(clean)) {
-      setError("שם לא תקין — בלי קללות או מילים פוגעניות, בין 2 ל־20 תווים.");
+      setError("שם לא תקין — בלי קללות, ג׳יבריש או רצף מספרים. 2–20 תווים.");
       return;
     }
     onSubmit(clean);
@@ -448,7 +528,7 @@ function NameScreen({
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold mb-2">איך קוראים לך?</h2>
           <p className="text-sm text-muted-foreground">
-            השם יישמר אצלך בדפדפן ויופיע בטבלת השיאים אחרי שתסיים את המשחק.
+            השם יישמר אצלך בדפדפן ויופיע בטבלת השיאים אם תגיע לטופ 10.
           </p>
         </div>
 
@@ -463,7 +543,7 @@ function NameScreen({
         />
         {error && <p className="text-sm text-rose-400 mb-2 text-center">{error}</p>}
         <p className="text-[11px] text-muted-foreground text-center mb-5">
-          🛡️ שמות עם קללות או מילים פוגעניות נחסמים אוטומטית.
+          🛡️ שמות עם קללות, ג׳יבריש או רצף מספרים נחסמים אוטומטית.
         </p>
 
         <div className="flex gap-3">
@@ -493,7 +573,9 @@ function StartScreen({
 }: {
   onStart: () => void; muted: boolean; onToggleMute: () => void; playerName: string;
 }) {
-  const leaderboard = useMemo(() => getLeaderboard(playerName), [playerName]);
+  const [version, setVersion] = useState(0); // re-render אחרי מחיקת אדמין
+  const leaderboard = useMemo(() => getLeaderboard(playerName), [playerName, version]);
+  const admin = isAdmin(playerName);
 
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 py-10">
@@ -505,10 +587,6 @@ function StartScreen({
         </div>
 
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass mb-5 text-xs sm:text-sm font-semibold animate-slide-up">
-            <Sparkles className="w-3.5 h-3.5 text-[var(--brand-2)]" />
-            <span>משחק טריוויה • 15 שאלות</span>
-          </div>
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold leading-tight mb-4 text-gradient-shine animate-slide-up">
             איך יצרו את המחשב הראשון?
           </h1>
@@ -528,15 +606,20 @@ function StartScreen({
           </button>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-2 mb-8 animate-fade-in">
-          {["טיימר לכל שאלה", "שאלות קשות x2 ניקוד", "קומבו ו־XP", "טבלת שיאים מקומית", "הסבר אחרי כל שאלה"].map((t) => (
-            <span key={t} className="glass px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium">
-              {t}
+        {admin && (
+          <div className="mb-4 glass-strong rounded-2xl p-3 text-center border border-amber-400/40 animate-fade-in">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300">
+              <ShieldCheck className="w-4 h-4" />
+              מצב אדמין פעיל — אפשר להעיף שחקנים מהטבלה
             </span>
-          ))}
-        </div>
+          </div>
+        )}
 
-        <Leaderboard entries={leaderboard} />
+        <Leaderboard
+          entries={leaderboard}
+          admin={admin}
+          onRemove={(name) => { removeFromLeaderboard(name); setVersion((v) => v + 1); }}
+        />
       </div>
     </div>
   );
@@ -544,22 +627,26 @@ function StartScreen({
 
 // ============ END SCREEN ============
 function EndScreen({
-  score, correct, total, maxCombo, xp, playerName, onRestart, onHome, muted, onToggleMute,
+  score, correct, total, maxCombo, xp, playerName, qualified,
+  onRestart, onHome, muted, onToggleMute,
 }: {
   score: number; correct: number; total: number; maxCombo: number; xp: number;
-  playerName: string;
+  playerName: string; qualified: boolean;
   onRestart: () => void; onHome: () => void; muted: boolean; onToggleMute: () => void;
 }) {
   const pct = (correct / total) * 100;
+  const [version, setVersion] = useState(0);
   const { title, msg, emoji } = useMemo(() => {
     if (pct === 100) return { title: "מושלם!", msg: "ענית נכון על כל השאלות. אגדה!", emoji: "👑" };
     if (pct >= 80) return { title: "מצוין!", msg: "ידע מרשים בהיסטוריה של המחשבים.", emoji: "🏆" };
     if (pct >= 60) return { title: "כל הכבוד!", msg: "תוצאה יפה — עוד קצת ואתה מומחה.", emoji: "⭐" };
     if (pct >= 40) return { title: "לא רע", msg: "יש על מה לבנות. נסה שוב!", emoji: "💪" };
-    return { title: "נסה שוב", msg: "כל מאסטר התחיל איפשהו. קדימה!", emoji: "🚀" };
+    return { title: "תמשיך להתאמן", msg: "כל מאסטר התחיל איפשהו. קדימה!", emoji: "🚀" };
   }, [pct]);
 
-  const leaderboard = useMemo(() => getLeaderboard(playerName), [playerName, score]);
+  const leaderboard = useMemo(() => getLeaderboard(playerName), [playerName, score, version]);
+  const admin = isAdmin(playerName);
+  const myRank = leaderboard.findIndex((e) => e.isYou) + 1;
 
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 py-10">
@@ -570,10 +657,20 @@ function EndScreen({
         <div className="text-7xl sm:text-8xl mb-4 float-slow">{emoji}</div>
         <h1 className="text-4xl sm:text-6xl font-extrabold mb-3 text-gradient-shine">{title}</h1>
         <p className="text-base sm:text-lg text-muted-foreground mb-6">{msg}</p>
+
         {playerName && (
-          <p className="text-sm sm:text-base mb-4">
-            כל הכבוד <span className="font-bold text-[var(--brand-2)]">{playerName}</span>!
-            הציון נשמר ויופיע בטבלת השיאים. 🎉
+          <p className="text-sm sm:text-base mb-4 animate-fade-in">
+            {qualified ? (
+              <>
+                כל הכבוד <span className="font-bold text-[var(--brand-2)]">{playerName}</span>! 🎉
+                <span className="block mt-1">הציון נשמר ותופיע{myRank > 0 ? ` במקום #${myRank}` : ""} בטבלת השיאים.</span>
+              </>
+            ) : (
+              <>
+                <span className="font-bold text-[var(--brand-2)]">{playerName}</span>, תמשיך להתאמן 💪
+                <span className="block mt-1 text-muted-foreground">הציון לא מספיק לטופ 10 הפעם — נסה שוב!</span>
+              </>
+            )}
           </p>
         )}
 
@@ -595,12 +692,17 @@ function EndScreen({
             שחק שוב
           </button>
           <button onClick={onHome} className="glass inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-lg font-semibold hover:scale-[1.03] transition">
-            <ChevronLeft className="w-5 h-5" />
-            למסך הראשי
+            <Home className="w-5 h-5" />
+            לדף הבית
           </button>
         </div>
 
-        <Leaderboard entries={leaderboard} />
+        <Leaderboard
+          entries={leaderboard}
+          admin={admin}
+          highlight
+          onRemove={(name) => { removeFromLeaderboard(name); setVersion((v) => v + 1); }}
+        />
       </div>
     </div>
   );
@@ -616,7 +718,11 @@ function StatBox({ label, value, color }: { label: string; value: string; color:
 }
 
 // ============ LEADERBOARD ============
-function Leaderboard({ entries }: { entries: LeaderEntry[] }) {
+function Leaderboard({
+  entries, admin, highlight, onRemove,
+}: {
+  entries: LeaderEntry[]; admin?: boolean; highlight?: boolean; onRemove?: (name: string) => void;
+}) {
   return (
     <div className="glass-strong rounded-3xl p-5 sm:p-7 soft-glow text-right">
       <div className="flex items-center justify-between mb-5">
@@ -630,7 +736,7 @@ function Leaderboard({ entries }: { entries: LeaderEntry[] }) {
         {entries.map((p, i) => {
           const isFirst = i === 0;
           const icon =
-            i === 0 ? <Crown className="w-5 h-5 text-amber-400" /> :
+            i === 0 ? <Crown className="w-5 h-5 text-amber-400 animate-pop" /> :
             i === 1 ? <Medal className="w-5 h-5 text-slate-300" /> :
             i === 2 ? <Medal className="w-5 h-5 text-orange-400" /> :
             <Award className="w-4 h-4 text-muted-foreground" />;
@@ -638,13 +744,14 @@ function Leaderboard({ entries }: { entries: LeaderEntry[] }) {
             <li
               key={p.name + i}
               className={`
-                flex items-center justify-between gap-3 p-3 rounded-2xl transition-all
+                flex items-center justify-between gap-3 p-3 rounded-2xl transition-all animate-slide-up
                 ${isFirst
                   ? "bg-gradient-to-l from-amber-500/15 via-amber-400/10 to-transparent border border-amber-400/30 shadow-[0_0_20px_-5px_rgba(251,191,36,0.4)]"
                   : p.isYou
-                    ? "bg-gradient-to-l from-[var(--brand)]/20 to-transparent border border-[var(--brand)]/40"
+                    ? `bg-gradient-to-l from-[var(--brand)]/25 to-transparent border border-[var(--brand)]/50 ${highlight ? "shadow-[0_0_25px_-5px_rgba(167,139,250,0.6)] animate-pop" : ""}`
                     : "bg-white/[0.03] border border-white/5 hover:bg-white/[0.06]"}
               `}
+              style={{ animationDelay: `${i * 40}ms` }}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 font-bold text-sm shrink-0">
@@ -660,13 +767,24 @@ function Leaderboard({ entries }: { entries: LeaderEntry[] }) {
                   )}
                 </span>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-white/5 text-muted-foreground font-medium hidden sm:inline">
                   {p.level}
                 </span>
                 <span className="font-bold tabular-nums text-sm sm:text-base">
                   {p.score.toLocaleString()}
                 </span>
+                {admin && !p.isYou && onRemove && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`להעיף את "${p.name}" מהטבלה?`)) onRemove(p.name);
+                    }}
+                    className="ml-1 p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-300 transition"
+                    aria-label="הסר מהטבלה"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </li>
           );
