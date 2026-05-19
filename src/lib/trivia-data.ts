@@ -247,20 +247,49 @@ export const LEADERBOARD = BASE_LEADERBOARD;
 
 const STORAGE_KEY = "trivia.scores.v1";
 const NAME_KEY = "trivia.player.name";
+const BLACKLIST_KEY = "trivia.blacklist.v1";
+export const ADMIN_NAME = "Tom_1264";
 
-// פילטר קללות / שמות לא ראויים (עברית + אנגלית בסיסי)
+// פילטר קללות / שמות לא ראויים (עברית + אנגלית מורחב)
 const BAD_WORDS = [
+  // עברית
   "כוס", "זין", "בן זונה", "בן זונא", "מניאק", "חרא", "פיפי", "קקי",
   "נאצי", "היטלר", "שרמוטה", "זונה", "מטומטם", "אידיוט", "דביל",
+  "אשך", "אשכים", "ביצים", "פות", "תחת", "שמן", "הומו", "לסבית",
+  "יתרת", "טמבל", "פתי", "מפגר", "חולה נפש", "מסטול", "סמים",
+  "אונס", "אנס", "להרוג", "מוות", "מתאבד", "לעזאזל",
+  // אנגלית
   "fuck", "shit", "bitch", "nigger", "nigga", "ass", "dick", "porn",
-  "sex", "nazi", "hitler", "cunt", "fag",
+  "sex", "nazi", "hitler", "cunt", "fag", "rape", "kill", "suicide",
+  "penis", "vagina", "boobs", "tits", "whore", "slut",
 ];
+
+// פילטר ג׳יבריש: רצף אותיות חסר משמעות / רק מספרים / רק אות שחוזרת
+function isGibberish(name: string): boolean {
+  const n = name.trim();
+  if (!n) return true;
+  // רק מספרים / רק סימנים
+  if (/^[\d\W_]+$/.test(n)) return true;
+  // אות אחת חוזרת 3+ פעמים ברצף (אאא, bbb)
+  if (/(.)\1{2,}/.test(n)) return true;
+  // יותר מ־50% מספרים
+  const digits = (n.match(/\d/g) || []).length;
+  if (digits / n.length > 0.5) return true;
+  // רצף ארוך של עיצורים ללא תנועה (אנגלית) — לדוגמה "qwrty"
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(n)) return true;
+  // רק 2 אותיות שונות לאורך 5+ תווים (סוג של "אבאבא")
+  const uniq = new Set(n.replace(/\s/g, "")).size;
+  if (n.replace(/\s/g, "").length >= 5 && uniq <= 2) return true;
+  return false;
+}
 
 export function isNameClean(name: string): boolean {
   const n = name.trim().toLowerCase();
   if (!n) return false;
   if (n.length < 2 || n.length > 20) return false;
-  return !BAD_WORDS.some((w) => n.includes(w.toLowerCase()));
+  if (BAD_WORDS.some((w) => n.includes(w.toLowerCase()))) return false;
+  if (isGibberish(name)) return false;
+  return true;
 }
 
 export function sanitizeName(name: string): string {
@@ -337,16 +366,56 @@ function levelLabel(score: number): string {
   return "מתחיל";
 }
 
+// ===== Blacklist (לאדמין בלבד) =====
+function readBlacklist(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(BLACKLIST_KEY);
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeBlacklist(list: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(BLACKLIST_KEY, JSON.stringify(list));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isAdmin(name: string): boolean {
+  return sanitizeName(name) === ADMIN_NAME;
+}
+
+export function removeFromLeaderboard(name: string) {
+  // מוסיף לרשימה השחורה (גם BASE וגם saved יוסתרו)
+  const list = readBlacklist();
+  if (!list.includes(name)) list.push(name);
+  writeBlacklist(list);
+  // מוחק גם מהשמורים
+  const saved = readSaved().filter((s) => s.name !== name);
+  writeSaved(saved);
+}
+
 export function getLeaderboard(currentPlayer?: string): LeaderEntry[] {
-  const saved = readSaved().map<LeaderEntry>((s) => ({
-    name: s.name,
-    score: s.score,
-    level: levelLabel(s.score),
-    isYou: !!currentPlayer && s.name === currentPlayer,
-  }));
+  const blacklist = new Set(readBlacklist());
+  const saved = readSaved()
+    .filter((s) => !blacklist.has(s.name) && isNameClean(s.name))
+    .map<LeaderEntry>((s) => ({
+      name: s.name,
+      score: s.score,
+      level: levelLabel(s.score),
+      isYou: !!currentPlayer && s.name === currentPlayer,
+    }));
+  const base = BASE_LEADERBOARD.filter((e) => !blacklist.has(e.name));
   // מיזוג: מסירים כפילויות לפי שם, מעדיפים את הגבוה
   const byName = new Map<string, LeaderEntry>();
-  for (const e of [...BASE_LEADERBOARD, ...saved]) {
+  for (const e of [...base, ...saved]) {
     const prev = byName.get(e.name);
     if (!prev || e.score > prev.score) byName.set(e.name, e);
     else if (e.isYou) byName.set(e.name, { ...prev, isYou: true });
@@ -355,3 +424,46 @@ export function getLeaderboard(currentPlayer?: string): LeaderEntry[] {
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
 }
+
+// בודק האם הניקוד מספיק לטופ 10 (לפני שמירה)
+export function qualifiesForLeaderboard(score: number): boolean {
+  if (score <= 0) return false;
+  const top = getLeaderboard();
+  if (top.length < 10) return true;
+  const lowest = top[top.length - 1].score;
+  return score > lowest;
+}
+
+// ===== Dev-only validator: השאלות מבוססות על נושאי עבודת החקר =====
+// נושאי הליבה לפי הטקסט של תום, אילאיי, דור, דניאל ויובל.
+const SOURCE_KEYWORDS = [
+  "z1", "צוזה", "קונראד", "ברלין", "בינארי", "מכני", "לוחיות",
+  "eniac", "טון", "מחשב", "מחשבים", "תוכנ", "גרפיק", "בינה",
+  "vr", "מציאות", "פיקסל", "משחק", "התפת", "1936", "1938", "1943",
+  "חישוב", "אלקטרוני", "מהיר", "איטי", "ענק", "סמארטפון",
+];
+
+export function validateQuestionsAgainstSource(): { ok: boolean; issues: string[] } {
+  const issues: string[] = [];
+  for (const q of QUESTIONS) {
+    const blob = (q.q + " " + q.options.join(" ") + " " + q.explanation).toLowerCase();
+    const hits = SOURCE_KEYWORDS.filter((k) => blob.includes(k.toLowerCase()));
+    if (hits.length < 2) {
+      issues.push(`שאלה לא קשורה מספיק לטקסט: "${q.q}"`);
+    }
+  }
+  return { ok: issues.length === 0, issues };
+}
+
+// בדיקה אוטומטית בזמן פיתוח — אם משהו לא מתאים, יודפס לקונסול
+if (typeof window !== "undefined" && import.meta.env.DEV) {
+  const r = validateQuestionsAgainstSource();
+  if (!r.ok) {
+    // eslint-disable-next-line no-console
+    console.warn("[trivia validator] פריטים לא תקינים:", r.issues);
+  } else {
+    // eslint-disable-next-line no-console
+    console.info("[trivia validator] ✓ כל השאלות עוברות בדיקה");
+  }
+}
+

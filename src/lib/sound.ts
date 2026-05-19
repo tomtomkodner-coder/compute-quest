@@ -1,66 +1,83 @@
-// Web Audio API helpers — no external files needed
+// Web Audio API helpers — Kahoot-style punchy SFX, no external files
 let ctx: AudioContext | null = null;
+let masterMuted = false;
 
 function getCtx() {
   if (typeof window === "undefined") return null;
   if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  // resume on user gesture (autoplay policy)
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
   return ctx;
 }
 
+export function setMuted(v: boolean) {
+  masterMuted = v;
+  if (v) stopMusic();
+}
+
 export function playTone(freq: number, duration = 0.15, type: OscillatorType = "square", volume = 0.15) {
+  if (masterMuted) return;
   const ac = getCtx();
   if (!ac) return;
   const osc = ac.createOscillator();
   const gain = ac.createGain();
   osc.type = type;
   osc.frequency.value = freq;
-  gain.gain.value = volume;
+  gain.gain.setValueAtTime(volume, ac.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + duration);
   osc.connect(gain).connect(ac.destination);
   osc.start();
   osc.stop(ac.currentTime + duration);
 }
 
+// Kahoot-style "ding!" — bright triangle chord, fast attack
 export function sfxCorrect() {
-  playTone(660, 0.1, "square");
-  setTimeout(() => playTone(880, 0.15, "square"), 90);
-  setTimeout(() => playTone(1320, 0.2, "square"), 200);
+  if (masterMuted) return;
+  playTone(784, 0.12, "triangle", 0.22);   // G5
+  setTimeout(() => playTone(1047, 0.14, "triangle", 0.22), 80);  // C6
+  setTimeout(() => playTone(1568, 0.22, "triangle", 0.22), 170); // G6
 }
 
+// Kahoot-style "buzz!" — descending sawtooth
 export function sfxWrong() {
-  playTone(200, 0.2, "sawtooth", 0.2);
-  setTimeout(() => playTone(110, 0.3, "sawtooth", 0.2), 150);
+  if (masterMuted) return;
+  playTone(330, 0.18, "sawtooth", 0.22);
+  setTimeout(() => playTone(220, 0.22, "sawtooth", 0.22), 120);
+  setTimeout(() => playTone(146, 0.28, "sawtooth", 0.2), 260);
 }
 
 export function sfxClick() {
-  playTone(800, 0.05, "square", 0.1);
+  playTone(900, 0.05, "triangle", 0.12);
 }
 
 export function sfxTick() {
-  playTone(1200, 0.03, "square", 0.05);
+  playTone(1400, 0.04, "square", 0.06);
+}
+
+export function sfxSkip() {
+  playTone(520, 0.08, "triangle", 0.12);
+  setTimeout(() => playTone(380, 0.1, "triangle", 0.12), 60);
 }
 
 export function sfxWin() {
-  const notes = [523, 659, 784, 1047, 1319];
-  notes.forEach((n, i) => setTimeout(() => playTone(n, 0.2, "square", 0.18), i * 120));
+  const notes = [523, 659, 784, 1047, 1319, 1568];
+  notes.forEach((n, i) => setTimeout(() => playTone(n, 0.22, "triangle", 0.2), i * 110));
 }
 
-// Background music loop — simple chiptune arpeggio
+// Background music loop — soft chiptune
 let musicInterval: number | null = null;
 let musicStep = 0;
 export function startMusic() {
+  if (masterMuted) return;
   if (musicInterval) return;
   const ac = getCtx();
   if (!ac) return;
   const bass = [110, 110, 146, 130];
   const lead = [220, 277, 330, 415, 330, 277, 220, 277];
   musicInterval = window.setInterval(() => {
-    const a = getCtx();
-    if (!a) return;
-    // bass
-    if (musicStep % 4 === 0) playTone(bass[(musicStep / 4) % bass.length], 0.3, "triangle", 0.05);
-    // lead
-    playTone(lead[musicStep % lead.length], 0.12, "square", 0.025);
+    if (masterMuted) return;
+    if (musicStep % 4 === 0) playTone(bass[(musicStep / 4) % bass.length], 0.3, "triangle", 0.04);
+    playTone(lead[musicStep % lead.length], 0.12, "square", 0.02);
     musicStep++;
   }, 220);
 }
