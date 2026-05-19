@@ -247,20 +247,49 @@ export const LEADERBOARD = BASE_LEADERBOARD;
 
 const STORAGE_KEY = "trivia.scores.v1";
 const NAME_KEY = "trivia.player.name";
+const BLACKLIST_KEY = "trivia.blacklist.v1";
+export const ADMIN_NAME = "Tom_1264";
 
-// פילטר קללות / שמות לא ראויים (עברית + אנגלית בסיסי)
+// פילטר קללות / שמות לא ראויים (עברית + אנגלית מורחב)
 const BAD_WORDS = [
+  // עברית
   "כוס", "זין", "בן זונה", "בן זונא", "מניאק", "חרא", "פיפי", "קקי",
   "נאצי", "היטלר", "שרמוטה", "זונה", "מטומטם", "אידיוט", "דביל",
+  "אשך", "אשכים", "ביצים", "פות", "תחת", "שמן", "הומו", "לסבית",
+  "יתרת", "טמבל", "פתי", "מפגר", "חולה נפש", "מסטול", "סמים",
+  "אונס", "אנס", "להרוג", "מוות", "מתאבד", "לעזאזל",
+  // אנגלית
   "fuck", "shit", "bitch", "nigger", "nigga", "ass", "dick", "porn",
-  "sex", "nazi", "hitler", "cunt", "fag",
+  "sex", "nazi", "hitler", "cunt", "fag", "rape", "kill", "suicide",
+  "penis", "vagina", "boobs", "tits", "whore", "slut",
 ];
+
+// פילטר ג׳יבריש: רצף אותיות חסר משמעות / רק מספרים / רק אות שחוזרת
+function isGibberish(name: string): boolean {
+  const n = name.trim();
+  if (!n) return true;
+  // רק מספרים / רק סימנים
+  if (/^[\d\W_]+$/.test(n)) return true;
+  // אות אחת חוזרת 3+ פעמים ברצף (אאא, bbb)
+  if (/(.)\1{2,}/.test(n)) return true;
+  // יותר מ־50% מספרים
+  const digits = (n.match(/\d/g) || []).length;
+  if (digits / n.length > 0.5) return true;
+  // רצף ארוך של עיצורים ללא תנועה (אנגלית) — לדוגמה "qwrty"
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/i.test(n)) return true;
+  // רק 2 אותיות שונות לאורך 5+ תווים (סוג של "אבאבא")
+  const uniq = new Set(n.replace(/\s/g, "")).size;
+  if (n.replace(/\s/g, "").length >= 5 && uniq <= 2) return true;
+  return false;
+}
 
 export function isNameClean(name: string): boolean {
   const n = name.trim().toLowerCase();
   if (!n) return false;
   if (n.length < 2 || n.length > 20) return false;
-  return !BAD_WORDS.some((w) => n.includes(w.toLowerCase()));
+  if (BAD_WORDS.some((w) => n.includes(w.toLowerCase()))) return false;
+  if (isGibberish(name)) return false;
+  return true;
 }
 
 export function sanitizeName(name: string): string {
