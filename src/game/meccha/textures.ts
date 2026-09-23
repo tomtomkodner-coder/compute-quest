@@ -401,3 +401,242 @@ export const splat = () => {
   const t = new THREE.CanvasTexture(c);
   return t;
 };
+
+// ---------- טקסטורות למפות נוספות ----------
+
+/** רעש עדין מעל צבע בסיס (שטיח, בטון, קיר צבוע) */
+export const noise = (base: string, amount = 0.08, seed = 1, speck = 1400) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < speck; i++) {
+      const v = (r() - 0.5) * amount * 2;
+      g.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`;
+      g.fillRect(r() * w, r() * h, 1 + r() * 3, 1 + r() * 3);
+    }
+  });
+
+/** טפט צהוב של הבקרומס — פסים עדינים ודוגמת חצים */
+export const backroomsWall = () =>
+  makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = "#c2b35f";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "rgba(120,100,30,0.16)";
+    for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 3, h);
+    g.strokeStyle = "rgba(110,95,30,0.18)";
+    g.lineWidth = 2;
+    for (let y = 16; y < h; y += 32)
+      for (let x = 16; x < w; x += 32) {
+        g.beginPath();
+        g.moveTo(x - 5, y + 4);
+        g.lineTo(x, y - 4);
+        g.lineTo(x + 5, y + 4);
+        g.stroke();
+      }
+  });
+
+export const fluorescent = () =>
+  makeTex(128, 64, (g, w, h) => {
+    g.fillStyle = "#d9d3b0";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "#fffbe6";
+    g.fillRect(8, 8, w - 16, h - 16);
+    g.strokeStyle = "rgba(0,0,0,0.12)";
+    g.lineWidth = 2;
+    for (let x = 8; x < w; x += 20) { g.beginPath(); g.moveTo(x, 8); g.lineTo(x, h - 8); g.stroke(); }
+  });
+
+export const concrete = (base = "#8d8d86", seed = 4) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 60; i++) {
+      g.fillStyle = `rgba(0,0,0,${0.03 + r() * 0.07})`;
+      g.beginPath();
+      g.ellipse(r() * w, r() * h, 6 + r() * 30, 4 + r() * 20, r() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.strokeStyle = "rgba(0,0,0,0.25)";
+    g.lineWidth = 2;
+    g.strokeRect(0, 0, w, h);
+  });
+
+export const graffiti = (seed = 2) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = "#6b6f63";
+    g.fillRect(0, 0, w, h);
+    const bw = w / 4, bh = h / 8;
+    for (let y = 0; y < 8; y++)
+      for (let x = -1; x < 5; x++) {
+        g.fillStyle = `rgba(${90 + r() * 30},${92 + r() * 25},${80 + r() * 20},1)`;
+        g.fillRect(x * bw + (y % 2) * (bw / 2) + 2, y * bh + 2, bw - 4, bh - 4);
+      }
+    const cols = ["#ff3d7f", "#3df2ff", "#ffe53d", "#7dff3d", "#b43dff", "#ff8a3d"];
+    for (let i = 0; i < 5; i++) {
+      g.strokeStyle = cols[Math.floor(r() * cols.length)];
+      g.lineWidth = 8 + r() * 10;
+      g.lineCap = "round";
+      g.beginPath();
+      let x = r() * w, y = r() * h;
+      g.moveTo(x, y);
+      for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 120; y += (r() - 0.5) * 80; g.lineTo(x, y); }
+      g.stroke();
+    }
+  });
+
+export const hay = () =>
+  makeTex(128, 128, (g, w, h) => {
+    const r = rng(8);
+    g.fillStyle = "#d9b44a";
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++) {
+      g.strokeStyle = ["#e8c867", "#b8922e", "#f2d98b"][Math.floor(r() * 3)];
+      g.lineWidth = 1 + r();
+      const x = r() * w, y = r() * h, a = (r() - 0.5) * 0.6;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 18, y + Math.sin(a) * 18); g.stroke();
+    }
+  });
+
+/** שמיים מצוירים עם עננים (קיר הרקע של Indoor Country) */
+export const skyMural = () =>
+  makeTex(512, 256, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, "#5fb6ff");
+    grd.addColorStop(1, "#bfe6ff");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    const r = rng(12);
+    g.fillStyle = "#ffffff";
+    for (let i = 0; i < 9; i++) {
+      const x = r() * w, y = 30 + r() * (h * 0.5), s = 18 + r() * 22;
+      for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x + k * s * 0.8, y + Math.sin(k) * 6, s, 0, Math.PI * 2); g.fill(); }
+    }
+    g.fillStyle = "#7ccf5a";
+    g.beginPath();
+    g.moveTo(0, h);
+    for (let x = 0; x <= w; x += 16) g.lineTo(x, h - 40 - Math.sin(x / 60) * 18);
+    g.lineTo(w, h);
+    g.fill();
+  });
+
+export const barnRed = () =>
+  makeTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#b3261e";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "rgba(0,0,0,0.18)";
+    for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 2, h);
+    g.strokeStyle = "#f5f0e6";
+    g.lineWidth = 8;
+    g.strokeRect(4, 4, w - 8, h - 8);
+    g.beginPath(); g.moveTo(8, 8); g.lineTo(w - 8, h - 8); g.moveTo(w - 8, 8); g.lineTo(8, h - 8); g.stroke();
+  });
+
+/** קרטון-עומד של פרה / תרנגולת */
+export const standee = (kind: "cow" | "chicken") =>
+  makeTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    if (kind === "cow") {
+      g.fillStyle = "#ffffff";
+      g.beginPath(); g.ellipse(64, 70, 50, 32, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#1c1c1c";
+      g.beginPath(); g.ellipse(48, 62, 14, 10, 0.4, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(84, 80, 12, 9, -0.3, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#f2a7b8";
+      g.beginPath(); g.ellipse(22, 52, 14, 12, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#ffffff";
+      for (const x of [34, 54, 78, 98]) g.fillRect(x, 96, 8, 26);
+    } else {
+      g.fillStyle = "#fafafa";
+      g.beginPath(); g.ellipse(64, 76, 36, 30, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(80, 42, 18, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#e53935";
+      g.beginPath(); g.arc(80, 22, 7, 0, Math.PI * 2); g.arc(88, 25, 6, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#ffb300";
+      g.beginPath(); g.moveTo(96, 42); g.lineTo(110, 46); g.lineTo(96, 50); g.fill();
+      g.fillRect(56, 104, 5, 18); g.fillRect(70, 104, 5, 18);
+    }
+  });
+
+export const candyStripe = (a = "#ff5c8a", b = "#ffffff") =>
+  makeTex(128, 128, (g, w, h) => {
+    g.fillStyle = b;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = a;
+    for (let i = -h; i < w; i += 32) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 16, 0); g.lineTo(i + 16 + h, h); g.lineTo(i + h, h); g.fill();
+    }
+  });
+
+export const gingerbread = () =>
+  makeTex(128, 128, (g, w, h) => {
+    const r = rng(21);
+    g.fillStyle = "#b8743d";
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 80; i++) { g.fillStyle = `rgba(90,45,15,${0.1 + r() * 0.15})`; g.fillRect(r() * w, r() * h, 2, 2); }
+    g.strokeStyle = "#fff6f0";
+    g.lineWidth = 5;
+    g.beginPath();
+    for (let x = 0; x <= w; x += 16) g.lineTo(x, 12 + (x / 16) % 2 * 8);
+    g.stroke();
+    g.beginPath();
+    for (let x = 0; x <= w; x += 16) g.lineTo(x, h - 12 - (x / 16) % 2 * 8);
+    g.stroke();
+  });
+
+export const chocolate = () =>
+  makeTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#5b3421";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "#6f412a";
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) g.fillRect(x * 32 + 4, y * 32 + 4, 24, 24);
+  });
+
+export const snowTile = () => tiles("#eef6fb", "#d5e7f2", 6, "rgba(90,130,160,0.25)");
+
+export const penguinPattern = () =>
+  makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = "#9fd3ef";
+    g.fillRect(0, 0, w, h);
+    const s = 64;
+    for (let y = 0; y < 4; y++)
+      for (let x = 0; x < 4; x++) {
+        const cx = x * s + s / 2 + (y % 2) * 16, cy = y * s + s / 2;
+        g.fillStyle = "#1d2b3a";
+        g.beginPath(); g.ellipse(cx, cy, 12, 18, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#ffffff";
+        g.beginPath(); g.ellipse(cx, cy + 3, 7, 12, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#ffb300";
+        g.beginPath(); g.moveTo(cx - 3, cy - 10); g.lineTo(cx + 3, cy - 10); g.lineTo(cx, cy - 6); g.fill();
+      }
+  });
+
+/** שלט רחוב יפני (אוסקה) */
+export const signboard = (bg: string, fg: string, text: string, w = 256, h = 96) =>
+  makeTex(w, h, (g) => {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    g.strokeStyle = fg;
+    g.lineWidth = 6;
+    g.strokeRect(5, 5, w - 10, h - 10);
+    g.fillStyle = fg;
+    g.font = `bold ${Math.floor(h * 0.55)}px "M PLUS Rounded 1c", "Hiragino Sans", sans-serif`;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(text, w / 2, h / 2 + 2);
+  });
+
+export const asphalt = () => noise("#4a4a4f", 0.12, 9, 2400);
+
+export const shutter = () =>
+  makeTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#9aa1a6";
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 8) { g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(0, y, w, 2); g.fillStyle = "rgba(255,255,255,0.2)"; g.fillRect(0, y + 2, w, 1); }
+  });
+
+export const trashBag = () => noise("#1f1f24", 0.18, 3, 900);
+
+export const whiteTile = () => tiles("#f4f4f2", "#eceae6", 8, "rgba(0,0,0,0.12)");
