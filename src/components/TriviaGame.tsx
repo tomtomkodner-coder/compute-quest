@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import confetti from "canvas-confetti";
 import {
   Crown, Trophy, Medal, Zap, Flame, Timer, Volume2, VolumeX,
@@ -604,6 +605,14 @@ function StartScreen({
             <Play className="w-6 h-6 fill-current" />
             {playerName ? `המשך בתור ${playerName}` : "התחל משחק"}
           </button>
+          <div className="mt-4">
+            <Link
+              to="/chameleon"
+              className="glass inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base sm:text-lg font-bold hover:scale-105 transition animate-fade-in"
+            >
+              🦎 משחק חדש: הזיקית המציירת
+            </Link>
+          </div>
         </div>
 
         {admin && (
