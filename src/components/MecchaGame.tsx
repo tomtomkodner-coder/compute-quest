@@ -316,10 +316,10 @@ function GameView({
                 ))}
               </div>
               <div className="flex gap-1.5 pointer-events-auto">
-                <button onClick={() => e?.togglePaint()} className={`hud-btn px-4 gap-1.5 font-bold ${hud.paintMode ? "!bg-emerald-500/60" : ""}`}>
-                  <Paintbrush className="w-4 h-4" /> {hud.paintMode ? "סיום צביעה" : "צביעה (F)"}
+                <button onClick={() => e?.togglePaint()} className={`hud-btn px-3 sm:px-4 gap-1.5 font-bold ${hud.paintMode ? "!bg-emerald-500/60" : ""}`}>
+                  <Paintbrush className="w-4 h-4" /> {hud.paintMode ? "סיום צביעה" : <>צביעה<span className="hidden md:inline"> (F)</span></>}
                 </button>
-                <button onClick={() => e?.toggleSeekerView()} className={`hud-btn px-4 gap-1.5 font-bold ${hud.seekerView ? "!bg-amber-500/60" : ""}`}>
+                <button onClick={() => e?.toggleSeekerView()} className={`hud-btn px-3 sm:px-4 gap-1.5 font-bold ${hud.seekerView ? "!bg-amber-500/60" : ""}`}>
                   <Eye className="w-4 h-4" /> מבט השומר
                 </button>
                 {hud.phase === "prep" && (

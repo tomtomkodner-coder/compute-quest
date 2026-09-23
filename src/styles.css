@@ -191,6 +191,7 @@
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     color: white;
+    white-space: nowrap;
     transition: transform 0.15s ease, background 0.15s ease;
   }
   .hud-btn:active { transform: scale(0.95); }
