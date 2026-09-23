@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { paintable, type PaintTex } from "./textures";
 
-export type PoseId = "stand" | "crouch" | "ball" | "flat" | "pillar" | "star";
+export type PoseId = "stand" | "crouch" | "ball" | "flat" | "sit" | "pillar" | "star" | "tpose";
 export type SizeId = "petite" | "normal" | "plump";
 
 export const POSES: { id: PoseId; label: string; emoji: string }[] = [
@@ -10,14 +10,16 @@ export const POSES: { id: PoseId; label: string; emoji: string }[] = [
   { id: "crouch", label: "כריעה", emoji: "🧎" },
   { id: "ball", label: "כדור", emoji: "⚪" },
   { id: "flat", label: "שכיבה", emoji: "🛌" },
+  { id: "sit", label: "ישיבה", emoji: "🪑" },
   { id: "pillar", label: "עמוד", emoji: "🙌" },
   { id: "star", label: "כוכב", emoji: "⭐" },
+  { id: "tpose", label: "T", emoji: "✝️" },
 ];
 
 export const SIZES: { id: SizeId; label: string; scale: [number, number, number] }[] = [
-  { id: "petite", label: "קטנטן", scale: [0.72, 0.72, 0.72] },
+  { id: "petite", label: "קטן", scale: [0.62, 0.62, 0.62] },
   { id: "normal", label: "רגיל", scale: [1, 1, 1] },
-  { id: "plump", label: "שמנמן", scale: [1.3, 0.95, 1.3] },
+  { id: "plump", label: "גדול", scale: [1.35, 1.25, 1.35] },
 ];
 
 export interface Part {
@@ -31,14 +33,15 @@ export interface Character {
   parts: Part[];
   meshes: THREE.Mesh[];
   armL: THREE.Group; armR: THREE.Group; legL: THREE.Group; legR: THREE.Group; head: THREE.Group;
-  hammer: THREE.Group | null;
+  gun: THREE.Group | null;
+  label: THREE.Sprite | null;
   pose: PoseId;
   size: SizeId;
   walkPhase: number;
   isSeeker: boolean;
 }
 
-export function buildCharacter(opts: { seeker?: boolean; baseColor?: string } = {}): Character {
+export function buildCharacter(opts: { seeker?: boolean; baseColor?: string; accent?: string } = {}): Character {
   const seeker = !!opts.seeker;
   const base = opts.baseColor ?? (seeker ? "#3d2c8d" : "#f2f2f2");
   const root = new THREE.Group();
@@ -99,24 +102,31 @@ export function buildCharacter(opts: { seeker?: boolean; baseColor?: string } = 
   const legL = limb(0.18, 0.5, 0.13, 0.3);
   const legR = limb(-0.18, 0.5, 0.13, 0.3);
 
-  let hammer: THREE.Group | null = null;
+  let gun: THREE.Group | null = null;
   if (seeker) {
-    hammer = new THREE.Group();
-    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 8), new THREE.MeshStandardMaterial({ color: "#8d5524" }));
-    handle.position.y = 0.2;
-    const headM = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.55, 16), new THREE.MeshStandardMaterial({ color: "#ff006e" }));
-    headM.rotation.z = Math.PI / 2;
-    headM.position.y = 0.75;
-    handle.castShadow = headM.castShadow = true;
-    hammer.add(handle, headM);
-    hammer.position.set(0, -0.7, 0.1);
-    hammer.rotation.x = Math.PI / 2;
-    armR.add(hammer);
+    // רובה צבע (שוטגאן) — מוחזק בשתי ידיים
+    gun = new THREE.Group();
+    const dark = new THREE.MeshStandardMaterial({ color: "#2b2d42", roughness: 0.5, metalness: 0.4 });
+    const tank = new THREE.MeshStandardMaterial({ color: opts.accent ?? "#ff006e", roughness: 0.3 });
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.9, 10), dark);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0, 0.35);
+    const body2 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.5), dark);
+    body2.position.set(0, -0.02, -0.1);
+    const canister = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), tank);
+    canister.position.set(0, 0.17, -0.05);
+    const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.25, 10), tank);
+    pump.rotation.x = Math.PI / 2;
+    pump.position.set(0, -0.08, 0.35);
+    for (const m of [barrel, body2, canister, pump]) { m.castShadow = true; gun.add(m); }
+    gun.position.set(-0.18, 1.18, 0.42);
+    gun.name = "gun";
+    body.add(gun);
   }
 
   const ch: Character = {
     root, body, parts, meshes: parts.map((p) => p.mesh),
-    armL, armR, legL, legR, head, hammer,
+    armL, armR, legL, legR, head, gun, label: null,
     pose: "stand", size: "normal", walkPhase: 0, isSeeker: seeker,
   };
   for (const m of ch.meshes) m.userData.char = ch;
@@ -138,6 +148,17 @@ export function applyPose(ch: Character, pose: PoseId, walk = 0) {
   body.scale.set(1, 1, 1);
   head.rotation.set(0, 0, 0);
   for (const l of [armL, armR, legL, legR]) l.rotation.set(0, 0, 0);
+  if (ch.isSeeker) {
+    const sw = Math.sin(ch.walkPhase) * 0.7 * walk;
+    legL.rotation.x = sw;
+    legR.rotation.x = -sw;
+    armR.rotation.x = -1.35;
+    armR.rotation.z = 0.35;
+    armL.rotation.x = -1.45;
+    armL.rotation.z = -0.55;
+    body.position.y = Math.abs(Math.sin(ch.walkPhase)) * 0.06 * walk;
+    return;
+  }
   switch (pose) {
     case "stand": {
       const sw = Math.sin(ch.walkPhase) * 0.7 * walk;
@@ -174,6 +195,15 @@ export function applyPose(ch: Character, pose: PoseId, walk = 0) {
       armL.rotation.z = armR.rotation.z = 0;
       armL.rotation.x = armR.rotation.x = -3;
       head.rotation.x = -0.9;
+      break;
+    case "sit":
+      body.position.y = -0.42;
+      legL.rotation.x = legR.rotation.x = -1.55;
+      armL.rotation.x = armR.rotation.x = -0.3;
+      break;
+    case "tpose":
+      armL.rotation.z = Math.PI / 2;
+      armR.rotation.z = -Math.PI / 2;
       break;
     case "pillar":
       armL.rotation.z = Math.PI - 0.08;
@@ -224,4 +254,44 @@ export function fillPart(ptex: PaintTex, color: string) {
 
 export function resetPaint(ch: Character) {
   for (const p of ch.parts) if (p.ptex) fillPart(p.ptex, "#f2f2f2");
+}
+
+export function setSurface(ch: Character, metalness: number, roughness: number) {
+  for (const p of ch.parts) {
+    if (!p.ptex) continue;
+    const m = p.mesh.material as THREE.MeshStandardMaterial;
+    m.metalness = metalness;
+    m.roughness = roughness;
+  }
+}
+
+/** שם מעל הראש (רק לחברי קבוצה) */
+export function setLabel(ch: Character, text: string | null, color = "#ffffff") {
+  if (ch.label) {
+    ch.root.remove(ch.label);
+    (ch.label.material as THREE.SpriteMaterial).map?.dispose();
+    ch.label.material.dispose();
+    ch.label = null;
+  }
+  if (!text) return;
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 64;
+  const g = c.getContext("2d")!;
+  g.font = "bold 34px Heebo, Arial, sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.lineWidth = 7;
+  g.strokeStyle = "rgba(0,0,0,0.75)";
+  g.strokeText(text, 128, 34);
+  g.fillStyle = color;
+  g.fillText(text, 128, 34);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
+  sp.scale.set(1.6, 0.4, 1);
+  sp.position.y = 2.35;
+  sp.renderOrder = 12;
+  ch.root.add(sp);
+  ch.label = sp;
 }

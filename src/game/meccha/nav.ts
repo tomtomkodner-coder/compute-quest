@@ -26,7 +26,7 @@ export function buildNav(world: World, radius = 0.45): Nav {
   const blocked = new Uint8Array(cols * rows);
   const near = new Uint8Array(cols * rows);
   const hits = (o: Obstacle, x: number, z: number, r: number) =>
-    o.top > 0.3 && o.bottom < 1.6 && x > o.minX - r && x < o.maxX + r && z > o.minZ - r && z < o.maxZ + r;
+    o.enabled !== false && o.top > 0.3 && o.bottom < 1.6 && x > o.minX - r && x < o.maxX + r && z > o.minZ - r && z < o.maxZ + r;
 
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {

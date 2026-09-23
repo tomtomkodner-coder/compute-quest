@@ -278,3 +278,126 @@ export function labelTexture(text: string, color: string) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+
+export const marble = (base = "#f1ede4", vein = "#b9b2a4", seed = 5) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 14; i++) {
+      g.strokeStyle = vein;
+      g.globalAlpha = 0.25 + r() * 0.35;
+      g.lineWidth = 0.6 + r() * 1.8;
+      g.beginPath();
+      let x = r() * w;
+      let y = 0;
+      g.moveTo(x, y);
+      while (y < h) {
+        x += (r() - 0.5) * 30;
+        y += 10 + r() * 20;
+        g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  });
+
+export const tiles = (a: string, b: string, n = 8, grout = "rgba(0,0,0,0.18)") =>
+  makeTex(256, 256, (g, w, h) => {
+    const s = w / n;
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        g.fillStyle = (x + y) % 2 ? a : b;
+        g.fillRect(x * s, y * s, s, s);
+      }
+    g.strokeStyle = grout;
+    g.lineWidth = 3;
+    for (let i = 0; i <= n; i++) {
+      g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, h); g.stroke();
+      g.beginPath(); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke();
+    }
+  });
+
+export const damask = (bg: string, fg: string) =>
+  makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = fg;
+    for (const [cx, cy] of [[64, 64], [192, 192], [192, 64], [64, 192]] as const) {
+      const big = (cx + cy) % 256 === 128 ? 1 : 0.55;
+      g.beginPath();
+      g.ellipse(cx, cy, 26 * big, 44 * big, 0, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.arc(cx, cy - 52 * big, 8 * big, 0, Math.PI * 2);
+      g.arc(cx, cy + 52 * big, 8 * big, 0, Math.PI * 2);
+      g.fill();
+    }
+    void h;
+  });
+
+export const painting = (seed: number) =>
+  makeTex(160, 128, (g, w, h) => {
+    const r = rng(seed);
+    const pals = [
+      ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"],
+      ["#0b132b", "#1c2541", "#3a506b", "#5bc0be", "#ffd166"],
+      ["#fefae0", "#dda15e", "#bc6c25", "#606c38", "#283618"],
+      ["#ffcad4", "#f4acb7", "#9d8189", "#d8e2dc", "#6d597a"],
+    ];
+    const pal = pals[Math.floor(r() * pals.length)];
+    // שמיים ואדמה
+    g.fillStyle = pal[0];
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = pal[1];
+    g.fillRect(0, h * (0.5 + r() * 0.2), w, h);
+    for (let i = 0; i < 7; i++) {
+      g.fillStyle = pal[2 + Math.floor(r() * 3)];
+      g.beginPath();
+      if (r() < 0.5) g.arc(r() * w, r() * h, 8 + r() * 26, 0, Math.PI * 2);
+      else {
+        const x = r() * w;
+        const y = r() * h;
+        g.moveTo(x, y);
+        g.lineTo(x + 20 + r() * 40, y + 30 + r() * 30);
+        g.lineTo(x - 20 - r() * 30, y + 30 + r() * 30);
+      }
+      g.fill();
+    }
+    // מסגרת זהב
+    g.lineWidth = 12;
+    g.strokeStyle = "#b8860b";
+    g.strokeRect(6, 6, w - 12, h - 12);
+    g.lineWidth = 3;
+    g.strokeStyle = "#ffd76a";
+    g.strokeRect(11, 11, w - 22, h - 22);
+  });
+
+export const bars = () =>
+  makeTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = "#3a3a44";
+    for (let i = 0; i < 8; i++) g.fillRect(i * 16 + 5, 0, 6, h);
+    g.fillRect(0, 10, w, 6);
+    g.fillRect(0, h - 16, w, 6);
+  });
+
+export const splat = () => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d")!;
+  const r = rng(Math.floor(Math.random() * 1e6));
+  g.fillStyle = "#fff";
+  g.beginPath();
+  g.arc(32, 32, 16, 0, Math.PI * 2);
+  g.fill();
+  for (let i = 0; i < 9; i++) {
+    const a = r() * Math.PI * 2;
+    const d = 14 + r() * 14;
+    g.beginPath();
+    g.arc(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 2 + r() * 5, 0, Math.PI * 2);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  return t;
+};
