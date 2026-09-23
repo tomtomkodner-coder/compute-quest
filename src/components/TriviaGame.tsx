@@ -610,7 +610,7 @@ function StartScreen({
               to="/chameleon"
               className="glass inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base sm:text-lg font-bold hover:scale-105 transition animate-fade-in"
             >
-              🦎 משחק חדש: הזיקית המציירת
+              🦎 משחק חדש: Meccha Chameleon
             </Link>
           </div>
         </div>
