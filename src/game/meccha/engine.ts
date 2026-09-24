@@ -17,7 +17,9 @@ import {
   setLabel, setGlow, disposeCharacter, POSES, SIZES, BODY_TYPES,
   type Character, type PoseId, type SizeId, type BodyType, type Brush, type Part,
 } from "./character";
-import { Fx, rainbow } from "./fx";
+import { Fx, rainbow, type Surface } from "./fx";
+const DOWN = new THREE.Vector3(0, -1, 0);
+const STEP_ORIGIN = new THREE.Vector3();
 import { buildShotgun } from "./gun";
 import type { Net, Presence } from "./net";
 import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic } from "@/lib/sound";
@@ -1475,7 +1477,7 @@ export class Engine {
     if (p.display) return;
     if (p.moving && p.ch.root.visible && Math.abs(p.tpos.y - p.pos.y) < 0.2) {
       p.stepT = (p.stepT ?? 0) - dt;
-      if (p.stepT <= 0) { p.stepT = 0.38; this.fx.stepSound(p.pos); }
+      if (p.stepT <= 0) { p.stepT = 0.38; this.fx.stepSound(p.pos, false, this.surfaceAt(p.pos)); }
     }
     const k = Math.min(1, dt * 12);
     if (p.pos.distanceTo(p.tpos) > 6) p.pos.copy(p.tpos);
@@ -1583,7 +1585,7 @@ export class Engine {
     this.wasAir = !grounded && !this.attached;
     if (grounded && moving && moved) {
       this.stepT -= dt;
-      if (this.stepT <= 0) { this.stepT = sprint ? 0.26 : this.crouch ? 0.55 : 0.38; this.fx.stepSound(undefined, this.crouch); }
+      if (this.stepT <= 0) { this.stepT = sprint ? 0.26 : this.crouch ? 0.55 : 0.38; this.fx.stepSound(undefined, this.crouch, this.surfaceAt(m.pos)); }
     } else this.stepT = 0.05;
     if (m.armed) m.yaw = this.camYaw + Math.PI;
     else if (moving && !this.attached && !this.rmb) { // קליק ימני מוחזק = Rotation Lock (הדמות לא מסתובבת לכיוון התנועה)
@@ -1600,6 +1602,19 @@ export class Engine {
       else if (!this.crouch && m.pose === "crouch") m.pose = "stand";
     }
     m.tpos.copy(m.pos);
+  }
+
+  /** סוג המשטח מתחת לרגליים (לצלילי הצעדים), לפי תכונות החומר */
+  private surfaceAt(pos: THREE.Vector3): Surface {
+    this.ray.set(STEP_ORIGIN.set(pos.x, pos.y + 0.4, pos.z), DOWN);
+    this.ray.far = 1.2;
+    const hit = this.ray.intersectObjects(this.world.surfaces, false)[0];
+    const mat = hit && ((Array.isArray((hit.object as THREE.Mesh).material) ? ((hit.object as THREE.Mesh).material as THREE.Material[])[0] : (hit.object as THREE.Mesh).material) as THREE.MeshStandardMaterial);
+    if (!mat || !("roughness" in mat)) return "wood";
+    if (mat.metalness >= 0.5) return "metal";
+    if (mat.roughness <= 0.42) return "tile";
+    if (mat.roughness >= 0.88) return "soft";
+    return "wood";
   }
 
   /** נצמדים לקיר: באוויר, עם רווח לחוץ, מול משטח אנכי */

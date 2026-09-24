@@ -4,6 +4,8 @@ import { splat, labelTexture } from "./textures";
 import { playTone, playNoise } from "@/lib/sound";
 
 /** צבע קשת אקראי (כמו ההתזה הצבעונית של רובה הצבע) */
+export type Surface = "tile" | "wood" | "soft" | "metal";
+
 export function rainbow() {
   return `#${new THREE.Color().setHSL(Math.random(), 0.9, 0.55).getHexString()}`;
 }
@@ -237,12 +239,25 @@ export class Fx {
     setTimeout(() => playTone(150, 0.16, "sawtooth", 0.12), 90);
   }
   /** צעד (מקומי או של שחקן אחר — חלש יותר לפי המרחק) */
-  stepSound(at?: THREE.Vector3, soft = false) {
+  /** צעדים לפי סוג הרצפה (אריחים / עץ / שטיח ודשא / מתכת) — במשחק שומעים את ההבדל */
+  stepSound(at?: THREE.Vector3, soft = false, surf: Surface = "wood") {
     if (this.muted) return;
     const v = this.vol(at) * (soft ? 0.5 : 1);
     if (v < 0.08) return;
-    playNoise(0.07, 0.16 * v, 520 + Math.random() * 180, "lowpass");
-    playTone(90 + Math.random() * 20, 0.05, "sine", 0.08 * v);
+    const j = Math.random();
+    if (surf === "tile") {
+      playNoise(0.035, 0.13 * v, 2600 + j * 600, "bandpass");
+      playTone(170 + j * 30, 0.035, "sine", 0.06 * v);
+    } else if (surf === "soft") {
+      playNoise(0.09, 0.12 * v, 330 + j * 90, "lowpass");
+    } else if (surf === "metal") {
+      playNoise(0.04, 0.1 * v, 3400, "bandpass");
+      playTone(520 + j * 80, 0.12, "triangle", 0.035 * v);
+      playTone(90, 0.05, "sine", 0.07 * v);
+    } else {
+      playNoise(0.06, 0.15 * v, 800 + j * 200, "lowpass");
+      playTone(105 + j * 20, 0.05, "sine", 0.08 * v);
+    }
   }
   jumpSound() {
     if (this.muted) return;
