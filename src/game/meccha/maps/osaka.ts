@@ -170,6 +170,28 @@ export function buildOsaka(): World {
   const sign = (key: string, text: string, bg: string, fg: string, o: O.SignOpts = {}, glow = 0) =>
     k.mat(k.tex("os-s-" + key, () => O.osSign(text, bg, fg, o)), "#ffffff", [1, 1], { roughness: 0.45, bump: 0.15, ...(glow ? { emissive: "#ffffff", emissiveIntensity: glow } : {}) });
   B.opt(panelM, { noShadow: false });
+  const plantPot = k.mat(null, "#8a5a3a", [1, 1], { roughness: 0.7 });
+  const leafM = k.mat(k.tex("leaves", T.leaves), "#9fbf8a", [1, 1], { roughness: 0.8 });
+  const yellowPlate = k.mat(null, "#d9c74a", [1, 1], { roughness: 0.6 });
+  const wireM = k.mat(null, "#151515", [1, 1], { roughness: 0.7 });
+  const takoBall = k.mat(null, "#b8702e", [1, 1], { roughness: 0.5 });
+  const woodPM = k.mat(k.tex("os-woodp", () => T.wood("#9a7a58", "#6e5236", 29)), "#ffffff", [1, 1], { roughness: 0.7, bump: 0.6 });
+  const woodP = () => woodPM;
+  const woodFacM = k.mat(k.tex("os-woodf", () => T.wood("#5c4130", "#3a281c", 31)), "#ffffff", [1, 1], { roughness: 0.75, bump: 0.8 });
+  const woodFacade = () => woodFacM;
+  const whiteM = k.mat(null, "#f2f2ee", [1, 1], { roughness: 0.6 });
+  const whiteWall = () => whiteM;
+  const uniRoe = k.mat(null, "#ff9a2e", [1, 1], { roughness: 0.25 });
+  const norenUni = k.mat(k.tex("os-nu", () => O.osNoren("うに", "#1f2f5a")), "#ffffff", [1, 1], { roughness: 0.9, bump: 0.1 });
+  const norenGyoza = k.mat(k.tex("os-ng", () => O.osNoren("餃子", "#b3101a")), "#ffffff", [1, 1], { roughness: 0.9, bump: 0.1 });
+  const noren2 = k.mat(k.tex("os-n2", () => O.osNoren("たこ焼", "#d8262b")), "#ffffff", [1, 1], { roughness: 0.9, bump: 0.1 });
+  const menuGyoza = k.mat(k.tex("os-mg", () => O.osMenu("餃子", 4)), "#ffffff", [1, 1], { roughness: 0.7, bump: 0.1 });
+  const griddle = k.mat(k.tex("os-grid", O.osGriddle), "#ffffff", [1, 1], { roughness: 0.4, metalness: 0.3, bump: 0.6 });
+  const okoM = k.mat(k.tex("os-oko", O.osOkonomi), "#ffffff", [1, 1], { roughness: 0.35, bump: 0.4 });
+  const hoseM = k.mat(null, "#3f9a4a", [1, 1], { roughness: 0.5 });
+  const basketM = k.mat(null, "#e63946", [1, 1], { roughness: 0.4 });
+  const weed = k.mat(null, "#6f7a3a", [1, 1], { roughness: 0.9 });
+  const popM = k.mat(k.tex("os-pop", () => O.osSign("特価", "#ffe14d", "#d00000", { worn: 0 })), "#ffffff", [1, 1], { roughness: 0.6, bump: 0 });
 
   // ---------------- ground ----------------
   k.floor(-70, 70, -70, 11.9, concDark, 4);
@@ -464,11 +486,9 @@ export function buildOsaka(): World {
   };
   const cone3 = (x: number, z: number) => { B.cyl(cone, 0.04, 0.16, 0.7, x, 0.03, z, { seg: 12 }); B.box(cone, 0.4, 0.04, 0.4, x, 0, z, { flat: true }); B.cyl(white, 0.1, 0.12, 0.1, x, 0.35, z, { seg: 12 }); };
   const plant = (x: number, z: number, s = 1) => {
-    B.lathe(k.mat(null, "#8a5a3a", [1, 1], { roughness: 0.7 }) === plantPot ? plantPot : plantPot, [[0, 0], [0.18 * s, 0], [0.24 * s, 0.35 * s], [0.25 * s, 0.38 * s], [0, 0.38 * s]], x, 0, z, { seg: 12 });
+    B.lathe(plantPot, [[0, 0], [0.18 * s, 0], [0.24 * s, 0.35 * s], [0.25 * s, 0.38 * s], [0, 0.38 * s]], x, 0, z, { seg: 12 });
     for (let i = 0; i < 5; i++) B.sphere(leafM, 0.16 * s, x + (rnd() - 0.5) * 0.25 * s, 0.45 * s + rnd() * 0.25 * s, z + (rnd() - 0.5) * 0.25 * s, { ws: 8, hs: 6 });
   };
-  const plantPot = k.mat(null, "#8a5a3a", [1, 1], { roughness: 0.7 });
-  const leafM = k.mat(k.tex("leaves", T.leaves), "#9fbf8a", [1, 1], { roughness: 0.8 });
   const acUnit = (x: number, y: number, z: number, ry: number) => {
     B.box(acWhite, 0.8, 0.6, 0.3, x, y, z, { ry });
     B.cyl(black, 0.2, 0.2, 0.02, x + Math.sin(ry) * 0.16 - Math.cos(ry) * 0.1, y + 0.3, z + Math.cos(ry) * 0.16 + Math.sin(ry) * 0.1, { rx: Math.PI / 2, ry, seg: 14 });
@@ -480,12 +500,10 @@ export function buildOsaka(): World {
     B.box(steelDark, 1.2, 0.1, 0.1, x, h - 1.4, z, { flat: true });
     for (const dx of [-0.7, 0, 0.7]) B.cyl(white, 0.04, 0.05, 0.14, x + dx, h - 0.5, z, { seg: 6 });
     B.cyl(steel, 0.22, 0.22, 0.7, x + 0.3, h - 2.6, z + 0.25, { seg: 12 });
-    B.box(k.mat(null, "#d9c74a", [1, 1], { roughness: 0.6 }) === yellowPlate ? yellowPlate : yellowPlate, 0.25, 0.9, 0.02, x, 1.9, z + 0.17, { flat: true });
+    B.box(yellowPlate, 0.25, 0.9, 0.02, x, 1.9, z + 0.17, { flat: true });
     k.collider(x - 0.18, x + 0.18, z - 0.18, z + 0.18, 0, h, false);
     return [x, h - 0.5, z] as V3t;
   };
-  const yellowPlate = k.mat(null, "#d9c74a", [1, 1], { roughness: 0.6 });
-  const wireM = k.mat(null, "#151515", [1, 1], { roughness: 0.7 });
 
   // ---------------- shop definitions ----------------
   const cafeSign = sign("cafe", "喫茶 ミナミ", "#5a2d1a", "#f6e3b4", { border: "#f6e3b4" });
@@ -584,22 +602,10 @@ export function buildOsaka(): World {
       goodsShelf(cx, zf + 1.4, 1.6, 1.3, Math.PI);
       // sale shelves and baskets out front
       goodsShelf(cx - 1.3, zf - 0.45, 1.3, 1.1, Math.PI);
-      for (let i = 0; i < 3; i++) B.box(k.mat(null, "#e63946", [1, 1], { roughness: 0.4 }) === basketM ? basketM : basketM, 0.5, 0.25, 0.35, cx + 0.6 + i * 0.55, 0, zf - 0.45, {});
+      for (let i = 0; i < 3; i++) B.box(basketM, 0.5, 0.25, 0.35, cx + 0.6 + i * 0.55, 0, zf - 0.45, {});
       k.collider(cx + 0.3, cx + 2.0, zf - 0.65, zf - 0.25, 0, 0.26, true);
       for (let i = 0; i < 5; i++) B.geo(popM, new THREE.PlaneGeometry(0.22, 0.16), cx - 1.8 + i * 0.25, 1.2, zf - 0.69, { ry: Math.PI });
     } });
-  function woodP() { return k.mat(k.tex("os-woodp", () => T.wood("#9a7a58", "#6e5236", 29)), "#ffffff", [1, 1], { roughness: 0.7, bump: 0.6 }); }
-  function woodFacade() { return k.mat(k.tex("os-woodf", () => T.wood("#5c4130", "#3a281c", 31)), "#ffffff", [1, 1], { roughness: 0.75, bump: 0.8 }); }
-  function whiteWall() { return k.mat(null, "#f2f2ee", [1, 1], { roughness: 0.6 }); }
-  const uniRoe = k.mat(null, "#ff9a2e", [1, 1], { roughness: 0.25 });
-  const norenUni = k.mat(k.tex("os-nu", () => O.osNoren("うに", "#1f2f5a")), "#ffffff", [1, 1], { roughness: 0.9, bump: 0.1 });
-  const norenGyoza = k.mat(k.tex("os-ng", () => O.osNoren("餃子", "#b3101a")), "#ffffff", [1, 1], { roughness: 0.9, bump: 0.1 });
-  const menuGyoza = k.mat(k.tex("os-mg", () => O.osMenu("餃子", 4)), "#ffffff", [1, 1], { roughness: 0.7, bump: 0.1 });
-  const griddle = k.mat(k.tex("os-grid", O.osGriddle), "#ffffff", [1, 1], { roughness: 0.4, metalness: 0.3, bump: 0.6 });
-  const okoM = k.mat(k.tex("os-oko", O.osOkonomi), "#ffffff", [1, 1], { roughness: 0.35, bump: 0.4 });
-  const hoseM = k.mat(null, "#3f9a4a", [1, 1], { roughness: 0.5 });
-  const basketM = k.mat(null, "#e63946", [1, 1], { roughness: 0.4 });
-  const popM = k.mat(k.tex("os-pop", () => O.osSign("特価", "#ffe14d", "#d00000", { worn: 0 })), "#ffffff", [1, 1], { roughness: 0.6, bump: 0 });
 
   for (const s of shops) buildShop(s);
 
@@ -739,7 +745,7 @@ export function buildOsaka(): World {
     }
     // boat of takoyaki held up
     B.box(woodDark, 1.0, 0.1, 0.5, cx + 1.2, cy - 0.5, cz + 0.7, { flat: true });
-    for (let i = 0; i < 6; i++) B.sphere(k.mat(null, "#b8702e", [1, 1], { roughness: 0.5 }) === takoBall ? takoBall : takoBall, 0.12, cx + 0.8 + (i % 3) * 0.28, cy - 0.33, cz + 0.58 + Math.floor(i / 3) * 0.24, { ws: 10, hs: 8 });
+    for (let i = 0; i < 6; i++) B.sphere(takoBall, 0.12, cx + 0.8 + (i % 3) * 0.28, cy - 0.33, cz + 0.58 + Math.floor(i / 3) * 0.24, { ws: 10, hs: 8 });
     B.rod(steelDark, 0.07, [cx, cy - 0.2, -3], [cx, cy, cz], 8);
     k.collider(cx - 1.6, cx + 1.6, -3, cz + 1.2, cy - 1.4, cy + 1.8, true);
   }
@@ -795,7 +801,6 @@ export function buildOsaka(): World {
     B.rod(wireM, 0.02, [cx, cy + 0.9, cz], [cx, 7.0, -3], 4);
     for (let i = 0; i < 4; i++) lantern(9.9 + i * 1.1, 2.05, -2.7, 0.2, i % 2 ? lanternW : lanternM);
   }
-  const takoBall = k.mat(null, "#b8702e", [1, 1], { roughness: 0.5 });
 
   // ---------------- open street furniture ----------------
   vending(-3.1, 2.3, Math.PI, "#1f5fb0", 2);
