@@ -2554,6 +2554,7 @@ export class Engine {
   private paintAt(part: Part, at: THREE.Vector3, prev: THREE.Vector3 | null) {
     const r = this.brushSize / 2;
     const b = this.brush;
+    if (!prev && this.history[0] !== b.color) { this.addHistory(b.color); this.emit(); } // צבע חדש נכנס להיסטוריה כשמתחילים לצבוע בו
     const nowB = performance.now();
     if (nowB - this.brushT > 90) { this.brushT = nowB; this.fx.brushSound(); }
     const send = (q: THREE.Vector3) => this.queuePaintOp(["p", r3(q.x), r3(q.y), r3(q.z), r3(r), b.color, r2(b.alpha), r2(b.metal), r2(b.rough), r2(b.emis)]);
@@ -2588,13 +2589,13 @@ export class Engine {
   private commitPick() {
     if (!this.pickPreview) return;
     const pp = this.pickPreview;
-    this.brush = { ...this.brush, color: pp.color, metal: pp.metal, rough: pp.rough, emis: pp.emis };
+    if (this.overwritePick) this.brush = { ...this.brush, color: pp.color, metal: pp.metal, rough: pp.rough, emis: pp.emis };
     this.addHistory(pp.color);
     this.fx.pickSound();
     this.emit();
   }
   private addHistory(c: string) {
-    this.history = [c, ...this.history.filter((x) => x !== c)].slice(0, 8);
+    this.history = [c, ...this.history.filter((x) => x !== c)].slice(0, 32);
     this.histIdx = 0;
   }
 
@@ -2844,9 +2845,11 @@ export class Engine {
   }
   setBrush(patch: Partial<Brush>) {
     this.brush = { ...this.brush, ...patch };
-    if (patch.color && HEX.test(patch.color)) this.addHistory(patch.color);
     this.emit();
   }
+  /** "Overwrite color picker on sample": הטפטפת מחליפה את הצבע הנוכחי (אחרת רק נוספת להיסטוריה) */
+  overwritePick = true;
+  setOverwritePick(v: boolean) { this.overwritePick = v; this.emit(); }
   setBrushSize(b: number) { this.brushSize = b; this.emit(); }
   /** מוחקים את כל הצבע (חוזרים ללבן) */
   clearPaint() {

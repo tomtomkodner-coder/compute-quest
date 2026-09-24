@@ -330,7 +330,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           </div>
 
           {/* שמאל: לשונית "Missed-Spot Ranking" */}
-          {hud.settings.missed && (hud.phase === "hide" || hud.phase === "hunt") && <MissedTab hud={hud} />}
+          {hud.settings.missed && (hud.phase === "hide" || hud.phase === "hunt") && !hud.paintMode && <MissedTab hud={hud} />}
 
           {/* ימין: רשימת המקשים עם האייקונים, כמו במשחק */}
           {!touch && !hud.paintMode && (hud.phase === "hide" || hud.phase === "hunt" || hud.phase === "check") && <KeyColumn hud={hud} hider={hider} hunter={hunter} />}
@@ -351,7 +351,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           {hud.freeLook && <div className="absolute top-24 left-1/2 -translate-x-1/2 z-20 text-xs font-bold text-[#4cc9f0] pointer-events-none" style={{ textShadow: OUTLINE }}>{t("FREE CAMERA")} {hud.freeCam ? t("· moving (4)") : t("· 4 to move")}</div>}
 
           {/* "Search Start!" */}
-          {announce && <div className="absolute top-[15%] left-1/2 -translate-x-1/2 z-30 text-5xl font-medium pointer-events-none" style={{ fontFamily: SERIF, textShadow: "0 2px 8px rgba(0,0,0,.7)" }}>{announce}</div>}
+          {announce && <div className="absolute top-[13%] left-1/2 -translate-x-1/2 z-30 text-5xl font-medium pointer-events-none whitespace-nowrap" style={{ fontFamily: SERIF, textShadow: "0 0 3px #000, 0 2px 10px rgba(0,0,0,.9), 0 0 18px rgba(0,0,0,.6)" }}>{announce}</div>}
 
           {/* היהלומים הירוקים: זמינות השכפולים */}
           {hider && (hud.phase === "hide" || hud.phase === "hunt") && (
@@ -478,15 +478,18 @@ function Person({ color, size = 22 }: { color: string; size?: number }) {
 
 function Hourglass({ frac }: { frac: number }) {
   const f = Math.max(0, Math.min(1, frac));
+  const top = 12 * f, bot = 12 * (1 - f);
   return (
-    <svg width="22" height="30" viewBox="0 0 22 30" aria-hidden>
-      <rect x="2" y="1" width="18" height="2.4" rx="1" fill="#e9f5ea" />
-      <rect x="2" y="26.6" width="18" height="2.4" rx="1" fill="#e9f5ea" />
-      <path d="M4.5 3.4 h13 c0 6-4.5 8-5.2 11.6 c.7 3.6 5.2 5.6 5.2 11.6 h-13 c0-6 4.5-8 5.2-11.6 c-.7-3.6-5.2-5.6-5.2-11.6 z" fill="rgba(255,255,255,.18)" stroke="#e9f5ea" strokeWidth="1.1" />
-      <clipPath id="hgTop"><rect x="0" y={3.4 + 11.6 * (1 - f)} width="22" height={11.6 * f} /></clipPath>
-      <clipPath id="hgBot"><rect x="0" y={26.6 - 11.6 * (1 - f)} width="22" height={11.6 * (1 - f)} /></clipPath>
-      <path d="M5.3 3.9 h11.4 c-.4 5-4.2 7-4.9 11.1 h-1.6 c-.7-4.1-4.5-6.1-4.9-11.1 z" fill="#2fd05a" clipPath="url(#hgTop)" />
-      <path d="M10.2 15 h1.6 c.7 4.1 4.5 6.1 4.9 11.1 h-11.4 c.4-5 4.2-7 4.9-11.1 z" fill="#2fd05a" clipPath="url(#hgBot)" />
+    <svg width="24" height="32" viewBox="0 0 24 32" aria-hidden style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,.7))" }}>
+      <defs>
+        <clipPath id="hgT"><rect x="0" y={3.5 + (12 - top)} width="24" height={top} /></clipPath>
+        <clipPath id="hgB"><rect x="0" y={28.5 - bot} width="24" height={bot} /></clipPath>
+      </defs>
+      <path d="M5 3.5 h14 c0 6.5-5 8.5-5.8 12.5 c.8 4 5.8 6 5.8 12.5 h-14 c0-6.5 5-8.5 5.8-12.5 c-.8-4-5.8-6-5.8-12.5 z" fill="#2fd05a" clipPath="url(#hgT)" />
+      <path d="M5 3.5 h14 c0 6.5-5 8.5-5.8 12.5 c.8 4 5.8 6 5.8 12.5 h-14 c0-6.5 5-8.5 5.8-12.5 c-.8-4-5.8-6-5.8-12.5 z" fill="#2fd05a" clipPath="url(#hgB)" />
+      <path d="M5 3.5 h14 c0 6.5-5 8.5-5.8 12.5 c.8 4 5.8 6 5.8 12.5 h-14 c0-6.5 5-8.5 5.8-12.5 c-.8-4-5.8-6-5.8-12.5 z" fill="none" stroke="#fff" strokeWidth="1.6" />
+      <rect x="2.5" y="1" width="19" height="3" rx="1.2" fill="#fff" />
+      <rect x="2.5" y="28" width="19" height="3" rx="1.2" fill="#fff" />
     </svg>
   );
 }
@@ -930,35 +933,124 @@ function Slider({ id, label, value, min, max, step, onChange, bg }: { id: string
   );
 }
 
+/** פס גרירה בסגנון בוחר הצבעים של המשחק (Unreal): פס צבעוני + שדה מספרי */
+function Bar({ label, value, bg, onChange, max = 1, digits = 3 }: { label: string; value: number; bg: string; onChange: (v: number) => void; max?: number; digits?: number }) {
+  const set = (ev: React.PointerEvent<HTMLDivElement>) => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    onChange(Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * max);
+  };
+  return (
+    <div className="flex items-center gap-1">
+      {label && <span className="w-2.5 text-[9px] opacity-80">{label}</span>}
+      <div className="relative flex-1 h-[11px] rounded-[2px] cursor-ew-resize touch-none" style={{ background: bg }}
+        onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); set(ev); }} onPointerMove={(ev) => { if (ev.buttons) set(ev); }}>
+        <span className="absolute top-[-1px] bottom-[-1px] w-[3px] bg-white border border-black -translate-x-1/2 pointer-events-none" style={{ left: `${(value / max) * 100}%` }} />
+      </div>
+      <input value={value.toFixed(digits)} onChange={(ev) => { const v = Number(ev.target.value); if (!Number.isNaN(v)) onChange(Math.max(0, Math.min(max, v))); }}
+        className="w-[46px] bg-black/60 border border-white/15 rounded-[2px] px-1 text-[9px] tabular-nums outline-none" />
+    </div>
+  );
+}
+
+/** פס אנכי (בהירות / שקיפות) ליד הגלגל */
+function VBar({ value, bg, onChange }: { value: number; bg: string; onChange: (v: number) => void }) {
+  const set = (ev: React.PointerEvent<HTMLDivElement>) => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    onChange(Math.max(0, Math.min(1, 1 - (ev.clientY - r.top) / r.height)));
+  };
+  return (
+    <div className="relative w-[13px] h-[104px] cursor-ns-resize touch-none border border-white/20" style={{ background: bg }}
+      onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); set(ev); }} onPointerMove={(ev) => { if (ev.buttons) set(ev); }}>
+      <span className="absolute left-[-2px] right-[-2px] h-[3px] bg-white border border-black -translate-y-1/2 pointer-events-none" style={{ top: `${(1 - value) * 100}%` }} />
+    </div>
+  );
+}
+
+const CHECKER = "repeating-conic-gradient(#999 0% 25%, #ddd 0% 50%) 50% / 8px 8px";
+
 function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | null; touch: boolean }) {
+  const [srgb, setSrgb] = useState(true);
   const col = hud.pickPreview && hud.picking ? hud.pickPreview : hud.color;
   const hsv = hexToHsv(hud.color);
+  const [r, g, b] = rgbOf(hud.color).map((x) => x / 255);
   const set = (color: string) => engine?.setBrush({ color });
+  const setRgb = (i: number, v: number) => { const c = [r, g, b]; c[i] = v; set(`#${c.map((x) => hex2(x * 255)).join("")}`); };
+  const [hexText, setHexText] = useState(hud.color);
+  useEffect(() => setHexText(hud.color.slice(1).toUpperCase() + "FF"), [hud.color]);
+  const hues = "linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)";
+  const pal = Array.from({ length: 32 }, (_, i) => hud.history[i] ?? null);
+  const preview = (c: string) => (srgb ? c : `color-mix(in srgb, ${c} 80%, #000)`);
   return (
-    <div dir={isRtl() ? "rtl" : "ltr"} className={`absolute z-20 left-2 ${touch ? "top-2 max-h-[calc(100dvh-16px)]" : "top-28 max-h-[calc(100dvh-130px)]"} w-[228px] overflow-auto rounded-2xl bg-white/95 text-black border-[3px] border-black p-2.5 grid gap-2 text-[11px]`}>
-      <div className="flex items-center gap-2">
-        <ColorWheel color={hud.color} onChange={set} />
-        <div className="grid gap-1.5 flex-1">
-          <div className="h-12 rounded-xl border-2 border-black" style={{ background: col }} />
-          {touch && (
-            <button onPointerDown={() => engine?.setPicking(!hud.picking)}
-              className={`rounded-xl border-2 border-black py-1 font-black inline-flex items-center justify-center gap-1 ${hud.picking ? "bg-[#ffd23f]" : "bg-white"}`}>
-              <Pipette className="w-3.5 h-3.5" /> {t("Pick")}
-            </button>
-          )}
-        </div>
+    <div dir="ltr" className={`absolute z-20 left-0 ${touch ? "top-0" : "top-0"} flex text-white text-[10px]`} style={{ textShadow: "none" }}>
+      {/* לשוניות הכלים בשמאל (פלטה / מכחולים) */}
+      <div className="flex flex-col gap-1.5 pt-[190px] pl-1">
+        <span className="w-9 h-9 rounded bg-white/90 grid place-items-center text-lg">🎨</span>
+        <span className="w-9 h-9 rounded bg-white/70 grid place-items-center text-lg">🖌️</span>
       </div>
-      <Slider id="pv" label={t("Brightness")} value={hsv.v} min={0} max={1} step={0.01} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} />
-      <Slider id="pm" label={t("Metallic")} value={hud.metal} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ metal: v })} />
-      <Slider id="pro" label={t("Roughness")} value={hud.rough} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ rough: v })} />
-      <Slider id="pe" label={t("Emissive")} value={hud.emis} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ emis: v })} />
-      {hud.history.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {hud.history.map((c) => <button key={c} onClick={() => set(c)} className={`w-6 h-6 rounded-md border-2 ${c === hud.color ? "border-black" : "border-black/30"}`} style={{ background: c }} aria-label={c} />)}
+      <div className="flex flex-col gap-2 p-2">
+        <div className="w-[250px] rounded bg-[#151515]/85 p-2 grid gap-1.5 max-h-[calc(100dvh-120px)] overflow-auto">
+          <div className="flex gap-1.5 items-start">
+            <ColorWheel color={hud.color} onChange={set} />
+            <VBar value={hsv.v} bg={`linear-gradient(${hsvToHex(hsv.h, hsv.s, 1)},#000)`} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} />
+            <VBar value={hud.alpha} bg={`linear-gradient(${hud.color},transparent), ${CHECKER}`} onChange={(v) => engine?.setBrush({ alpha: v })} />
+            <div className="grid gap-1 flex-1">
+              <div className="h-[34px] border border-white/20 grid">
+                <div style={{ background: preview(col) }} />
+                <div style={{ background: preview(hud.history[1] ?? hud.color) }} />
+              </div>
+              <label className="flex items-center gap-1 text-[9px]"><input type="checkbox" checked={srgb} onChange={(e) => setSrgb(e.target.checked)} className="w-2.5 h-2.5" /> {t("sRGB Preview")}</label>
+              <button onPointerDown={() => engine?.setPicking(!hud.picking)} className={`h-6 w-7 rounded grid place-items-center ${hud.picking ? "bg-[#ffd23f] text-black" : "bg-white/10"}`} aria-label={t("3D Eyedropper")}><Pipette className="w-3.5 h-3.5" /></button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-[3px]">
+            <Bar label="R" value={r} bg={`linear-gradient(90deg,#000,#f00)`} onChange={(v) => setRgb(0, v)} />
+            <Bar label="H" value={hsv.h} max={360} digits={1} bg={hues} onChange={(v) => set(hsvToHex(v, hsv.s, hsv.v))} />
+            <Bar label="G" value={g} bg={`linear-gradient(90deg,#000,#0f0)`} onChange={(v) => setRgb(1, v)} />
+            <Bar label="S" value={hsv.s} bg={`linear-gradient(90deg,#fff,${hsvToHex(hsv.h, 1, 1)})`} onChange={(v) => set(hsvToHex(hsv.h, v, hsv.v))} />
+            <Bar label="B" value={b} bg={`linear-gradient(90deg,#000,#00f)`} onChange={(v) => setRgb(2, v)} />
+            <Bar label="V" value={hsv.v} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} />
+            <Bar label="A" value={hud.alpha} bg={`linear-gradient(90deg,transparent,${hud.color}), ${CHECKER}`} onChange={(v) => engine?.setBrush({ alpha: v })} />
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] opacity-80 whitespace-nowrap">Hex sRGB</span>
+              <input value={hexText} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9a-f]/gi, "").slice(0, 8); setHexText(v); if (v.length >= 6) set("#" + v.slice(0, 6).toLowerCase()); }}
+                className="w-full bg-black/60 border border-white/15 rounded-[2px] px-1 text-[9px] uppercase outline-none" />
+            </div>
+          </div>
+          {/* היסטוריית הצבעים */}
+          <div className="flex gap-1 items-start">
+            <span className="text-[11px] opacity-80 mt-[1px]">🕘</span>
+            <div className="grid grid-cols-16 gap-[2px] flex-1" style={{ gridTemplateColumns: "repeat(16, minmax(0, 1fr))" }}>
+              {pal.map((c, i) => (
+                <button key={i} disabled={!c} onClick={() => c && set(c)} className={`aspect-square rounded-[1px] ${c === hud.color ? "outline outline-1 outline-white" : ""}`} style={{ background: c ?? "rgba(255,255,255,.07)" }} aria-label={c ?? "empty"} />
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Bar label="" value={hud.metal} bg="linear-gradient(90deg,#333,#bbb)" onChange={(v) => engine?.setBrush({ metal: v })} />
+            <Bar label="" value={hud.rough} bg="linear-gradient(90deg,#bbb,#333)" onChange={(v) => engine?.setBrush({ rough: v })} />
+            <span className="-mt-1 text-[9px] opacity-80">{t("Metallic")}</span>
+            <span className="-mt-1 text-[9px] opacity-80">{t("Roughness")}</span>
+            <Bar label="" value={hud.emis} bg="linear-gradient(90deg,#222,#ffe9a8)" onChange={(v) => engine?.setBrush({ emis: v })} />
+            <span />
+            <span className="-mt-1 text-[9px] opacity-80">{t("Emissive")}</span>
+          </div>
+          <label className="flex items-center gap-1 text-[9px]"><input type="checkbox" checked={engine?.overwritePick ?? true} onChange={(e) => engine?.setOverwritePick(e.target.checked)} className="w-2.5 h-2.5" /> {t("Overwrite color picker on sample")}</label>
+          <button onPointerDown={() => engine?.setPicking(!hud.picking)} className={`rounded py-1.5 font-bold flex items-center justify-center gap-1.5 ${hud.picking ? "bg-[#ffd23f] text-black" : "bg-white/10"}`}>
+            <span className="w-3.5 h-3.5 bg-white rounded-[2px]" /> {t("3D Eyedropper")}
+          </button>
         </div>
-      )}
-      <button onClick={() => engine?.setShadow(!hud.shadow)} className={`rounded-lg border-2 border-black py-0.5 font-black ${!hud.shadow ? "bg-black text-white" : ""}`}>{t(hud.shadow ? "V Shadow ON" : "V Shadow OFF")}</button>
-      {!touch && <div className="text-[10px] font-bold text-black/60 leading-tight">{t("LMB paint · hold Space = eyedropper · RMB drag = brush size · MMB / Alt+LMB rotate · wheel zoom (Space+wheel = colours) · F close")}</div>}
+        {/* מדריך המקשים מתחת ללוח, כמו במשחק */}
+        {!touch && (
+          <div className="w-[160px] rounded bg-[#151515]/70 p-1.5 grid gap-1.5 text-[9px]">
+            <div className="flex items-center gap-1.5"><Pipette className="w-4 h-4" /><KeyBox k="SPACE" color="#ffc21a" /><span>{t("3D Eyedropper (Hold)")}</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-4 text-center">◎</span><KeyBox k="RMB" /><span>{t("Brush Size")}</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-4 text-center">☀</span><KeyBox k="V" on={hud.shadow} /><span>{t(hud.shadow ? "Shadow" : "Shadow OFF")}</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-4 text-center">⟲</span><KeyBox k="MMB" /><span>{t("Rotate Camera")}</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-4 text-center">⌕</span><KeyBox k="Wheel" /><span>{t("Zoom")}</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-4 text-center">✕</span><KeyBox k="F" /><span>{t("Paint Mode")}</span></div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
