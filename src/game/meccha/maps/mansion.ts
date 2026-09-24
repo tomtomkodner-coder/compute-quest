@@ -15,7 +15,6 @@ type Side = { m: Mat; ch: number; trim: Trim } | null;
 type Door = { c: number; w: number; h?: number; arch?: [number, number] };
 
 export function buildMansion(): World {
-  (globalThis as any).__mt = { start: performance.now() };
   const k = new Kit(9.4, 2.5);
   const rnd = X.rng(20260610);
   const pick = <V>(a: V[]) => a[Math.floor(rnd() * a.length)];
@@ -195,8 +194,11 @@ export function buildMansion(): World {
   const torus = (m: Mat, R: number, r: number, x: number, y: number, z: number, o: PO = {}, arc = Math.PI * 2, rs = 8, ts = 24) =>
     put(m, new THREE.TorusGeometry(R, r, r < 0.02 ? Math.min(rs, 4) : r < 0.04 ? Math.min(rs, 6) : rs, Math.max(6, Math.min(ts, Math.round(segFor(R * sMax(o), ts) * (arc / (Math.PI * 2)) + 2))), arc), [x, y, z], o);
   const extr = (m: Mat, shape: THREE.Shape, depth: number, x: number, y: number, z: number, o: PO = {}, bevel = 0) => {
-    const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 1, curveSegments: 12 });
-    g.translate(0, 0, -depth / 2);
+    const g = cg(`e${shape.uuid},${depth},${bevel}`, () => {
+      const eg = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 1, curveSegments: 12 });
+      eg.translate(0, 0, -depth / 2);
+      return eg;
+    });
     put(m, g, [x, y, z], o);
   };
   const plane = (m: Mat, w: number, h: number, x: number, y: number, z: number, ry: number, uvRect: [number, number, number, number]) => {
@@ -207,7 +209,7 @@ export function buildMansion(): World {
   };
 
   // ================= materials =================
-  const tx = <Q extends X.PaintTex>(key: string, f: () => Q) => { const t0 = performance.now(); const r = k.tex("mn_" + key, f); const G = globalThis as any; G.__mt ??= {}; G.__mt["tx:" + key] = (G.__mt["tx:" + key] ?? 0) + performance.now() - t0; return r; };
+  const tx = <Q extends X.PaintTex>(key: string, f: () => Q) => k.tex("mn_" + key, f);
   const mExt = M(tx("plExt", () => X.plaster("#d6cdbd", 1)), "#fff", 3, { bump: 0.15 });
   const mCeil = M(tx("ceil", () => X.plaster("#efe7d8", 2)), "#fff", 3, { bump: 0.12, shadow: false });
   const mCeilDark = M(tx("planksC", () => X.planks("#5a4030", 31, 6)), "#fff", 1.4, { shadow: false, roughness: 0.7 });
@@ -997,6 +999,17 @@ export function buildMansion(): World {
     box(mMahog, 0.34, 0.3, 0.16, 0, 1.43, 0.3, { r: 0.03 });
     plane(mClock, 0.2, 0.2, 0, 1.6, 0.385, 0, [0, 0, 1, 1]);
     col(-1.5, 1.5, 0, 0.58, 0, 1.43);
+    // folding brass-and-iron fire screen standing on the hearth
+    const screenPanel = (cx: number, cz: number, w: number, ry: number) => grp(cx, 0.06, cz, ry, () => {
+      box(mSoot, w - 0.04, 0.56, 0.01, 0, 0.08, 0);
+      for (const sx of [-1, 1]) box(mBrass, 0.025, 0.66, 0.025, sx * (w / 2 - 0.0125), 0, 0);
+      box(mBrass, w, 0.025, 0.03, 0, 0.64, 0);
+      box(mBrass, w, 0.02, 0.03, 0, 0.07, 0);
+      for (let i = 1; i < 6; i++) box(mIron, 0.008, 0.56, 0.012, -w / 2 + (w * i) / 6, 0.08, 0.004);
+    });
+    screenPanel(0, 0.86, 0.8, 0);
+    for (const sx of [-1, 1]) screenPanel(sx * 0.56, 0.78, 0.36, -sx * 0.45);
+    col(-0.75, 0.75, 0.66, 0.9, 0, 0.72);
   });
   painting(-9.83, 3.6, 0.8, Math.PI / 2, 1.5, 1.9, 1);
   // armchairs around the fireplace
@@ -1923,7 +1936,6 @@ export function buildMansion(): World {
   for (const [x, z, ry] of [[13.67, 17.5 - 2.3, Math.PI / 2], [27.83, 15.5, -Math.PI / 2], [27.83, 19.6, -Math.PI / 2]] as const) sconce(x, 2.2, z, ry);
 
   // ================= flush batches =================
-  const TF = performance.now();
   for (const [m, b] of info) {
     if (!b.len) continue;
     const g = new THREE.BufferGeometry();
@@ -1940,7 +1952,6 @@ export function buildMansion(): World {
   k.instances(jarGeo, k.mat(null, "#ffffff", [1, 1], { roughness: 0.15, metalness: 0.05 }), jars, { noShadow: true });
   k.instances(bottleGeo, k.mat(null, "#ffffff", [1, 1], { roughness: 0.12, metalness: 0.1 }), bottles, { noShadow: true });
 
-  { const G = globalThis as any; G.__mt ??= {}; G.__mt.flush = performance.now() - TF; }
   // ================= spawns & lighting =================
   const hiderSpawns = Array.from({ length: 24 }, (_, i) => {
     const a = (i / 24) * Math.PI * 2;
@@ -1949,7 +1960,6 @@ export function buildMansion(): World {
   });
   const hunterSpawns = [[-2.4, 20.4], [-1.2, 20.4], [0, 20.4], [1.2, 20.4], [2.4, 20.4], [-1.8, 19.2], [-0.6, 19.2], [0.6, 19.2], [1.8, 19.2]].map(([x, z]) => new THREE.Vector3(x, 0, z));
 
-  { const G = globalThis as any; G.__mt.total = performance.now() - G.__mt.start; }
   return k.finish({
     id: "mansion",
     name: "Hide-and-Seek Mansion",

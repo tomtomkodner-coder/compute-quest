@@ -194,6 +194,8 @@ export function buildSugarland(): World {
     k.mat(k.tex("sg-hillm", () => S.sgFrosting("#b8f0d8", 22, 90)), "#ffffff", [3, 2], { roughness: 0.55, bump: 0.2 }),
   ];
   for (const m of [...mountainMats, snowCap, ...hillMats, cloudM]) B.opt(m, { noShadow: true });
+  Object.entries({ ground, pathM, frostPink, ginger, icing, icingPink, wafer, choc, chocBar, milkChoc, milk, stripeR, stripeG, stripeP, stick, cream, berry, leaf, glazePink, dough, cottonP, cottonB, cloudM, pepper, glass, snowCap, lockerBody }).forEach(([n, m]) => (m.m.name = n));
+  [["roof", roofs], ["swirl", swirls], ["gum", gums], ["hard", hard], ["ice", donutIcings], ["mac", macs], ["mt", mountainMats], ["hill", hillMats], ["lock", lockers]].forEach(([n, l]) => (l as Mat[]).forEach((m, i) => (m.m.name = `${n}${i}`)));
 
   // ---------------- ground ----------------
   const X0 = -24, X1 = 24, Z0 = -21, Z1 = 21;

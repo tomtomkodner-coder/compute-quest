@@ -83,22 +83,30 @@ class Frame {
 type Inst = { pos: V3t; rotX?: number; rotY?: number; rotZ?: number; scale?: V3t; color?: string };
 /** אוסף מופעים של כדורים (בובות, בלונים, ברווזים, קישוטים) — הכול בקריאת ציור אחת לכל חומר ורמת פירוט */
 class Spheres {
-  hi: Inst[] = [];
-  lo: Inst[] = [];
+  /** LOD tiers by the part's real size: [min radius (m), width segs, height segs] */
+  static tiers: [number, number, number][] = [[0.2, 14, 10], [0.07, 10, 7], [0.025, 7, 5], [0, 5, 4]];
+  static geos = new Map<number, THREE.SphereGeometry>();
+  lists: Inst[][] = Spheres.tiers.map(() => []);
   private q = new THREE.Quaternion();
   private e = new THREE.Euler();
   add(x: number, y: number, z: number, ry: number, s: number, parts: [number, number, number, number, number, number, number, string, number][]) {
     const qy = new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), ry);
-    for (const [ox, oy, oz, sx, sy, sz, rz, col, hi] of parts) {
+    for (const [ox, oy, oz, sx, sy, sz, rz, col] of parts) {
       const o = new V3(ox * s, oy * s, oz * s).applyQuaternion(qy);
       this.q.setFromAxisAngle(new V3(0, 0, 1), rz).premultiply(qy);
       this.e.setFromQuaternion(this.q, "XYZ");
-      (hi ? this.hi : this.lo).push({ pos: [x + o.x, y + o.y, z + o.z], rotX: this.e.x, rotY: this.e.y, rotZ: this.e.z, scale: [sx * s, sy * s, sz * s], color: col });
+      const r = Math.max(sx, sy, sz) * s;
+      const t = Spheres.tiers.findIndex(([mr]) => r >= mr);
+      this.lists[t].push({ pos: [x + o.x, y + o.y, z + o.z], rotX: this.e.x, rotY: this.e.y, rotZ: this.e.z, scale: [sx * s, sy * s, sz * s], color: col });
     }
   }
   flush(k: Kit, m: Mat) {
-    if (this.hi.length) k.instances(new THREE.SphereGeometry(1, 16, 11), m, this.hi);
-    if (this.lo.length) k.instances(new THREE.SphereGeometry(1, 8, 6), m, this.lo);
+    this.lists.forEach((l, i) => {
+      if (!l.length) return;
+      let g = Spheres.geos.get(i);
+      if (!g) { g = new THREE.SphereGeometry(1, Spheres.tiers[i][1], Spheres.tiers[i][2]); Spheres.geos.set(i, g); }
+      k.instances(g, m, l, { noShadow: i >= 2 });
+    });
   }
 }
 
@@ -543,7 +551,7 @@ export function buildPenguin(): World {
     const yel = k.mat(null, "#f7c948", [1, 1], { roughness: 0.3 });
     const red = k.mat(null, "#c62828", [1, 1], { roughness: 0.35 });
     const sph = (m: Mat, ox: number, oy: number, oz: number, sx: number, sy: number, sz: number, rz = 0, rx = 0) =>
-      k.add(new THREE.SphereGeometry(1, 48, 32), m, [SX + ox * S, y0 + oy * S, SZ + oz * S], { scale: [sx * S, sy * S, sz * S], rotZ: rz, rotX: rx });
+      k.add(statueSph, m, [SX + ox * S, y0 + oy * S, SZ + oz * S], { scale: [sx * S, sy * S, sz * S], rotZ: rz, rotX: rx });
     sph(blk, 0, 0.42, 0, 0.34, 0.42, 0.3, 0, -0.06);
     sph(wht, 0, 0.4, 0.085, 0.28, 0.35, 0.23, 0, -0.06);
     sph(blk, 0, 0.84, 0.0, 0.23, 0.21, 0.22);
@@ -597,7 +605,7 @@ export function buildPenguin(): World {
       k.collider(x - 0.3, x + 0.3, z - 0.3, z + 0.3, 0, 3.68, true);
     }
     // מעקות: עמודונים (מופע אחד) + מאחז יד זהוב
-    const balGeo = lathe([[0.05, 0], [0.05, 0.06], [0.03, 0.12], [0.045, 0.35], [0.025, 0.6], [0.04, 0.78], [0.05, 0.84], [0, 0.84]], 12);
+    const balGeo = lathe([[0.05, 0], [0.05, 0.06], [0.03, 0.12], [0.045, 0.35], [0.025, 0.6], [0.04, 0.78], [0.05, 0.84]], 8);
     const bal: Inst[] = [];
     const rail = (ax: "x" | "z", c: number, a1: number, a2: number) => {
       const n = Math.round(Math.abs(a2 - a1) / 0.22);
