@@ -349,9 +349,24 @@ export function buildSewer(): World {
   grateBridge(-11);
   grateBridge(7);
   // big pipe crossing the channel low (climb over) at z = 13
-  pipeRun(pipeGrey, 0.42, [-MW + 0.2, 0.62, 12.5], [MW - 0.2, 0.62, 12.5], 2.2);
-  for (const x of [-4.5, -1.2, 1.2, 4.5]) B.box(conc2, 0.5, x * x < 4 ? 0.25 : 0.2, 0.9, x, x * x < 4 ? 0 : FY, 12.5, { flat: true, uv: 1 });
-  k.collider(-MW, MW, 12.1, 12.9, 0, 1.04, true);
+  // (it dips low only over the water and rises over both walkways, so the walkways stay open underneath)
+  {
+    const PY = 0.62, HY = 2.95, xe = CH - 0.5;
+    const path = (sx: number): THREE.Vector3[] => [
+      new THREE.Vector3(sx * (MW - 0.15), HY, 12.5), new THREE.Vector3(sx * (CH + 0.6), HY, 12.5), new THREE.Vector3(sx * (xe + 0.05), HY - 0.35, 12.5),
+      new THREE.Vector3(sx * xe, HY - 1.0, 12.5), new THREE.Vector3(sx * (xe - 0.05), PY + 0.4, 12.5), new THREE.Vector3(sx * (xe - 0.5), PY, 12.5), new THREE.Vector3(0, PY, 12.5),
+    ];
+    for (const sx of [-1, 1]) {
+      const pts = path(sx);
+      B.geo(pipeGrey, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "centripetal", 0.2), 40, 0.42, 18), 0, 0, 0);
+      // flanges at the bends + wall bracket
+      for (const fx of [CH + 0.9, xe - 0.8]) B.rod(rustBare, 0.48, [sx * fx, fx > CH ? HY : PY, 12.5], [sx * (fx + 0.06), fx > CH ? HY : PY, 12.5], 18);
+      B.box(steel, 0.9, 0.1, 0.12, sx * (MW - 0.5), HY - 0.52, 12.5, { flat: true });
+      k.collider(Math.min(sx * (xe - 0.45), sx * (xe + 0.45)), Math.max(sx * (xe - 0.45), sx * (xe + 0.45)), 12.05, 12.95, 0, HY + 0.42, false);
+    }
+    for (const x of [-1.2, 1.2]) B.box(conc2, 0.5, 0.25, 0.9, x, 0, 12.5, { flat: true, uv: 1 });
+    k.collider(-xe, xe, 12.08, 12.92, 0, PY + 0.42, true);
+  }
   // concrete pillars along the channel edge
   for (const z of [-17, -4, 10, 20]) for (const s of [-1, 1]) {
     B.box(conc2, 0.75, WALLH + 2.1, 0.75, s * (CH + 0.55), 0, z, { flat: true, uv: 1.4, world: true });
@@ -438,7 +453,7 @@ export function buildSewer(): World {
   k.collider(-13.1, -11.4, -10.2, -9.2, FY, FY + 0.9, true);
   for (let i = 0; i < 3; i++) B.geo(rubber, new THREE.TorusGeometry(0.3, 0.11, 8, 18), -9.9, FY + 0.11 + i * 0.22, 0.0 - i * 0.03, { rx: Math.PI / 2 });
   k.collider(-10.35, -9.45, -0.45, 0.45, FY, FY + 0.66, true);
-  sandbagWall(-11.3, -3.2, 2.4, 3, 0);
+  sandbagWall(-11.3, -3.2, 1.2, 3, 0);
   cagedLamp(WX2 - 0.02, 2.4, -8.2, "w", lampFlicker);
   cagedLamp(WX1 + 0.02, 2.4, -15.8, "e", lampDead);
   cagedLamp(WX1 + 0.02, 2.4, -1.2, "e", lampCold);
@@ -592,15 +607,17 @@ export function buildSewer(): World {
   k.collider(-2.2, 2.2, 17.2, 17.5, FY, FY + 0.9, false);
   sandbagWall(-5.2, 18.6, 2.4, 3, Math.PI / 2);
   sandbagWall(5.3, 17.9, 1.8, 2, Math.PI / 2 + 0.1);
-  drum(-5.8, 21.0, drumRed);
-  drum(-5.2, 21.3, drumRed);
-  drum(-5.6, 21.8, drumBlue);
+  // drums stored in the niche behind the stairs
+  drum(-5.75, 22.55, drumRed);
+  drum(-5.8, 23.25, drumRed);
+  drum(-5.7, 23.95, drumBlue);
+  drum(-5.75, 23.3, drumRust, FY + 0.88);
 
   // ============ MAIN TUNNEL PROPS ============
   // north end: pump platform with valves, drums, sandbags
-  sandbagWall(-4.5, -22.6, 2.4, 3, 0);
-  for (const [x, z, m] of [[4.2, -23.2, drumRed], [4.9, -23.0, drumRust], [4.55, -22.4, drumRed], [5.6, -23.3, drumBlue]] as const) drum(x, z, m);
-  drum(3.6, -21.6, drumRust, FY, true, 1.2);
+  sandbagWall(-5.4, -22.6, 1.2, 3, 0);
+  for (const [x, z, m] of [[4.2, -23.2, drumRed], [4.9, -23.0, drumRust], [5.6, -23.3, drumBlue]] as const) drum(x, z, m);
+  drum(5.5, -22.2, drumRust, FY, true, 0);
   B.box(plate, 2.0, 0.9, 1.4, -5.3, FY, -18.0, { uv: 1 });
   B.cyl(pipeGrey, 0.35, 0.35, 0.9, -5.3, FY + 0.9, -18.0, { seg: 18 });
   valve(-5.3, FY + 2.0, -18.0, "z", 0.3, pipeYellow);
@@ -723,8 +740,23 @@ export function buildSewer(): World {
 
   // hiders: both walkways between the bridges; hunters: maintenance landing
   const hiders: THREE.Vector3[] = [];
-  for (let i = 0; i < 15; i++) hiders.push(new THREE.Vector3(-5.4 + (i % 3) * 1.2, FY, -9.0 + Math.floor(i / 3) * 1.15));
+  for (let i = 0; i < 15; i++) hiders.push(new THREE.Vector3(-4.9 + (i % 3) * 1.0, FY, -9.3 + Math.floor(i / 3) * 1.0));
   for (let i = 0; i < 9; i++) hiders.push(new THREE.Vector3(3.3 + (i % 3) * 1.1, FY, -8.6 + Math.floor(i / 3) * 1.2));
+  // safety: push any spawn that sits inside furniture (nav inflates obstacles by 0.45 m) to the nearest clear nav cell
+  {
+    const cellC = (v: number, o: number) => o + (Math.floor((v - o) / 0.5) + 0.5) * 0.5;
+    const blockedAt = (px: number, pz: number) => {
+      const x = cellC(px, -13.8), z = cellC(pz, -24);
+      return k.obstacles.some((o) => o.top > 0.46 && o.bottom < 1.6 && x > o.minX - 0.5 && x < o.maxX + 0.5 && z > o.minZ - 0.5 && z < o.maxZ + 0.5);
+    };
+    for (const v of hiders) {
+      if (!blockedAt(v.x, v.z)) continue;
+      search: for (let d = 0.25; d < 3; d += 0.25) for (let a = 0; a < 16; a++) {
+        const x = v.x + Math.cos((a / 16) * Math.PI * 2) * d, z = v.z + Math.sin((a / 16) * Math.PI * 2) * d;
+        if (!blockedAt(x, z)) { v.x = x; v.z = z; break search; }
+      }
+    }
+  }
   const hunters: THREE.Vector3[] = [];
   for (let i = 0; i < 9; i++) hunters.push(new THREE.Vector3(-1.2 + (i % 3) * 1.2, FY, 20.6 + Math.floor(i / 3) * 1.2));
 

@@ -21,6 +21,15 @@ function place(geo: G, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, 
 function lathe(pts: [number, number][], seg = 28) {
   return new THREE.LatheGeometry(pts.map(([r, h]) => new THREE.Vector2(r, h)), seg);
 }
+/** lathe whose v coordinate follows real height (y / vScale) instead of the point index */
+function latheV(pts: [number, number][], seg: number, vScale: number) {
+  const geo = lathe(pts, seg);
+  const uv = geo.attributes.uv;
+  const n = pts.length;
+  for (let i = 0; i < uv.count; i++) uv.setY(i, pts[i % n][1] / vScale);
+  uv.needsUpdate = true;
+  return geo;
+}
 function beam(a: V3t, b: V3t, r1: number, r2 = r1, seg = 10) {
   const va = new V3(...a), vb = new V3(...b);
   const len = va.distanceTo(vb);
@@ -115,10 +124,10 @@ export function buildEgypt(): World {
   const mRelief = k.mat(tx("relief1", () => E.relief(1)), "#ffffff", [1, 1], { roughness: 0.9, bump: 1.1 });
   const mRelief2 = k.mat(tx("relief2", () => E.relief(7, false, "#c9a270")), "#ffffff", [1, 1], { roughness: 0.9, bump: 1.1 });
   const mPainted = k.mat(tx("tomb", () => E.relief(3, true)), "#ffffff", [1, 1], { roughness: 0.85, bump: 0.6 });
-  const mCol = k.mat(tx("col", () => E.columnBand()), "#ffffff", [4, 1], { roughness: 0.9, bump: 1.0 });
+  const mCol = k.mat(tx("col", () => E.columnBand()), "#ffffff", [2, 1], { roughness: 0.9, bump: 1.0 });
   const mCap = k.mat(tx("cap", () => E.capital()), "#ffffff", [3, 1], { roughness: 0.9, bump: 0.7 });
   const mBand = k.mat(tx("band", () => E.glyphBand()), "#ffffff", [1, 1], { roughness: 0.9, bump: 1.0 });
-  const mObelisk = k.mat(tx("col", () => E.columnBand()), "#e3b3a0", [1, 1], { roughness: 0.6, bump: 1.0 });
+  const mObelisk = k.mat(tx("col", () => E.columnBand()), "#e3b3a0", [1, 0.5], { roughness: 0.6, bump: 1.0 });
   const mStars = k.mat(tx("stars", () => E.starCeiling()), "#ffffff", [1, 1], { roughness: 0.9, bump: 0.3 });
   const mPave = k.mat(tx("pave", () => E.paving()), "#ffffff", [1, 1], { roughness: 0.88, bump: 0.8 });
   const mSand = k.mat(tx("sand", () => E.sand()), "#ffffff", [1, 1], { roughness: 1, bump: 0.5 });
@@ -264,8 +273,8 @@ export function buildEgypt(): World {
   // FLOORS + OUTSIDE LANDSCAPE
   // ======================================================================
   // forecourt sand (z > 7), interior paving
-  b.add(mSand, place(new THREE.BoxGeometry(42, 0.2, 14.5), 0, -0.1, 14), 3);
-  b.add(mPave, place(new THREE.BoxGeometry(42, 0.2, 28.5), 0, -0.1, -7.25), 4);
+  b.add(mSand, place(new THREE.BoxGeometry(43, 0.2, 14.5), 0, -0.1, 14.25), 3);
+  b.add(mPave, place(new THREE.BoxGeometry(43, 0.2, 28.5), 0, -0.1, -7.25), 4);
   // paved processional way through the forecourt
   b.add(mPave, place(new THREE.BoxGeometry(4.6, 0.04, 14.2), 0, 0.0, 14), 4);
   // desert outside the walls + distant dunes and pyramids
@@ -285,7 +294,7 @@ export function buildEgypt(): World {
   // ======================================================================
   // north outer wall
   wall("x", -21, -21.5, -9.5, H.side, [], mPainted, 0);
-  wall("x", -21, -9.5, 9.5, H.throne, [], mRelief2, 4.2);
+  wall("x", -21, -9.5, 9.5, H.throne, [], mRelief2, 4);
   wall("x", -21, 9.5, 21.5, H.side, [], mRelief, 0);
   // west / east outer walls (interior wings)
   wall("z", -21, -21.5, 6, H.side, [], mRelief, 0, 1, false);
@@ -293,30 +302,25 @@ export function buildEgypt(): World {
   // tomb gets painted walls on its west side: overlay painted panels
   // z = -9.5 cross wall (tomb|gallery, hall|throne, treasury|gallery)
   wall("x", -9.5, -21.5, -13.5, H.side, [[-17, 2.4]], mRelief2, 0);
-  wall("x", -9.5, -13.5, 13.5, H.hall, [[0, 4.2, 4.6]], mRelief, 4.2);
+  wall("x", -9.5, -13.5, 13.5, H.hall, [[0, 4.2, 4.6]], mRelief, 4);
   wall("x", -9.5, 13.5, 21.5, H.side, [[17, 2.4]], mRelief2, 0);
   // throne room side walls
-  wall("z", -9.5, -21.5, -10, H.throne, [[-15, 2.4]], mRelief2, 4.2);
-  wall("z", 9.5, -21.5, -10, H.throne, [[-15, 2.4]], mRelief2, 4.2);
+  wall("z", -9.5, -21.5, -10, H.throne, [[-15, 2.4]], mRelief2, 4);
+  wall("z", 9.5, -21.5, -10, H.throne, [[-15, 2.4]], mRelief2, 4);
   // hall side walls
-  wall("z", -13.5, -9, 4, H.hall, [[-2, 2.6]], mRelief, 4.2);
-  wall("z", 13.5, -9, 4, H.hall, [[-2, 2.6]], mRelief, 4.2);
+  wall("z", -13.5, -9, 4, H.hall, [[-2, 2.6]], mRelief, 4);
+  wall("z", 13.5, -9, 4, H.hall, [[-2, 2.6]], mRelief, 4);
   // gallery south walls (to forecourt), height 5.4 so their tops join the roofs
   wall("x", 6.5, -21.5, -14, H.side + 0.4, [[-17.5, 2.4]], mBlock, 0);
   wall("x", 6.5, 14, 21.5, H.side + 0.4, [[17.5, 2.4]], mBlock, 0);
   cornice("x", 7.02, -21.5, -14, H.side + 0.4, 0.04);
   cornice("x", 7.02, 14, 21.5, H.side + 0.4, 0.04);
   // painted tomb walls: overlay the inner faces of the burial chamber with the painted relief
-  for (const [x1, x2, z1, z2] of [[-20.5, -10, -20.52, -20.48], [-20.52, -20.48, -20.5, -10], [-10.02, -9.98, -20.5, -10], [-20.5, -10, -9.98, -10.02]] as const) {
-    if (x2 - x1 > 1) {
-      // along x (north / south faces) — skip the door area on the south face
-      if (z1 > -15) { boxAt(mPainted, x1, -18.2, 0, H.side, Math.min(z1, z2), Math.max(z1, z2), 4, false); boxAt(mPainted, -15.8, x2, 0, H.side, Math.min(z1, z2), Math.max(z1, z2), 4, false); }
-      else boxAt(mPainted, x1, x2, 0, H.side, Math.min(z1, z2), Math.max(z1, z2), 4, false);
-    } else if (x1 > -15) {
-      boxAt(mPainted, x1, x2, 0, H.side, z1, -16.2, 4, false);
-      boxAt(mPainted, x1, x2, 0, H.side, -13.8, z2, 4, false);
-    } else boxAt(mPainted, x1, x2, 0, H.side, z1, z2, 4, false);
-  }
+  boxAt(mPainted, -20.52, -20.48, 0, H.side, -20.5, -10, 4, false);
+  boxAt(mPainted, -10.02, -9.98, 0, H.side, -20.5, -16.2, 4, false);
+  boxAt(mPainted, -10.02, -9.98, 0, H.side, -13.8, -10, 4, false);
+  boxAt(mPainted, -20.5, -18.2, 0, H.side, -10.02, -9.98, 4, false);
+  boxAt(mPainted, -15.8, -10, 0, H.side, -10.02, -9.98, 4, false);
 
   // ---------------- PYLON ----------------
   {
@@ -357,8 +361,9 @@ export function buildEgypt(): World {
     b.add(mCedar, place(boxGeo(2.1, 5.6, 0.18), -2.1, 2.8, 3.2, 0, -1.25, 0), 1.5);
     k.collider(-2.4, -1.8, 2.1, 4.1, 0, 5.6, false);
     for (let i = 0; i < 5; i++) b.add(mBronze, place(new THREE.BoxGeometry(2.12, 0.08, 0.2), -2.1, 0.6 + i * 1.1, 3.2, 0, -1.25, 0));
-    b.add(mCedar, place(boxGeo(2.1, 0.2, 5.0), 2.9, 0.1, 1.2, 0, 0.35, 0.05), 1.5);
-    for (let i = 0; i < 5; i++) b.add(mBronze, place(new THREE.BoxGeometry(2.12, 0.22, 0.08), 2.9, 0.12, 1.2 - 2 + i, 0, 0.35, 0.05));
+    const df = new Frame(-0.4, 1.4, 0.35);
+    b.add(mCedar, df.put(boxGeo(2.1, 0.2, 5.0), 0, 0.1, 0), 1.5);
+    for (let i = 0; i < 5; i++) b.add(mBronze, df.put(new THREE.BoxGeometry(2.14, 0.22, 0.08), 0, 0.11, -2 + i));
   }
 
   // ---------------- forecourt perimeter (ruined) ----------------
@@ -389,8 +394,8 @@ export function buildEgypt(): World {
     if (s < 0) cornice("x", 21.1, -4.5, -2.9, 5.6, 1.1);
   }
   // fallen lintel of the gate, half buried
-  b.add(mBand, place(boxGeo(4.8, 0.7, 1.0), 3.2, 0.25, 19.3, 0.1, 0.5, 0.08), 1.3);
-  k.collider(1.3, 5.1, 18.1, 20.5, 0, 0.6, true);
+  b.add(mBand, place(boxGeo(4.8, 0.7, 1.0), 5.0, 0.25, 19.6, 0.1, 0.3, 0.08), 1.3);
+  k.collider(2.9, 7.1, 18.8, 20.4, 0, 0.6, true);
 
   // ---------------- roofs ----------------
   // hall: star ceiling, collapsed bay + two clerestory slots over the nave
@@ -411,7 +416,6 @@ export function buildEgypt(): World {
   slab(-21.5, -10, -21.5, -10, H.side, 0.4, mStars);
   slab(10, 21.5, -21.5, -10, H.side, 0.4, mStars);
   // cornices along the wing and hall roof edges
-  cornice("x", 4.02, -14, 14, H.hall + 0.5, 0.04);
   cornice("z", -21.52, -21.5, 6, H.side + 0.4, 0.04);
   cornice("z", 21.52, -21.5, 6, H.side + 0.4, 0.04);
   // broken edge blocks around the collapse
@@ -423,17 +427,17 @@ export function buildEgypt(): World {
   k.room("Hypostyle Hall", -13.5, 13.5, -9.5, 4);
   const colXs = [-10, -6.4, -2.8, 2.8, 6.4, 10];
   const colZs = [-6.3, -2.6, 1.0];
-  const shaftPts: [number, number][] = [[0.82, 0], [0.87, 0.35], [0.86, 1.4], [0.82, 3.0], [0.76, 4.6], [0.72, 5.5]];
+  const shaftPts: [number, number][] = [[0.84, 0], [0.87, 0.5], [0.85, 1.1], [0.83, 2.2], [0.8, 3.3], [0.76, 4.4], [0.72, 5.5]];
   const column = (x: number, z: number, broken = 0) => {
     b.add(mBlockShade, place(lathe([[0, 0], [1.08, 0], [1.1, 0.28], [1.0, 0.36], [0, 0.36]], 32), x, 0, z));
     if (broken) {
       // stump + jagged top
       const pts = shaftPts.filter((p) => p[1] < broken).concat([[0.8, broken], [0.5, broken + 0.18], [0, broken + 0.05]]);
-      b.add(mCol, place(lathe(pts, 32), x, 0.36, z));
+      b.add(mCol, place(latheV(pts, 32, 5.5), x, 0.36, z));
       k.collider(x - 0.85, x + 0.85, z - 0.85, z + 0.85, 0, broken + 0.4, true);
       return;
     }
-    b.add(mCol, place(lathe(shaftPts, 32), x, 0.36, z));
+    b.add(mCol, place(latheV(shaftPts, 32, 5.5), x, 0.36, z));
     for (let i = 0; i < 3; i++) b.add(mBlockShade, place(new THREE.TorusGeometry(0.73, 0.05, 6, 32), x, 5.5 + i * 0.13, z, Math.PI / 2, 0, 0));
     b.add(mCap, place(lathe([[0.72, 0], [0.9, 0.25], [1.2, 0.65], [1.42, 1.0], [1.5, 1.15], [1.46, 1.22], [0, 1.22]], 32), x, 5.9, z));
     b.add(mBlock, place(boxGeo(1.9, 0.3, 1.9), x, 7.26, z), 2);
@@ -443,8 +447,11 @@ export function buildEgypt(): World {
   for (const z of colZs) for (const x of colXs) column(x, z, x === -6.4 && z === -2.6 ? 1.9 : x === 10 && z === 1.0 ? 3.6 : 0);
   // architraves along each row of columns (x) and down the nave (z)
   for (const z of colZs) {
-    boxAt(mBand, -13, 13, 7.41, 8.0, z - 0.55, z + 0.55, 2.4, false);
-    k.collider(-13, 13, z - 0.55, z + 0.55, 7.41, 8.0, true);
+    const spans = z === -2.6 ? [[-13, -10.8], [-6.8, 13]] : [[-13, 13]];
+    for (const [a1, a2] of spans) {
+      boxAt(mBand, a1, a2, 7.41, 8.0, z - 0.55, z + 0.55, 2.4, false);
+      k.collider(a1, a2, z - 0.55, z + 0.55, 7.41, 8.0, true);
+    }
   }
   for (const x of [-2.8, 2.8]) boxAt(mBand, x - 0.5, x + 0.5, 7.41, 8.0, -9, 4, 2.4, false);
   // the broken column's drums lying in the aisle
@@ -582,8 +589,8 @@ export function buildEgypt(): World {
   jackalGuard(3.3, -8.3, 0.5, 1.15, 0);
   for (const s of [-1, 1]) boxAt(mBlock, s * 3.3 - 0.55, s * 3.3 + 0.55, 0, 0.5, -8.9, -7.7, 2);
   for (const s of [-1, 1]) {
-    boxAt(mBlockShade, s * 9 - 0.9, s * 9 + 0.9, 0, 0.6, -9, -7.2, 2);
-    seated(s * 9, -8.25, 0.6, 1.25, 0, mLime, mNemesStone, mBlockShade);
+    boxAt(mBlockShade, s * 9 - 0.9, s * 9 + 0.9, 0, 0.6, -9, -6.9, 2);
+    seated(s * 9, -7.95, 0.6, 1.25, 0, mLime, mNemesStone, mBlockShade);
   }
   // colossal fallen head near the collapse
   {
@@ -660,13 +667,14 @@ export function buildEgypt(): World {
     b.add(mEmber, f.put(new THREE.SphereGeometry(0.085, 10, 6), 0, 0.46, 0.36, 0, 0, 0, [1, 0.5, 1]));
     b.add(mFlame, f.put(lathe([[0, 0], [0.08, 0.05], [0.095, 0.14], [0.06, 0.28], [0.025, 0.4], [0, 0.48]], 12), 0, 0.44, 0.36));
   };
-  const brazier = (x: number, z: number, s = 1) => {
-    const f = new Frame(x, z, 0, 0, s);
+  const brazier = (x: number, z: number, s = 1, y = 0) => {
+    const f = new Frame(x, z, 0, y, s);
     for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; b.add(mBronze, f.raw(beam([Math.cos(a) * 0.32, 0, Math.sin(a) * 0.32], [Math.cos(a) * 0.18, 0.9, Math.sin(a) * 0.18], 0.03))); }
     b.add(mBronze, f.put(lathe([[0.05, 0], [0.3, 0.08], [0.42, 0.22], [0.44, 0.26], [0.0, 0.26]], 20), 0, 0.85, 0));
     b.add(mEmber, f.put(new THREE.SphereGeometry(0.38, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.06, 0, 0, 0, 0, [1, 0.25, 1]));
     b.add(mFlame, f.put(lathe([[0, 0], [0.2, 0.08], [0.22, 0.25], [0.12, 0.5], [0.04, 0.72], [0, 0.8]], 14), 0, 1.06, 0));
     f.col(k, -0.4, 0.4, -0.4, 0.4, 0, 1.12, false);
+    void y;
   };
   const canopic = (x: number, y: number, z: number, kind: number, ry: number) => {
     const f = new Frame(x, z, ry, y, 1);
@@ -715,9 +723,9 @@ export function buildEgypt(): World {
   };
 
   // hall props
-  offeringTable(0, -6.6, 0);
-  brazier(-1.6, -6.9);
-  brazier(1.6, -6.9);
+  offeringTable(0, -4.4, 0);
+  brazier(-5.4, -8.3);
+  brazier(5.4, -8.3);
   potCluster(-12.1, -8.2, 6, 0.7);
   potCluster(12.2, 3.0, 5, 0.6);
   potCluster(11.8, -7.6, 5, 0.7, [mPot, mAlab]);
@@ -787,10 +795,10 @@ export function buildEgypt(): World {
       jackalShrine(s * 3.4, -19.4, 1.2, 1.0, 0);
       pot(s * 4.1, 1.2, -17.3, 1.1, 2, mAlab);
       pot(s * 3.7, 1.2, -17.0, 0.8, 0, mAlab, false);
-      chest(s * 8.2, 0, -14.4, 0.9, 0.55, 0.6, s * 0.3, true, false, s < 0 ? mChest : mChest2);
-      potCluster(s * 8.4, -11.2, 4, 0.5, [mAlab, mPot]);
+      chest(s * 7.6, 0, -10.9, 0.9, 0.55, 0.6, s * 0.3, true, false, s < 0 ? mChest : mChest2);
+      potCluster(s * 4.4, -10.8, 4, 0.5, [mAlab, mPot]);
       torch(s * 2.8, 3.4, -20.48, 0);
-      cat(s * 1.4, -16.1, 0.8, 0.55, s * -0.25, mGold, mLapis);
+      cat(s * 1.4, -16.35, 0.8, 0.55, s * -0.25, mGold, mLapis);
     }
     k.collider(-2.2, 2.2, -20.5, -20.2, 1.2, 3.6, true);
     // gold piles on the dais
@@ -813,11 +821,11 @@ export function buildEgypt(): World {
     b.add(mGranite, place(new THREE.CylinderGeometry(0.8, 0.8, 2.8, 20, 1, false, 0, Math.PI), -15.0, 1.7, -15.3, 0.03, 0.22 + Math.PI / 2, Math.PI / 2 - 0.06, [1, 1, 0.25]), 1.5);
     k.collider(-16.6, -13.3, -16.4, -14.2, 0.36, 1.9, true);
     // gilded coffin on a lion bier
-    const lf = lionBed(-11.5, -16.4, 0, 2.1);
-    mummy(lf, 0.98, 1.85, true);
+    const lf = lionBed(-12.4, -12.2, Math.PI / 2, 2.1);
+    mummy(lf, 0.96, 1.85, true);
     // mummy on a second bier
-    const lf2 = lionBed(-19.4, -12.4, Math.PI / 2, 2.0);
-    mummy(lf2, 0.9, 1.7, false);
+    const lf2 = lionBed(-19.6, -14.6, 0, 2.0);
+    mummy(lf2, 0.94, 1.7, false);
     // canopic chest + 4 jars
     chest(-19.6, 0, -18.0, 0.8, 0.5, 0.8, 0.0, false, false, mChest2);
     for (let i = 0; i < 4; i++) canopic(-19.6 + (i % 2 ? 0.18 : -0.18), 0.64, -18.0 + (i < 2 ? -0.18 : 0.18), i, i * 0.5);
@@ -826,17 +834,16 @@ export function buildEgypt(): World {
     const t1 = chest(-13.2, 0, -19.9, 1.3, 0.7, 0.8, 0.0, false, true);
     chest(-13.2, t1, -19.9, 1.0, 0.45, 0.6, 0.12, true, false, mChest2);
     chest(-11.4, 0, -19.8, 1.0, 0.6, 0.7, -0.08, true, false);
-    jackalShrine(-19.8, -15.2, 0, 1.0, Math.PI / 2);
-    cat(-11.0, -11.0, 0, 0.9, -2.4, mBasalt, mGold);
-    cat(-19.8, -10.6, 0, 0.8, 2.4, mGold, mLapis);
-    potCluster(-10.9, -13.4, 5, 0.5, [mAlab, mPot]);
-    potCluster(-17.2, -20.0, 4, 0.4, [mPot, mClay]);
+    jackalShrine(-19.7, -11.4, 0, 1.0, Math.PI / 2);
+    cat(-10.8, -10.8, 0, 0.9, -2.4, mBasalt, mGold);
+    cat(-13.9, -10.8, 0, 0.8, Math.PI, mGold, mLapis);
+    potCluster(-10.9, -18.0, 5, 0.5, [mAlab, mPot]);
     // shabti shelf
-    boxAt(mCedar, -16.0, -13.8, 1.2, 1.28, -20.48, -20.1, 1, true);
-    for (let i = 0; i < 12; i++) b.add(mFaience, place(lathe([[0, 0], [0.04, 0], [0.045, 0.1], [0.04, 0.18], [0.03, 0.2], [0.035, 0.24], [0, 0.26]], 10), -15.85 + i * 0.18, 1.28, -20.3));
-    torch(-20.48, 2.9, -14.0, Math.PI / 2);
+    boxAt(mCedar, -17.6, -15.4, 1.2, 1.28, -20.48, -20.1, 1, true);
+    for (let i = 0; i < 12; i++) b.add(mFaience, place(lathe([[0, 0], [0.04, 0], [0.045, 0.1], [0.04, 0.18], [0.03, 0.2], [0.035, 0.24], [0, 0.26]], 10), -17.45 + i * 0.18, 1.28, -20.3));
+    torch(-20.48, 2.9, -17.0, Math.PI / 2);
     torch(-10.02, 2.9, -18.2, -Math.PI / 2);
-    brazier(-12.2, -12.0, 0.9);
+    brazier(-14.9, -11.5, 0.9);
   }
 
   // ======================================================================
@@ -864,7 +871,7 @@ export function buildEgypt(): World {
     const tf = new Frame(-15.4, 1.6, 0.1);
     b.add(mCedar, tf.put(boxGeo(1.8, 0.08, 0.8), 0, 0.8, 0));
     for (const [lx, lz] of [[-0.8, -0.32], [0.8, -0.32], [-0.8, 0.32], [0.8, 0.32]] as const) b.add(mCedar, tf.put(new THREE.CylinderGeometry(0.04, 0.035, 0.76, 8), lx, 0.38, lz));
-    for (let i = 0; i < 4; i++) canopic(...[tf.pt(-0.6 + i * 0.4, 0.1)].map(([px, pz]) => [px, 0.84, pz] as const)[0], i, 0.2);
+    for (let i = 0; i < 4; i++) { const [px, pz] = tf.pt(-0.6 + i * 0.4, 0.1); canopic(px, 0.84, pz, i, 0.2); }
     b.add(mBronze, tf.put(boxGeo(0.4, 0.02, 0.06), 0.3, 0.85, -0.25));
     tf.col(k, -0.9, 0.9, -0.4, 0.4, 0, 0.84, true);
     potCluster(-14.8, 4.8, 6, 0.8);
@@ -880,12 +887,12 @@ export function buildEgypt(): World {
     const scrolls: Inst[] = [];
     for (const z of [-6.5, -2.2, 2.4]) {
       const f = new Frame(20.15, z, -Math.PI / 2);
-      b.add(mCedar, f.put(boxGeo(2.6, 2.3, 0.08), 0, 1.15, 0.24));
+      b.add(mCedar, f.put(boxGeo(2.6, 2.3, 0.08), 0, 1.15, -0.24));
       for (const lx of [-1.3, -0.43, 0.43, 1.3]) b.add(mCedar, f.put(boxGeo(0.06, 2.3, 0.5), lx, 1.15, 0));
       for (const y of [0.05, 0.6, 1.15, 1.7, 2.25]) b.add(mCedar, f.put(boxGeo(2.66, 0.05, 0.52), 0, y, 0));
       for (let c = 0; c < 3; c++) for (let r2 = 0; r2 < 4; r2++) for (let i = 0; i < 6; i++) {
         const [px, pz] = f.pt(-1.1 + c * 0.86 + (i % 3) * 0.2 + rr(-0.03, 0.03), 0.02);
-        scrolls.push({ pos: [px, 0.14 + r2 * 0.55 + Math.floor(i / 3) * 0.09, pz], rotX: Math.PI / 2, rotZ: rr(-0.1, 0.1), rotY: -Math.PI / 2, scale: [1, rr(0.8, 1.1), 1], color: ["#e8dcb5", "#d9c998", "#efe4c4"][i % 3] });
+        scrolls.push({ pos: [px, 0.12 + r2 * 0.55 + Math.floor(i / 3) * 0.085, pz], rotZ: Math.PI / 2 + rr(-0.05, 0.05), rotY: rr(-0.12, 0.12), scale: [1, rr(0.8, 1.1), 1], color: ["#e8dcb5", "#d9c998", "#efe4c4"][i % 3] });
       }
       f.col(k, -1.33, 1.33, -0.28, 0.28, 0, 2.3, true);
     }
@@ -898,7 +905,7 @@ export function buildEgypt(): World {
       for (const [lx, lz] of [[-0.5, -0.22], [0.5, -0.22], [-0.5, 0.22], [0.5, 0.22]] as const) b.add(mCedar, f.put(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8), lx, 0.2, lz));
       b.add(mFood, f.put(new THREE.PlaneGeometry(0.5, 0.34), 0.1, 0.455, 0, -Math.PI / 2, 0, 0.1));
       b.add(mEbony, f.put(boxGeo(0.3, 0.04, 0.07), -0.4, 0.47, 0.1));
-      pot(...f.pt(0.45, -0.15), 0.45, 0.35, 3, mClay, false) ;
+      { const [px, pz] = f.pt(0.45, -0.15); pot(px, 0.45, pz, 0.35, 3, mClay, false); }
       f.col(k, -0.6, 0.6, -0.3, 0.3, 0, 0.46, true);
       const [sx, sz] = f.pt(0, 0.7);
       b.add(mCedar, place(boxGeo(0.45, 0.3, 0.4), sx, 0.15, sz), 1);
@@ -931,18 +938,18 @@ export function buildEgypt(): World {
       if (i < 2) chest(x, y, z, 0.7, 0.35, 0.5, ry + rr(-0.3, 0.3), true);
     });
     // gold heaps with coins, golden cats, vases, model boat, chariot wheel, shields
-    for (const [x, z, r] of [[16.4, -19.4, 0.9], [18.6, -15.2, 0.7], [13.2, -13.4, 0.6]] as const) {
+    for (const [x, z, r] of [[16.4, -19.4, 0.9], [18.6, -15.2, 0.7], [14.4, -12.8, 0.6]] as const) {
       b.add(mGold, place(new THREE.SphereGeometry(r, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), x, 0, z, 0, 0, 0, [1, 0.55, 1]));
       k.collider(x - r * 0.8, x + r * 0.8, z - r * 0.8, z + r * 0.8, 0, r * 0.5, true);
       for (let i = 0; i < 40; i++) { const a = rnd() * 6.28, d = rr(0, r * 1.3); const hh = Math.max(0, r * 0.55 * (1 - (d / r) ** 2)); coins.push({ pos: [x + Math.cos(a) * d, hh + 0.01, z + Math.sin(a) * d], rotX: rr(-0.6, 0.6), rotZ: rr(-0.6, 0.6) }); }
     }
-    boxAt(mBlock, 11.2, 12.4, 0, 0.8, -16.5, -15.3, 2);
-    cat(11.8, -15.9, 0.8, 1.1, Math.PI / 2, mGold, mLapis);
-    boxAt(mBlock, 11.2, 12.4, 0, 0.8, -12.3, -11.1, 2);
-    cat(11.8, -11.7, 0.8, 1.1, Math.PI / 2, mGold, mLapis);
+    for (const z of [-17.7, -12.3]) {
+      boxAt(mBlock, 10.3, 11.5, 0, 0.8, z - 0.6, z + 0.6, 2);
+      cat(10.9, z, 0.8, 1.1, Math.PI / 2, mGold, mLapis);
+    }
     // vases on a low bench
-    boxAt(mCedar, 14.6, 18.0, 0, 0.45, -10.9, -10.4, 1);
-    for (let i = 0; i < 6; i++) pot(14.9 + i * 0.55, 0.45, -10.65, rr(0.6, 0.9), i % 4, i % 2 ? mAlab : mGoldPale, false);
+    boxAt(mCedar, 11.6, 15.0, 0, 0.45, -10.9, -10.4, 1);
+    for (let i = 0; i < 6; i++) pot(11.9 + i * 0.55, 0.45, -10.65, rr(0.6, 0.9), i % 4, i % 2 ? mAlab : mGoldPale, false);
     cartBoat(16.2, 0.45, -16.8, 0.4, 1.1);
     boxAt(mCedar, 15.3, 17.1, 0, 0.45, -17.6, -16.0, 1, true);
     // chariot wheel leaning on the wall
@@ -968,14 +975,16 @@ export function buildEgypt(): World {
   // ======================================================================
   // FORECOURT
   // ======================================================================
+  k.room("Portico", -21, -14.2, 9.4, 21);
   k.room("Forecourt", -21, 21, 7, 21);
   {
     // avenue of seated cats on plinths
     for (const z of [10.2, 13.6, 17.0]) for (const s of [-1, 1]) {
       boxAt(mBlock, s * 4.3 - 0.6, s * 4.3 + 0.6, 0, 1.0, z - 0.8, z + 0.8, 2);
-      cornice("z", s * 4.3, z - 0.8, z + 0.8, 1.0, 1.0);
+      boxAt(mBlockShade, s * 4.3 - 0.7, s * 4.3 + 0.7, 1.0, 1.12, z - 0.9, z + 0.9, 2);
+      b.add(mBand, place(new THREE.BoxGeometry(1.22, 0.4, 1.62), s * 4.3, 0.6, z), 1.3);
       cat(s * 4.3, z, 1.12, 1.7, -s * Math.PI / 2, mBasalt, mGold);
-      k.collider(s * 4.3 - 0.35, s * 4.3 + 0.35, z - 0.5, z + 0.5, 1.12, 2.9, true);
+      k.collider(s * 4.3 - 0.5, s * 4.3 + 0.5, z - 0.4, z + 0.4, 1.12, 2.9, true);
     }
     // obelisks: west standing, east broken with pieces in the sand
     const obelisk = (x: number, z: number, h: number, broken: boolean) => {
@@ -987,28 +996,27 @@ export function buildEgypt(): World {
       } else {
         b.add(mObelisk, place(taper(1.1, 2.8, 1.1, 0.93, 0.93), x, 2.4, z), 1.6);
         k.collider(x - 0.55, x + 0.55, z - 0.55, z + 0.55, 1.0, 3.8, true);
-        b.add(mObelisk, place(taper(1.0, 3.6, 1.0, 0.8, 0.8), x + 3.4, 0.45, z + 2.6, Math.PI / 2 - 0.05, 0.9, 0), 1.6);
-        k.collider(x + 1.9, x + 4.9, z + 1.4, z + 3.8, 0, 0.95, true);
-        b.add(mObelisk, place(taper(0.8, 2.6, 0.8, 0.7, 0.7), x + 6.1, 0.38, z + 5.2, Math.PI / 2 + 0.1, 0.6, 0.1), 1.6);
-        b.add(mGold, place(new THREE.ConeGeometry(0.34, 0.6, 4), x + 7.3, 0.35, z + 6.1, 1.2, 0.4, 0.8));
-        k.collider(x + 5.2, x + 7.2, z + 4.3, z + 6.3, 0, 0.8, true);
+        b.add(mObelisk, place(taper(1.0, 3.6, 1.0, 0.8, 0.8), x + 1.0, 0.45, z + 3.2, Math.PI / 2 - 0.05, 0.15, 0), 1.6);
+        k.collider(x + 0.3, x + 1.7, z + 1.4, z + 5.0, 0, 0.95, true);
+        b.add(mObelisk, place(taper(0.8, 2.6, 0.8, 0.7, 0.7), x + 1.9, 0.38, z + 7.4, Math.PI / 2 + 0.1, 0.5, 0.1), 1.6);
+        b.add(mGold, place(new THREE.ConeGeometry(0.34, 0.6, 4), x + 2.8, 0.3, z + 9.2, 1.2, 0.4, 0.8));
+        k.collider(x + 1.0, x + 2.8, z + 6.2, z + 8.6, 0, 0.8, true);
       }
     };
     obelisk(-6.4, 9.0, 10, false);
     obelisk(6.4, 9.0, 10, true);
     // broken columns (a ruined colonnade) in the east court
-    const cols: [number, number, number][] = [[10.6, 11.2, 1.3], [13.8, 11.2, 3.9], [10.6, 15.0, 0.6], [13.8, 15.0, 2.5], [10.6, 18.6, 2.9]];
+    const cols: [number, number, number][] = [[12.8, 11.4, 1.3], [15.8, 11.4, 3.9], [12.8, 15.2, 0.6], [15.8, 15.2, 2.5], [12.8, 18.8, 2.9]];
     for (const [x, z, h] of cols) {
       b.add(mBlockShade, place(lathe([[0, 0], [0.8, 0], [0.82, 0.22], [0.74, 0.3], [0, 0.3]], 28), x, 0, z));
       const pts: [number, number][] = [[0.6, 0], [0.62, 0.3], [0.6, h * 0.6], [0.58, h]];
-      b.add(mCol, place(lathe([...pts, [0.4, h + 0.14], [0.1, h + 0.06], [0, h + 0.1]], 28), x, 0.3, z, 0, rnd() * 6, 0, [1, 1, 1]));
+      b.add(mCol, place(latheV([...pts, [0.4, h + 0.14], [0.1, h + 0.06], [0, h + 0.1]], 28, 5.5), x, 0.3, z, 0, rnd() * 6, 0, [1, 1, 1]));
       k.collider(x - 0.62, x + 0.62, z - 0.62, z + 0.62, 0, h + 0.4, true);
     }
-    drum(12.3, 13.0, 0.4, 1.0, 0.6);
-    drum(15.6, 17.4, 1.3, 1.0, 0.6);
-    drum(12.6, 19.8, -0.3, 0.8, 0.6);
-    b.add(mCap, place(lathe([[0.55, 0], [0.7, 0.2], [0.95, 0.5], [1.1, 0.8], [1.15, 0.9], [0, 0.92]], 28), 15.4, 1.05, 12.6, 1.7, 0.6, 0.1));
-    k.collider(14.5, 16.3, 11.7, 13.5, 0, 1.2, true);
+    drum(14.3, 13.3, 0.4, 1.0, 0.6);
+    drum(14.3, 17.1, 1.3, 1.0, 0.6);
+    b.add(mCap, place(lathe([[0.55, 0], [0.7, 0.2], [0.95, 0.5], [1.1, 0.8], [1.15, 0.9], [0, 0.92]], 28), 16.9, 1.05, 13.3, 1.7, 0.6, 0.1));
+    k.collider(16.0, 17.8, 12.4, 14.2, 0, 1.2, true);
     addRubble(12.5, 16.2, 3.4, 45, 0.55);
     addRubble(-10.6, 19.4, 1.6, 18, 0.5);
     addRubble(3.4, 17.8, 1.4, 10, 0.4);
@@ -1041,10 +1049,10 @@ export function buildEgypt(): World {
     };
     palm(-12.6, 16.8, 6.8, 0.12, 0.3);
     palm(-10.8, 12.4, 5.6, -0.1, 2.2);
-    palm(8.6, 20.0, 6.2, 0.14, 4.0);
+    palm(10.8, 20.0, 6.2, 0.14, 4.0);
     // pottery, baskets, a toppled offering table, a fallen seated statue
     potCluster(-8.8, 10.2, 5, 0.8);
-    potCluster(16.2, 9.0, 4, 0.6);
+    potCluster(14.6, 8.4, 4, 0.6);
     basket(-2.6, 0, 19.8, 0.34, 0.42, "#b33a2a");
     basket(-1.9, 0, 20.1, 0.28, 0.36, null);
     offeringTable(-9.0, 8.4, 0.3);
@@ -1079,8 +1087,7 @@ export function buildEgypt(): World {
     chest(-18.0, 1.24, 18.8, 1.1, 0.6, 0.7, 0.2, true, true);
     boxAt(mGranite, -18.6, -17.6, 1.24, 1.9, 16.0, 17.0, 1.5);
     cat(-18.1, 16.5, 1.9, 0.9, Math.PI / 2, mGold, mLapis);
-    brazier(-17.0, 10.3, 0.8);
-    k.room("Portico", -21, -14.2, 9.4, 21);
+    brazier(-17.0, 10.3, 0.8, 1.24);
     // --- east stair to the roofs: 15 steps x 0.36 m, landing on stone piers ---
     const N = 15, rise = 0.36, tread = 0.55, zBot = 19.9;
     for (let i = 1; i <= N; i++) {
@@ -1093,7 +1100,6 @@ export function buildEgypt(): World {
     boxAt(mBlock, 18.4, 19.2, 0, N * rise - 0.5, 8.8, 9.6, 2);
     // parapet on the open side of the stair
     for (let i = 1; i <= N; i += 2) boxAt(mBlockShade, 18.15, 18.35, i * rise, i * rise + 0.5, zBot - i * tread, zBot - i * tread + tread * 2, 1, false);
-    k.room("Roof", -22, 22, -22, 7);
     // roof-top stair from the east wing roof (5.4) to the hall roof (8.5)
     for (let i = 1; i <= 8; i++) {
       const z2 = -0.6 - (i - 1) * 0.45;

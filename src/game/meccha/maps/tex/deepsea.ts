@@ -78,14 +78,14 @@ export const sand = (seed = 3) =>
 
 /** caustic light pool: bright wavy cell web on black, faded radially (for additive overlay) */
 export const causticPool = (seed = 1, radial = true) =>
-  makeTex(512, 512, (g, w, h) => {
+  makeTex(256, 256, (g, w, h) => {
     const r = rng(seed);
-    const N = 9;
+    const N = 7;
     const pts: [number, number][] = [];
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) pts.push([(x + 0.15 + r() * 0.7) / N, (y + 0.15 + r() * 0.7) / N]);
-    const warp = vnoise(5, seed + 3);
+    const warp = vnoise(4, seed + 3), warp2 = vnoise(9, seed + 5);
     pixels(g, w, h, (u, v, o) => {
-      const wu = u + (warp(u, v) - 0.5) * 0.05, wv = v + (warp(v + 0.3, u) - 0.5) * 0.05;
+      const wu = u + (warp(u, v) - 0.5) * 0.16 + (warp2(u, v) - 0.5) * 0.04, wv = v + (warp(v, u) - 0.5) * 0.16 + (warp2(v, u) - 0.5) * 0.04;
       const cx = Math.floor(wu * N), cy = Math.floor(wv * N);
       let f1 = 9, f2 = 9;
       for (let dy = -1; dy <= 1; dy++)
@@ -99,7 +99,7 @@ export const causticPool = (seed = 1, radial = true) =>
           if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
         }
       const e = f2 - f1;
-      let s = Math.pow(Math.max(0, 1 - e * 3.2), 3);
+      let s = Math.pow(Math.max(0, 1 - e * 2.4), 2.2) * (0.6 + 0.4 * warp2(wu, wv));
       if (radial) {
         const d = Math.hypot(u - 0.5, v - 0.5) * 2;
         s *= Math.max(0, 1 - d * d) ** 1.4;
@@ -111,29 +111,30 @@ export const causticPool = (seed = 1, radial = true) =>
 /** rough rock with crevices and algae/encrusting patches */
 export const rock = (base = "#6d6f68", seed = 4, algae = 0.45) =>
   makeTex(256, 256, (g, w, h) => {
-    const n = fbm(seed, 5, 4), c = vnoise(16, seed + 2), a = fbm(seed + 7, 3, 3);
-    const B = hex(base), G = hex("#4f6b3a"), P = hex("#9a6f7d");
+    const n = fbm(seed, 5, 4), c = fbm(seed + 2, 3, 12), a = fbm(seed + 7, 3, 3);
+    const B = hex(base), G = hex("#56703c"), P = hex("#9a6f7d");
     pixels(g, w, h, (u, v, o) => {
       const t = n(u, v);
-      const crev = Math.abs(c(u, v) - 0.5) < 0.04 ? 0.55 : 1;
-      const al = Math.max(0, (a(u, v) - (1 - algae)) * 4);
-      const pk = Math.max(0, (a(v, u) - 0.78) * 5);
+      const pit = c(u, v);
+      const sh = 0.55 + t * 0.75 - Math.max(0, pit - 0.62) * 1.4;
+      const al = Math.min(1, Math.max(0, (a(u, v) - (1 - algae)) * 3));
+      const pk = Math.min(1, Math.max(0, (a(v, u) - 0.74) * 4));
       for (let k = 0; k < 3; k++) {
-        let x = B[k] * (0.65 + t * 0.7) * crev;
-        x = x + (G[k] - x) * Math.min(1, al) * 0.8;
-        x = x + (P[k] - x) * Math.min(1, pk) * 0.7;
-        o[k] = Math.min(255, x);
+        let x = B[k] * sh;
+        x = x + (G[k] * (0.7 + t * 0.5) - x) * al * 0.75;
+        x = x + (P[k] - x) * pk * 0.6;
+        o[k] = Math.min(255, Math.max(0, x));
       }
     });
     const r = rng(seed);
-    for (let i = 0; i < 500; i++) {
-      g.fillStyle = r() < 0.5 ? "rgba(0,0,0,0.25)" : "rgba(255,255,240,0.12)";
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = r() < 0.55 ? `rgba(0,0,0,${0.1 + r() * 0.2})` : `rgba(255,255,240,${0.05 + r() * 0.12})`;
       g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
     }
   });
 
 /** waterlogged hull planks (run along U), dark grime, green algae toward the bottom, nail heads */
-export const hullPlanks = (seed = 5, base = "#5a4431") =>
+export const hullPlanks = (seed = 5, base = "#7a624a") =>
   makeTex(512, 512, (g, w, h) => {
     const r = rng(seed);
     const rows = 8, ph = h / rows;
@@ -205,19 +206,21 @@ export const barrel = (seed = 6) =>
 /** weathered marble / limestone with algae stains (fade toward V=0 bottom) */
 export const marble = (seed = 7, base = "#e6e1d6", stain = true) =>
   makeTex(256, 256, (g, w, h) => {
-    const n = fbm(seed, 4, 3), vn = fbm(seed + 4, 4, 2);
+    const n = fbm(seed, 4, 3), vn = fbm(seed + 4, 3, 2), fine = vnoise(48, seed + 9);
     const B = hex(base);
     pixels(g, w, h, (u, v, o) => {
       const t = n(u, v);
-      const vein = Math.abs(Math.sin((u * 3 + vn(u, v) * 4) * Math.PI)) < 0.06 ? 0.78 : 1;
-      const st = stain ? Math.max(0, Math.min(1, (n(v, u) - 0.55) * 3)) * 0.5 : 0;
-      o[0] = B[0] * (0.88 + t * 0.2) * vein * (1 - st * 0.35);
-      o[1] = B[1] * (0.88 + t * 0.2) * vein * (1 - st * 0.18);
-      o[2] = B[2] * (0.88 + t * 0.2) * vein * (1 - st * 0.4);
+      const sv = Math.sin((u * 2 + v * 1.2 + vn(u, v) * 2.5) * Math.PI * 2);
+      const vein = 1 - 0.12 * Math.exp(-sv * sv * 60);
+      const st = stain ? Math.max(0, Math.min(1, (n(v, u) - 0.55) * 2.5)) * 0.5 : 0;
+      const k = (0.9 + t * 0.14 + (fine(u, v) - 0.5) * 0.05) * vein;
+      o[0] = B[0] * k * (1 - st * 0.3);
+      o[1] = B[1] * k * (1 - st * 0.12);
+      o[2] = B[2] * k * (1 - st * 0.35);
     });
     const r = rng(seed);
-    for (let i = 0; i < 300; i++) {
-      g.fillStyle = `rgba(60,60,50,${r() * 0.18})`;
+    for (let i = 0; i < 260; i++) {
+      g.fillStyle = `rgba(60,60,50,${r() * 0.12})`;
       g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
     }
   });
@@ -491,7 +494,7 @@ export const sail = (seed = 13) =>
 export const lightRay = () =>
   makeTex(128, 256, (g, w, h) => {
     pixels(g, w, h, (u, v, o) => {
-      const a = Math.pow(Math.sin(u * Math.PI), 3) * Math.pow(1 - v, 0.6) * (0.75 + 0.25 * Math.sin(u * 40));
+      const a = Math.pow(Math.sin(u * Math.PI), 4) * Math.pow(1 - v, 1.6) * (0.7 + 0.3 * Math.sin(u * 23));
       o[0] = 90 * a; o[1] = 190 * a; o[2] = 210 * a;
     });
   });

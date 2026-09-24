@@ -12,19 +12,19 @@ const SPR = ["#ff4f8b", "#ffd23f", "#3bceac", "#5e7bff", "#ff8c42", "#b56bff", "
 export const sgGround = () =>
   makeTex(512, 512, (g, w, h) => {
     const r = rng(3);
-    g.fillStyle = "#a9e8c4";
+    g.fillStyle = "#8fdcb2";
     g.fillRect(0, 0, w, h);
     for (let i = 0; i < 30; i++) {
       const x = r() * w, y = r() * h, rad = 40 + r() * 120;
       const gr = g.createRadialGradient(x, y, 0, x, y, rad);
-      const c = r() < 0.5 ? "150,225,185" : "195,245,210";
+      const c = r() < 0.5 ? "110,200,155" : "175,235,200";
       gr.addColorStop(0, `rgba(${c},${0.25 + r() * 0.25})`);
       gr.addColorStop(1, `rgba(${c},0)`);
       g.fillStyle = gr;
       for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) g.fillRect(x - rad + ox, y - rad + oy, rad * 2, rad * 2);
     }
     // גרגרי סוכר
-    for (let i = 0; i < 16000; i++) {
+    for (let i = 0; i < 9000; i++) {
       const v = r();
       g.fillStyle = v < 0.45 ? `rgba(255,255,255,${0.2 + r() * 0.5})` : v < 0.9 ? `rgba(60,150,110,${0.08 + r() * 0.14})` : `rgba(255,255,255,0.9)`;
       g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
@@ -92,12 +92,12 @@ export const sgGinger = () =>
       const rr = 0.8 + r() * 2.2;
       g.beginPath(); g.arc(r() * w, r() * h, rr, 0, Math.PI * 2); g.fill();
     }
-    for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(240,180,110,${r() * 0.18})`; g.fillRect(r() * w, r() * h, 1.5, 1.5); }
+    for (let i = 0; i < 4500; i++) { g.fillStyle = `rgba(240,180,110,${r() * 0.18})`; g.fillRect(r() * w, r() * h, 1.5, 1.5); }
   });
 
 /** רעפי ציפוי מעוגלים (קשקשים) בפסטל עם קצה לבן */
 export const sgRoof = (base: string) =>
-  makeTex(512, 512, (g, w, h) => {
+  makeTex(256, 256, (g, w, h) => {
     const r = rng(5);
     g.fillStyle = "#fff";
     g.fillRect(0, 0, w, h);

@@ -6,7 +6,58 @@ import * as THREE from "three";
 import * as T from "../textures";
 import * as P from "./tex/penguin";
 import * as L from "./tex/lobby";
-import { Kit, boxGeo, grid, ring, type Mat, type World } from "./kit";
+import { fastNormal } from "./tex/mansion";
+import { Kit, grid, ring, type Mat, type World } from "./kit";
+
+/** bevelled box like kit.boxGeo, but a flat 45° chamfer (44 tris) instead of RoundedBox (300 tris) */
+function chamferGeo(w: number, h: number, d: number, r: number) {
+  const a = w / 2, b = h / 2, c = d / 2, A = a - r, B = b - r, C = c - r;
+  const P: number[] = [];
+  type P3 = [number, number, number];
+  const tri = (p: P3, q: P3, t: P3) => {
+    const ux = q[0] - p[0], uy = q[1] - p[1], uz = q[2] - p[2], vx = t[0] - p[0], vy = t[1] - p[1], vz = t[2] - p[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    if (nx * (p[0] + q[0] + t[0]) + ny * (p[1] + q[1] + t[1]) + nz * (p[2] + q[2] + t[2]) < 0) P.push(...p, ...t, ...q);
+    else P.push(...p, ...q, ...t);
+  };
+  const quad = (p: P3, q: P3, t: P3, u: P3) => { tri(p, q, t); tri(p, t, u); };
+  for (const s of [-1, 1]) {
+    quad([s * a, -B, -C], [s * a, B, -C], [s * a, B, C], [s * a, -B, C]);
+    quad([-A, s * b, -C], [A, s * b, -C], [A, s * b, C], [-A, s * b, C]);
+    quad([-A, -B, s * c], [A, -B, s * c], [A, B, s * c], [-A, B, s * c]);
+  }
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    quad([sx * a, sy * B, -C], [sx * A, sy * b, -C], [sx * A, sy * b, C], [sx * a, sy * B, C]);
+    for (const sz of [-1, 1]) tri([sx * a, sy * B, sz * C], [sx * A, sy * b, sz * C], [sx * A, sy * B, sz * c]);
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) quad([sx * a, -B, sz * C], [sx * a, B, sz * C], [sx * A, B, sz * c], [sx * A, -B, sz * c]);
+  for (const sy of [-1, 1]) for (const sz of [-1, 1]) quad([-A, sy * b, sz * C], [A, sy * b, sz * C], [A, sy * B, sz * c], [-A, sy * B, sz * c]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
+  // "rounded" shading like RoundedBox: normal = direction from the inner core box to the vertex
+  const NN = new Float32Array(P.length);
+  for (let i = 0; i < P.length; i += 3) {
+    const ox = P[i] - Math.max(-A, Math.min(A, P[i])), oy = P[i + 1] - Math.max(-B, Math.min(B, P[i + 1])), oz = P[i + 2] - Math.max(-C, Math.min(C, P[i + 2]));
+    const il = 1 / (Math.hypot(ox, oy, oz) || 1);
+    NN[i] = ox * il; NN[i + 1] = oy * il; NN[i + 2] = oz * il;
+  }
+  g.setAttribute("normal", new THREE.BufferAttribute(NN, 3));
+  const n = g.attributes.normal, uv = new Float32Array((P.length / 3) * 2);
+  for (let i = 0; i < P.length / 3; i++) {
+    const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    if (ax >= ay && ax >= az) { uv[i * 2] = z / d + 0.5; uv[i * 2 + 1] = y / h + 0.5; }
+    else if (ay >= az) { uv[i * 2] = x / w + 0.5; uv[i * 2 + 1] = z / d + 0.5; }
+    else { uv[i * 2] = x / w + 0.5; uv[i * 2 + 1] = y / h + 0.5; }
+  }
+  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  return g;
+}
+function boxGeo(w: number, h: number, d: number) {
+  const min = Math.min(w, h, d), max = Math.max(w, h, d);
+  if (min < 0.05 || max > 4.5) return new THREE.BoxGeometry(w, h, d);
+  return chamferGeo(w, h, d, Math.min(0.035, min * 0.18));
+}
 
 type G = THREE.BufferGeometry;
 type V3t = [number, number, number];
@@ -84,8 +135,7 @@ type Inst = { pos: V3t; rotX?: number; rotY?: number; rotZ?: number; scale?: V3t
 /** אוסף מופעים של כדורים (בובות, בלונים, ברווזים, קישוטים) — הכול בקריאת ציור אחת לכל חומר ורמת פירוט */
 class Spheres {
   /** LOD tiers by the part's real size: [min radius (m), width segs, height segs] */
-  static tiers: [number, number, number][] = [[0.2, 14, 10], [0.07, 10, 7], [0.025, 7, 5], [0, 5, 4]];
-  static geos = new Map<number, THREE.SphereGeometry>();
+  static tiers: [number, number, number][] = [[0.2, 12, 8], [0.07, 8, 6], [0.025, 6, 4], [0, 5, 3]];
   lists: Inst[][] = Spheres.tiers.map(() => []);
   private q = new THREE.Quaternion();
   private e = new THREE.Euler();
@@ -103,9 +153,7 @@ class Spheres {
   flush(k: Kit, m: Mat) {
     this.lists.forEach((l, i) => {
       if (!l.length) return;
-      let g = Spheres.geos.get(i);
-      if (!g) { g = new THREE.SphereGeometry(1, Spheres.tiers[i][1], Spheres.tiers[i][2]); Spheres.geos.set(i, g); }
-      k.instances(g, m, l, { noShadow: i >= 2 });
+      k.instances(new THREE.SphereGeometry(1, Spheres.tiers[i][1], Spheres.tiers[i][2]), m, l, { noShadow: i >= 2 });
     });
   }
 }
@@ -113,6 +161,12 @@ class Spheres {
 export function buildPenguin(): World {
   const WING_H = 4.2, BALL_H = 9, DOOR_H = 2.5;
   const k = new Kit(WING_H, DOOR_H);
+  // quicker normal maps (same Sobel result, typed arrays) — Kit.mat() reuses ptex.normal when present
+  const kmat = k.mat.bind(k);
+  k.mat = (ptex, color, repeat, extra = {}) => {
+    if (ptex && (extra.bump ?? (extra.transparent ? 0 : 0.55)) > 0) fastNormal(ptex);
+    return kmat(ptex, color, repeat, extra);
+  };
   const b = new Batch();
   let seed = 11;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -498,7 +552,7 @@ export function buildPenguin(): World {
       const th = (t / 8) * (Math.PI / 2);
       pts.push([SX + Math.cos(a) * Math.cos(th) * domeR, cy + 0.3 + Math.sin(th) * domeR * 0.55 - 0.02, SZ + Math.sin(a) * Math.cos(th) * domeR]);
     }
-    k.tube(pts, 0.05, mTrim);
+    b.add(mTrim, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new V3(...p))), 20, 0.05, 6));
   }
   // שוליים לפתח הכיפה (מרובע→עיגול)
   b.add(mCeilBall, place(new THREE.BoxGeometry(hole.x2 - hole.x1, 0.3, 0.3), SX, cy + 0.15, hole.z1 + 0.15), 3);
@@ -550,6 +604,7 @@ export function buildPenguin(): World {
     const org = k.mat(null, "#f0a32a", [1, 1], { roughness: 0.3, metalness: 0.2 });
     const yel = k.mat(null, "#f7c948", [1, 1], { roughness: 0.3 });
     const red = k.mat(null, "#c62828", [1, 1], { roughness: 0.35 });
+    const statueSph = new THREE.SphereGeometry(1, 32, 22);
     const sph = (m: Mat, ox: number, oy: number, oz: number, sx: number, sy: number, sz: number, rz = 0, rx = 0) =>
       k.add(statueSph, m, [SX + ox * S, y0 + oy * S, SZ + oz * S], { scale: [sx * S, sy * S, sz * S], rotZ: rz, rotX: rx });
     sph(blk, 0, 0.42, 0, 0.34, 0.42, 0.3, 0, -0.06);
@@ -1156,10 +1211,10 @@ export function buildPenguin(): World {
     plantPot(10.2, -16.2, 1.1);
     plantPot(-10.2, -7.8, 1.0);
     plantPot(10.2, -7.8, 1.0);
-    plushie(-4.4, 0, -8.0, 0.8, Math.PI);
+    plushie(-4.4, 0, -7.42, 0.8, Math.PI);
     bunch(4.8, 0, -8.0, 6, 1.9);
-    ceramic(-9.9, 0, -12, 0.9, Math.PI / 2, 1);
-    k.collider(-10.2, -9.6, -12.3, -11.7, 0, 0.9, true);
+    ceramic(-10.45, 0, -12, 0.9, Math.PI / 2, 1);
+    k.collider(-10.75, -10.15, -12.3, -11.7, 0, 0.9, true);
   }
 
   // ---------- סיום: מופעים ----------
@@ -1172,6 +1227,20 @@ export function buildPenguin(): World {
 
   // ---------- נקודות הופעה ----------
   const hiders = [...ring(SX, SZ, 5.0, 12), ...ring(SX, SZ, 6.2, 12).map((v) => v.sub(new V3(SX, 0, SZ)).applyAxisAngle(new V3(0, 1, 0), Math.PI / 12).add(new V3(SX, 0, SZ)))];
+  // nudge any spawn that landed inside furniture (nav inflates obstacles by 0.45 m) along its ring until it is clear
+  const blockedAt = (px: number, pz: number) => {
+    const x = -21.8 + (Math.floor((px + 21.8) / 0.5) + 0.5) * 0.5, z = -16.8 + (Math.floor((pz + 16.8) / 0.5) + 0.5) * 0.5; // nav cell centre
+    return k.obstacles.some((o) => o.top > 0.46 && o.bottom < 1.6 && x > o.minX - 0.5 && x < o.maxX + 0.5 && z > o.minZ - 0.5 && z < o.maxZ + 0.5);
+  };
+  for (const v of hiders) {
+    if (!blockedAt(v.x, v.z)) continue;
+    const r = Math.hypot(v.x - SX, v.z - SZ), a0 = Math.atan2(v.z - SZ, v.x - SX);
+    search: for (let i = 1; i < 40; i++) for (const sg of [1, -1]) for (const dr of [0, -0.4, 0.4]) {
+      const a = a0 + sg * i * 0.03, rr = r + dr;
+      const x = SX + Math.cos(a) * rr, z = SZ + Math.sin(a) * rr;
+      if (!blockedAt(x, z)) { v.set(x, 0, z); break search; }
+    }
+  }
   return k.finish({
     id: "penguin", name: "Penguin Hotel",
     bounds: { minX: -21.8, maxX: 21.8, minZ: -16.8, maxZ: 16.8 },

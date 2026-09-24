@@ -35,9 +35,9 @@ function rod(a: V3t | THREE.Vector3, b: V3t | THREE.Vector3, r0: number, r1: num
   return orient(new THREE.CylinderGeometry(r1, r0, va.distanceTo(vb), seg, 1, open), va, vb);
 }
 /** capsule between two points; sz squashes it along world Z before orienting (limbs lying in an XY plane) */
-function capsule(a: V3t, b: V3t, r: number, sz = 1, seg = 14) {
+function capsule(a: V3t, b: V3t, r: number, sz = 1, seg = 14, cap = 5) {
   const va = new V3(...a), vb = new V3(...b);
-  const g = new THREE.CapsuleGeometry(r, Math.max(0.001, va.distanceTo(vb)), 5, seg);
+  const g = new THREE.CapsuleGeometry(r, Math.max(0.001, va.distanceTo(vb)), cap, seg);
   g.scale(1, 1, sz);
   return orient(g, va, vb);
 }
@@ -154,6 +154,9 @@ function rockGeo(seed: number, detail = 3, flat = -0.35) {
 // ---------------------------------------------------------------------------------------------
 export function buildDeepSea(): World {
   const k = new Kit(8, 3);
+  let TT = performance.now();
+  const TM: string[] = [];
+  const lap = (n: string) => { const t = performance.now(); TM.push(`${n}:${Math.round(t - TT)}`); TT = t; };
   const b = new Batch(k);
   const R = D.rng(4242);
   const rr = (a: number, c: number) => a + R() * (c - a);
@@ -173,7 +176,7 @@ export function buildDeepSea(): World {
   const mIron = k.mat(null, "#2f302f", [1, 1], { metalness: 0.75, roughness: 0.6 });
   const mRust = k.mat(k.tex("ds-rust", () => D.rock("#6b4a36", 17, 0.2)), "#fff", [1, 1], { metalness: 0.5, roughness: 0.75, bump: 0.6 });
   const mGold = k.mat(null, "#e2b64a", [1, 1], { metalness: 1, roughness: 0.28, emissive: "#6b4a10", emissiveIntensity: 0.25 });
-  const mMarble = k.mat(k.tex("ds-marble", () => D.marble(7)), "#fff", [1, 1], { roughness: 0.45, bump: 0.35 });
+  const mMarble = k.mat(k.tex("ds-marble", () => D.marble(7)), "#fff", [1, 1], { roughness: 0.45, bump: 0.2 });
   const mStone = k.mat(k.tex("ds-stone", () => D.marble(21, "#b9b3a3")), "#fff", [1, 1], { roughness: 0.8, bump: 0.6 });
   const mPaving = k.mat(k.tex("ds-paving", () => D.paving(8)), "#fff", [1, 1], { roughness: 0.9, bump: 0.8 });
   const mPlaque = k.mat(k.tex("ds-plaque", () => D.plaque("THE SEA UNICORN", "guardian of the sunken city")), "#fff", [1, 1], { roughness: 0.7, bump: 0.5 });
@@ -223,6 +226,7 @@ export function buildDeepSea(): World {
     return mesh;
   };
 
+  lap("mats");
   // ---------- layout ----------
   const X0 = -24, X1 = 24, Z0 = -20, Z1 = 20;
   const PX = 2, PZ = 1.5; // plaza / statue centre
@@ -240,7 +244,7 @@ export function buildDeepSea(): World {
 
   // ---------- rocks ----------
   const rockGeos = [rockGeo(11, 3), rockGeo(23, 3), rockGeo(37, 3, -0.2), rockGeo(51, 3, -0.5)];
-  const cliffGeos = [rockGeo(61, 5, -0.6), rockGeo(73, 5, -0.4), rockGeo(89, 5, -0.7)];
+  const cliffGeos = [rockGeo(61, 4, -0.6), rockGeo(73, 4, -0.4), rockGeo(89, 4, -0.7)];
   const rocks: { pos: V3t; rotY: number; scale: V3t; color?: string }[][] = rockGeos.map(() => []);
   const cliffs: { pos: V3t; rotY: number; scale: V3t; color?: string }[][] = cliffGeos.map(() => []);
   const rockTint = ["#ffffff", "#e9eef0", "#f2ece2", "#dfe6e2", "#c9cfd0"];
@@ -362,9 +366,16 @@ export function buildDeepSea(): World {
       const x = PX + Math.cos(a) * 8.1, z = PZ + Math.sin(a) * 8.1;
       b.add(mStone, xf(lathe([[0.62, 0], [0.62, 0.22], [0.5, 0.3], [0.46, 0.38]], 28), x, 0, z), 1.1);
       const shaft = new THREE.CylinderGeometry(0.4, 0.44, h, 20, 1);
-      b.add(mMarble, xf(shaft, x, 0.38 + h / 2, z, 0, R() * 6, 0), 0);
-      // jagged break on top
-      b.add(mMarble, xf(new THREE.ConeGeometry(0.41, 0.35, 20, 1), x, 0.38 + h + 0.12, z, (R() - 0.5) * 0.5, 0, (R() - 0.5) * 0.5, [1, 0.8, 1]));
+      const sp = shaft.attributes.position;
+      const ph = R() * 6, tilt = rr(0.1, 0.3);
+      for (let i = 0; i < sp.count; i++) {
+        if (sp.getY(i) < h / 2 - 0.001) continue;
+        const ax = sp.getX(i), az = sp.getZ(i);
+        const a = Math.atan2(az, ax);
+        sp.setY(i, h / 2 - (Math.hypot(ax, az) > 0.01 ? tilt * (1 + Math.cos(a + ph)) + 0.08 * Math.abs(Math.sin(a * 5 + ph)) : tilt * 0.9));
+      }
+      shaft.computeVertexNormals();
+      b.add(mMarble, xf(shaft, x, 0.38 + h / 2, z));
       k.collider(x - 0.5, x + 0.5, z - 0.5, z + 0.5, 0, 0.38 + h + 0.1, true);
       for (let i = 0; i < 5; i++) b.add(mPolyp, sphere(rr(0.05, 0.12), x + Math.cos(i * 1.3) * 0.43, rr(0.5, h), z + Math.sin(i * 1.3) * 0.43, 8, 6, [1, 0.6, 1]));
     };
@@ -382,6 +393,7 @@ export function buildDeepSea(): World {
     }
   }
 
+  lap("plaza");
   // =============================================================================================
   // SHIPWRECK (north-west)
   // =============================================================================================
@@ -605,6 +617,7 @@ export function buildDeepSea(): World {
     for (const s of [1, -1]) for (let x = SX0 + 2; x < SX0 + SL - 1; x += 3.2) dune(x, SZ + s * (hw(tOf(x), 0) + 0.8), 2.2, 1.1, rr(0.18, 0.3));
   }
 
+  lap("ship");
   // ---------- props: barrels, crates, chests, cannons, lanterns ----------
   const barrelG = lathe([[0.25, 0], [0.29, 0.1], [0.315, 0.3], [0.32, 0.45], [0.315, 0.6], [0.29, 0.8], [0.25, 0.9]], 20);
   const barrelLid = xf(new THREE.CircleGeometry(0.25, 20), 0, 0.9, 0, -PI / 2, 0, 0);
@@ -776,6 +789,7 @@ export function buildDeepSea(): World {
     k.room("Pearl Garden", 0, 11, Z0, -8.5);
   }
 
+  lap("props");
   // =============================================================================================
   // CORAL
   // =============================================================================================
@@ -786,23 +800,22 @@ export function buildDeepSea(): World {
     const parts: G[] = [];
     const grow = (p: THREE.Vector3, d: THREE.Vector3, len: number, rad: number, lvl: number) => {
       const e = p.clone().addScaledVector(d, len);
-      parts.push(rod(p, e, rad, rad * 0.78, 6, true));
-      if (lvl >= depth) { parts.push(new THREE.SphereGeometry(rad * 0.8, 6, 4).translate(e.x, e.y, e.z)); return; }
-      parts.push(new THREE.SphereGeometry(rad * 0.78, 6, 4).translate(e.x, e.y, e.z));
+      parts.push(rod(p, e, rad, rad * 0.78, 5, true));
+      if (lvl >= depth) { parts.push(new THREE.SphereGeometry(rad * 0.85, 5, 3).translate(e.x, e.y, e.z)); return; }
       for (let i = 0; i < splits; i++) {
         const nd = d.clone().add(new V3((r() - 0.5) * spread, (r() - 0.1) * 0.5, (r() - 0.5) * spread)).normalize();
         grow(e, nd, len * (0.72 + r() * 0.2), rad * 0.74, lvl + 1);
       }
     };
-    for (let i = 0; i < 3; i++) grow(new V3((r() - 0.5) * 0.1, 0, (r() - 0.5) * 0.1), new V3((r() - 0.5) * 0.8, 1, (r() - 0.5) * 0.8).normalize(), 0.3, 0.055, 0);
+    for (let i = 0; i < 3; i++) grow(new V3((r() - 0.5) * 0.1, 0, (r() - 0.5) * 0.1), new V3((r() - 0.5) * 0.8, 1, (r() - 0.5) * 0.8).normalize(), 0.34, 0.055, 0);
     const g = merge(parts);
     boxUV(g, 0.5);
     return g;
   };
-  const stagGeo = branchCoral(5, 2, 4, 1.3);
-  const bushGeo = branchCoral(9, 3, 3, 1.9);
+  const stagGeo = branchCoral(5, 2, 3, 1.3);
+  const bushGeo = branchCoral(9, 3, 2, 1.9);
   const tableGeo = lathe([[0.07, 0], [0.09, 0.2], [0.14, 0.3], [0.5, 0.36], [0.95, 0.4], [1.02, 0.47], [0.98, 0.5], [0.5, 0.45], [0.12, 0.42], [0, 0.43]], 28);
-  const brainGeo = new THREE.SphereGeometry(1, 32, 12, 0, PI * 2, 0, PI / 2);
+  const brainGeo = new THREE.SphereGeometry(1, 24, 8, 0, PI * 2, 0, PI / 2);
   const tubeCluster = (() => {
     const parts: G[] = [];
     const r = D.rng(77);
@@ -820,7 +833,7 @@ export function buildDeepSea(): World {
     const r = D.rng(99);
     for (let i = 0; i < 7; i++) {
       const h = 0.6 + r() * 1.3, a = r() * 6.28, d = i ? 0.12 + r() * 0.22 : 0;
-      parts.push(capsule([Math.cos(a) * d, 0, Math.sin(a) * d], [Math.cos(a) * d * 1.2, h, Math.sin(a) * d * 1.2], 0.08 + r() * 0.04, 1, 8));
+      parts.push(capsule([Math.cos(a) * d, 0, Math.sin(a) * d], [Math.cos(a) * d * 1.2, h, Math.sin(a) * d * 1.2], 0.08 + r() * 0.04, 1, 8, 2));
     }
     const g = merge(parts);
     boxUV(g, 0.4);
@@ -842,8 +855,8 @@ export function buildDeepSea(): World {
     paint(col, "#8a4a5a");
     parts.push(col);
     const tip = new THREE.Color("#fff4f8"), base = new THREE.Color("#ff8fc0");
-    for (let i = 0; i < 64; i++) {
-      const a = i * 2.39996, d = Math.sqrt(i / 64) * 0.16;
+    for (let i = 0; i < 44; i++) {
+      const a = i * 2.39996, d = Math.sqrt(i / 44) * 0.16;
       const L = 0.2 + r() * 0.14;
       const bx = Math.cos(a) * d, bz = Math.sin(a) * d;
       const out = new V3(Math.cos(a) * (0.3 + d * 3), 1, Math.sin(a) * (0.3 + d * 3)).normalize();
@@ -916,6 +929,7 @@ export function buildDeepSea(): World {
     }
   };
 
+  lap("coralgeo");
   // ---- the reef (east) ----
   {
     const reefRocks: [number, number, number, number][] = [];
@@ -1028,6 +1042,7 @@ export function buildDeepSea(): World {
   // rocks framing the plaza edge (low, climbable)
   boulder(PX - 7.9, PZ - 5.8, 1.2, 1.1); boulder(PX + 9.5, PZ - 3.4, 1.1, 0.9);
 
+  lap("scatter");
   // =============================================================================================
   // FISH
   // =============================================================================================
@@ -1142,6 +1157,7 @@ export function buildDeepSea(): World {
     k.instances(species[kind], m, fishInst[kind]);
   }
 
+  lap("fish");
   // =============================================================================================
   // JELLYFISH
   // =============================================================================================
@@ -1220,7 +1236,7 @@ export function buildDeepSea(): World {
   // bubbles rising from vents and clams
   for (const [x, z] of [[PX + 3.5, PZ - 2.8], [-6, 14], [12, -16], [20, 6], [-15, -16.5], [-3, 3]] as [number, number][]) bubbleColumn(x, 0.1, z, rr(5, 9), 16);
   bubbleColumn(-12.6, 1.5, SZ + 1.8, 6, 10);
-  const bubbleMesh = k.instances(new THREE.SphereGeometry(1, 10, 7), mBubble, bubbles, { noShadow: true });
+  const bubbleMesh = k.instances(new THREE.SphereGeometry(1, 8, 5), mBubble, bubbles, { noShadow: true });
   deco.add(bubbleMesh);
   // marine snow
   const snow: Inst[] = [];
@@ -1233,7 +1249,10 @@ export function buildDeepSea(): World {
       decoAdd(g, mRay, [x - 1.2, 9, z - 0.8], ry + 0.3, 0).rotation.set(0.08, ry + 0.3, 0.1);
     }
   }
+  lap("inst");
   b.flush();
+  lap("flush");
+  console.warn("DSTIME " + TM.join(" "));
 
   // pure light effects must not be paint/eyedropper targets
   k.surfaces = k.surfaces.filter((s) => !deco.has(s));

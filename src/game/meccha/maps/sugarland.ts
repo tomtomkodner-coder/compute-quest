@@ -32,7 +32,7 @@ function scaleUV(g: G, su: number, sv: number) {
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
 }
-type BO = { rx?: number; ry?: number; rz?: number; s?: number | V3t; solid?: boolean; stand?: boolean; uv?: number; world?: boolean; su?: number; sv?: number; parent?: THREE.Matrix4; seg?: number };
+type BO = { flat?: boolean; rx?: number; ry?: number; rz?: number; s?: number | V3t; solid?: boolean; stand?: boolean; uv?: number; world?: boolean; su?: number; sv?: number; parent?: THREE.Matrix4; seg?: number };
 class Batch {
   private lists = new Map<Mat, G[]>();
   private flags = new Map<Mat, { noShadow?: boolean }>();
@@ -60,7 +60,7 @@ class Batch {
   /** box, y = bottom */
   box(m: Mat, w: number, h: number, d: number, x: number, y: number, z: number, o: BO = {}) {
     const mn = Math.min(w, h, d), mx = Math.max(w, h, d);
-    const g = mn < 0.06 || mx > 6 ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, 2, Math.min(0.04, mn * 0.2));
+    const g = o.flat || mn < 0.06 || mx > 6 ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, 1, Math.min(0.04, mn * 0.2));
     return this.geo(m, g, x, y + h / 2, z, o);
   }
   cyl(m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, o: BO & { seg?: number; open?: boolean } = {}) {
@@ -125,13 +125,15 @@ function inset(pts: THREE.Vector2[], d: number) {
 
 export function buildSugarland(): World {
   const k = new Kit(3, 2.4);
+  const __t0 = performance.now(); const __tl: string[] = []; const TT = (n: string) => __tl.push(n + ":" + Math.round(performance.now() - __t0));
   const B = new Batch(k);
   const rnd = S.sgRng(2024);
 
+  TT("materials");
   // ---------------- materials ----------------
   const ground = k.mat(k.tex("sg-ground", S.sgGround), "#ffffff", [1, 1], { roughness: 0.8, bump: 0.45 });
   const pathM = k.mat(k.tex("sg-path", S.sgPath), "#ffffff", [1, 1], { roughness: 0.7, bump: 0.8 });
-  const frostPink = k.mat(k.tex("sg-frostp", () => S.sgFrosting("#ffc2dc", 12, 80)), "#ffffff", [1, 1], { roughness: 0.5, bump: 0.3 });
+  const frostPink = k.mat(k.tex("sg-frostp", () => S.sgFrosting("#ffc2dc", 12, 80)), "#ffffff", [1, 1], { roughness: 0.5, bump: 0 });
   const ginger = k.mat(k.tex("sg-ginger", S.sgGinger), "#ffffff", [1, 1], { roughness: 0.78, bump: 0.9 });
   const icing = k.mat(null, "#fffaf4", [1, 1], { roughness: 0.32 });
   const icingPink = k.mat(null, "#ff8fbf", [1, 1], { roughness: 0.3 });
@@ -166,37 +168,38 @@ export function buildSugarland(): World {
   const flame = k.mat(null, "#ffb938", [1, 1], { emissive: "#ffa928", emissiveIntensity: 2.2 });
   const dough = k.mat(k.tex("sg-dough", S.sgDough), "#ffffff", [1, 1], { roughness: 0.7, bump: 0.6 });
   const donutIcings = [
-    k.mat(k.tex("sg-ice1", () => S.sgIcing("#ff8fbf", 1)), "#ffffff", [1, 1], { roughness: 0.22, bump: 0.2 }),
-    k.mat(k.tex("sg-ice2", () => S.sgIcing("#5a2f1a", 2)), "#ffffff", [1, 1], { roughness: 0.2, bump: 0.2 }),
-    k.mat(k.tex("sg-ice3", () => S.sgIcing("#9ff0d8", 3)), "#ffffff", [1, 1], { roughness: 0.22, bump: 0.2 }),
-    k.mat(k.tex("sg-ice4", () => S.sgIcing("#fff4d6", 4)), "#ffffff", [1, 1], { roughness: 0.22, bump: 0.2 }),
+    k.mat(k.tex("sg-ice1", () => S.sgIcing("#ff8fbf", 1)), "#ffffff", [1, 1], { roughness: 0.22, bump: 0 }),
+    k.mat(k.tex("sg-ice2", () => S.sgIcing("#5a2f1a", 2)), "#ffffff", [1, 1], { roughness: 0.2, bump: 0 }),
+    k.mat(k.tex("sg-ice3", () => S.sgIcing("#9ff0d8", 3)), "#ffffff", [1, 1], { roughness: 0.22, bump: 0 }),
+    k.mat(k.tex("sg-ice4", () => S.sgIcing("#fff4d6", 4)), "#ffffff", [1, 1], { roughness: 0.22, bump: 0 }),
   ];
-  const macs = [["#ff9ec4", 1], ["#a6ecd2", 2], ["#c8b2ff", 3], ["#ffe38a", 4], ["#ffb58a", 5]].map(([c, s]) => k.mat(k.tex("sg-mac" + s, () => S.sgMacaron(c as string, s as number)), "#ffffff", [1, 1], { roughness: 0.6, bump: 0.35 }));
-  const cottonP = k.mat(k.tex("sg-cotp", () => S.sgCotton("#ffb3d9", 44)), "#ffffff", [2, 2], { roughness: 0.95, bump: 0.8 });
-  const cottonB = k.mat(k.tex("sg-cotb", () => S.sgCotton("#b5e3ff", 45)), "#ffffff", [2, 2], { roughness: 0.95, bump: 0.8 });
-  const cloudM = k.mat(k.tex("sg-cotw", () => S.sgCotton("#fff4fa", 46)), "#ffffff", [2, 2], { roughness: 1, bump: 0.5 });
+  const macTex = k.tex("sg-mac", () => S.sgMacaron("#ffffff", 1));
+  const macs = ["#ff9ec4", "#a6ecd2", "#c8b2ff", "#ffe38a", "#ffb58a"].map((c) => k.mat(macTex, c, [1, 1], { roughness: 0.6, bump: 0.35 }));
+  const cotTex = k.tex("sg-cot", () => S.sgCotton("#f4f4f4", 44));
+  const cottonP = k.mat(cotTex, "#ffb3d9", [2, 2], { roughness: 0.95, bump: 0.8 });
+  const cottonB = k.mat(cotTex, "#b5e3ff", [2, 2], { roughness: 0.95, bump: 0.8 });
+  const cloudM = k.mat(cotTex, "#fff6fb", [2, 2], { roughness: 1, bump: 0.5 });
   const pepper = k.mat(k.tex("sg-pep", S.sgPeppermint), "#ffffff", [1, 1], { roughness: 0.12, bump: 0 });
   const glass = k.mat(null, "#ffd98a", [1, 1], { roughness: 0.1, emissive: "#ffb347", emissiveIntensity: 0.55 });
   const signM = k.mat(k.tex("sg-sign", S.sgSign), "#ffffff", [1, 1], { roughness: 0.4, bump: 0.2 });
-  const lockers = [["#ffb3cf", "01"], ["#a6ecd2", "02"], ["#c8b2ff", "03"], ["#ffe38a", "04"], ["#9fd8ff", "05"], ["#ffb3cf", "06"]].map(([c, n], i) =>
-    k.mat(k.tex("sg-lock" + i, () => S.sgLocker(c, n, i + 3)), "#ffffff", [1, 1], { roughness: 0.35, metalness: 0.25, bump: 0.5 }));
+  const lockTex = [k.tex("sg-lock0", () => S.sgLocker("#ffffff", "12", 3)), k.tex("sg-lock1", () => S.sgLocker("#ffffff", "27", 4))];
+  const lockers = ["#ffb3cf", "#a6ecd2", "#c8b2ff", "#ffe38a", "#9fd8ff", "#ffc7a8"].map((c, i) => k.mat(lockTex[i % 2], c, [1, 1], { roughness: 0.35, metalness: 0.25, bump: 0.5 }));
   const lockerBody = k.mat(null, "#f3e6ee", [1, 1], { roughness: 0.4, metalness: 0.3 });
-  const tileM = k.mat(k.tex("sg-tile", () => T.checker("#ffe0ee", "#fff7fb", 8)), "#ffffff", [1, 1], { roughness: 0.25, bump: 0.3 });
+  const tileM = k.mat(k.tex("sg-tile", () => T.checker("#ffe0ee", "#fff7fb", 8)), "#ffffff", [1, 1], { roughness: 0.25, bump: 0 });
   const mountainMats = [
-    k.mat(k.tex("sg-mt1", () => S.sgMountain(["#ffb3d1", "#fff0f6", "#ff8fbf", "#ffe0ec"], 2)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0.2 }),
-    k.mat(k.tex("sg-mt2", () => S.sgMountain(["#a8ecd6", "#f0fff9", "#6fd7b8", "#d5f7ec"], 5)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0.2 }),
-    k.mat(k.tex("sg-mt3", () => S.sgMountain(["#c9b6ff", "#f5f0ff", "#a58cff", "#e4dbff"], 8)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0.2 }),
-    k.mat(k.tex("sg-mt4", () => S.sgMountain(["#ffe38a", "#fffbe6", "#ffc94d", "#ffeeb8"], 11)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0.2 }),
+    k.mat(k.tex("sg-mt1", () => S.sgMountain(["#ffb3d1", "#fff0f6", "#ff8fbf", "#ffe0ec"], 2)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0 }),
+    k.mat(k.tex("sg-mt2", () => S.sgMountain(["#a8ecd6", "#f0fff9", "#6fd7b8", "#d5f7ec"], 5)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0 }),
+    k.mat(k.tex("sg-mt3", () => S.sgMountain(["#c9b6ff", "#f5f0ff", "#a58cff", "#e4dbff"], 8)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0 }),
+    k.mat(k.tex("sg-mt4", () => S.sgMountain(["#ffe38a", "#fffbe6", "#ffc94d", "#ffeeb8"], 11)), "#ffffff", [3, 1], { roughness: 0.6, bump: 0 }),
   ];
-  const snowCap = k.mat(k.tex("sg-cap", () => S.sgCream("#ffffff", 5)), "#ffffff", [3, 1], { roughness: 0.45, bump: 0.2 });
-  const hillMats = [
-    k.mat(k.tex("sg-hillp", () => S.sgFrosting("#ffc6de", 21, 90)), "#ffffff", [3, 2], { roughness: 0.55, bump: 0.2 }),
-    k.mat(k.tex("sg-hillm", () => S.sgFrosting("#b8f0d8", 22, 90)), "#ffffff", [3, 2], { roughness: 0.55, bump: 0.2 }),
-  ];
+  const snowCap = k.mat(k.tex("sg-cap", () => S.sgCream("#ffffff", 5)), "#ffffff", [3, 1], { roughness: 0.45, bump: 0 });
+  const hillTex = k.tex("sg-hill", () => S.sgCream("#ffffff", 21));
+  const hillMats = [k.mat(hillTex, "#ffc6de", [3, 2], { roughness: 0.55, bump: 0 }), k.mat(hillTex, "#b8f0d8", [3, 2], { roughness: 0.55, bump: 0 })];
   for (const m of [...mountainMats, snowCap, ...hillMats, cloudM]) B.opt(m, { noShadow: true });
   Object.entries({ ground, pathM, frostPink, ginger, icing, icingPink, wafer, choc, chocBar, milkChoc, milk, stripeR, stripeG, stripeP, stick, cream, berry, leaf, glazePink, dough, cottonP, cottonB, cloudM, pepper, glass, snowCap, lockerBody }).forEach(([n, m]) => (m.m.name = n));
   [["roof", roofs], ["swirl", swirls], ["gum", gums], ["hard", hard], ["ice", donutIcings], ["mac", macs], ["mt", mountainMats], ["hill", hillMats], ["lock", lockers]].forEach(([n, l]) => (l as Mat[]).forEach((m, i) => (m.m.name = `${n}${i}`)));
 
+  TT("ground");
   // ---------------- ground ----------------
   const X0 = -24, X1 = 24, Z0 = -21, Z1 = 21;
   k.floor(-120, 120, -120, 120, ground, 3.2);
@@ -239,6 +242,7 @@ export function buildSugarland(): World {
   ribbon(pathM, [[8.5, -3.2], [10, 1.4], [16.8, 3.2], [20, 8], [21, 14]], 2.2, 0.02, 3.2);
   ribbon(pathM, [[-5, -13], [-8, -17], [-9, -22]], 2.0, 0.02, 3.2);
 
+  TT("chocolate river (eas");
   // ---------------- chocolate river (east) ----------------
   const riverPts: [number, number][] = [[7, -40], [8.4, -22], [10.6, -13], [13.6, -6], [13.2, 1], [11.6, 6], [12.3, 13], [14.6, 22], [16, 40]];
   B.opt(choc, { noShadow: true });
@@ -251,7 +255,7 @@ export function buildSugarland(): World {
       const off = 2.05 + Math.sin(i * 1.7) * 0.06;
       bank.push([p.x - tg.z * off * side, 0.05, p.z + tg.x * off * side]);
     }
-    B.tube(icing, bank, 0.2, { seg: 260, rs: 8 });
+    B.tube(icing, bank, 0.2, { seg: 180, rs: 6 });
   }
   // chocolate droplets & swirls floating
   for (let i = 0; i < 9; i++) {
@@ -297,10 +301,11 @@ export function buildSugarland(): World {
     }
   }
 
+  TT("props: builders");
   // ---------------- props: builders ----------------
   const gumProfile: [number, number][] = [[0, 0], [0.46, 0], [0.5, 0.03], [0.51, 0.12], [0.48, 0.36], [0.4, 0.58], [0.27, 0.74], [0.12, 0.82], [0, 0.84]];
   const gumdrop = (x: number, z: number, s: number, ci: number, solid = true, y = 0, tilt = 0) => {
-    B.lathe(gums[ci % gums.length], gumProfile, x, y, z, { s, seg: 20, rz: tilt, rx: tilt * 0.5 });
+    B.lathe(gums[ci % gums.length], gumProfile, x, y, z, { s, seg: s < 0.6 ? 11 : 20, rz: tilt, rx: tilt * 0.5 });
     if (solid) k.collider(x - 0.4 * s, x + 0.4 * s, z - 0.4 * s, z + 0.4 * s, y, y + 0.8 * s, true);
   };
   const lollipop = (x: number, z: number, h: number, r: number, mi: number, ry: number, lean = 0) => {
@@ -324,7 +329,7 @@ export function buildSugarland(): World {
     for (let i = 1; i <= 12; i++) { const a = (i / 12) * Math.PI * 1.05; pts.push([hook - Math.cos(a) * hook, h - hook + Math.sin(a) * hook, 0]); }
     pts.push([hook * 2.05, h - hook - 0.25, 0]);
     const c = new THREE.CatmullRomCurve3(pts.map((p) => new V3(...p)), false, "centripetal");
-    const g = new THREE.TubeGeometry(c, 70, r, 14, false);
+    const g = new THREE.TubeGeometry(c, 50, r, 10, false);
     scaleUV(g, (c.getLength() / (r * 7)), 1);
     B.geo(m, g, x, 0, z, { ry, rz: lean });
     // cap
@@ -436,10 +441,11 @@ export function buildSugarland(): World {
     k.collider(x - 2.4, x + 2.4, z - 2.4, z + 2.4, h * 0.72 - 1.3, h * 0.72 + 1.3, true);
   };
 
+  TT("gingerbread cookie f");
   // ---------------- gingerbread cookie figures ----------------
   const outline = gingerOutline();
   const cookieShape = new THREE.Shape(outline);
-  const cookieGeo = new THREE.ExtrudeGeometry(cookieShape, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.02, bevelSegments: 3, curveSegments: 6 });
+  const cookieGeo = new THREE.ExtrudeGeometry(cookieShape, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.02, bevelSegments: 2, curveSegments: 6 });
   cookieGeo.translate(0, 0, -0.035);
   const FZ = 0.035 + 0.025; // front face z
   const icingParts: G[] = [];
@@ -447,13 +453,13 @@ export function buildSugarland(): World {
     const ins = inset(outline, 0.035);
     for (const side of [1, -1]) {
       const pts = ins.map((p) => new V3(p.x, p.y, side * (FZ + 0.004)));
-      icingParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, "centripetal"), 160, 0.011, 5, true));
+      icingParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, "centripetal"), side > 0 ? 76 : 56, 0.011, side > 0 ? 4 : 3, true));
     }
     const zig = (x0: number, y0: number, x1: number, y1: number, n: number, amp: number) => {
       const pts: THREE.Vector3[] = [];
       const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L;
       for (let i = 0; i <= n; i++) { const t = i / n, a = (i % 2 ? 1 : -1) * amp; pts.push(new V3(x0 + dx * t + nx * a, y0 + dy * t + ny * a, FZ + 0.004)); }
-      icingParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.2), n * 6, 0.01, 5, false));
+      icingParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.2), n * 4, 0.01, 4, false));
     };
     for (const s of [1, -1]) {
       zig(s * 0.33, 0.57, s * 0.3, 0.71, 6, 0.018);
@@ -462,7 +468,7 @@ export function buildSugarland(): World {
     // smile
     const sm: THREE.Vector3[] = [];
     for (let i = 0; i <= 10; i++) { const a = Math.PI * 1.2 + (i / 10) * Math.PI * 0.6; sm.push(new V3(Math.cos(a) * 0.065, 0.86 + Math.sin(a) * 0.065, FZ + 0.004)); }
-    icingParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(sm), 20, 0.011, 5, false));
+    icingParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(sm), 12, 0.011, 4, false));
     for (const s of [1, -1]) { const e = new THREE.SphereGeometry(0.02, 8, 6); e.translate(s * 0.045, 0.9, FZ); icingParts.push(e); }
   }
   const cookieIcing = icingParts;
@@ -494,6 +500,7 @@ export function buildSugarland(): World {
     }
   };
 
+  TT("gingerbread houses");
   // ---------------- gingerbread houses ----------------
   const house = (cx: number, cz: number, w: number, d: number, ry: number, roof: Mat, H = 2.9) => {
     const P = new THREE.Matrix4().compose(new V3(cx, 0, cz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new V3(1, 1, 1));
@@ -519,14 +526,14 @@ export function buildSugarland(): World {
     const th = Math.atan2(hr, d / 2), L = (d / 2 + ov) / Math.cos(th);
     for (const s of [-1, 1]) {
       const g = new THREE.BoxGeometry(w + 2 * ov, 0.2, L);
-      boxUV(g, 0.9);
+      boxUV(g, 1.2);
       const zc = s * ((d / 2 + ov) / 2), yc = H + hr - ((d / 2 + ov) / 2) * Math.tan(th) + 0.1;
       B.geo(roof, g, 0, yc, zc, o({ rx: s * th }));
       // icing drip line along the eave
       const eave: V3t[] = [];
       const ez = s * (d / 2 + ov - 0.05), ey = H + hr - (d / 2 + ov) * Math.tan(th) + 0.02;
       for (let i = 0; i <= 28; i++) { const u = i / 28; eave.push([-w / 2 - ov + u * (w + 2 * ov), ey - Math.abs(Math.sin(u * Math.PI * 7)) * 0.13, ez]); }
-      const eg = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(eave.map((p) => new V3(...p))), 120, 0.07, 6);
+      const eg = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(eave.map((p) => new V3(...p))), 84, 0.07, 5);
       B.geo(icing, eg, 0, 0, 0, o());
       // barge boards (icing) along the rake
       for (const ex of [-1, 1]) {
@@ -539,7 +546,7 @@ export function buildSugarland(): World {
     const ridge = new THREE.CylinderGeometry(0.12, 0.12, w + 2 * ov, 10);
     B.geo(icing, ridge, 0, H + hr + 0.2, 0, o({ rz: Math.PI / 2 }));
     const ng = Math.floor(w / 0.9);
-    for (let i = 0; i <= ng; i++) B.lathe(gums[i % gums.length], gumProfile, -w / 2 + (i / ng) * w, H + hr + 0.22, 0, o({ s: 0.34, seg: 14 }));
+    for (let i = 0; i <= ng; i++) B.lathe(gums[i % gums.length], gumProfile, -w / 2 + (i / ng) * w, H + hr + 0.22, 0, o({ s: 0.34, seg: 10 }));
     // gables
     for (const s of [-1, 1]) {
       const sh = new THREE.Shape([new THREE.Vector2(-d / 2, 0), new THREE.Vector2(d / 2, 0), new THREE.Vector2(0, hr)]);
@@ -563,7 +570,7 @@ export function buildSugarland(): World {
       const nx = Math.sin(rot), nz = Math.cos(rot);
       B.box(glass, 0.8, 0.9, 0.04, lx + nx * 0.02, y, lz + nz * 0.02, wo({ ry: rot }));
       for (const [fw, fh, fx, fy] of [[0.96, 0.08, 0, -0.08], [0.96, 0.08, 0, 0.9], [0.08, 0.98, -0.44, -0.08], [0.08, 0.98, 0.44, -0.08], [0.05, 0.9, 0, 0], [0.8, 0.05, 0, 0.42]] as const)
-        B.box(icing, fw, fh, 0.07, lx + nx * 0.05 + Math.cos(rot) * fx, y + fy, lz + nz * 0.05 - Math.sin(rot) * fx, wo({ ry: rot }));
+        B.box(icing, fw, fh, 0.07, lx + nx * 0.05 + Math.cos(rot) * fx, y + fy, lz + nz * 0.05 - Math.sin(rot) * fx, wo({ ry: rot, flat: true }));
       // flower box = gumdrops on a wafer ledge
       B.box(wafer, 0.95, 0.12, 0.25, lx + nx * 0.15, y - 0.2, lz + nz * 0.15, wo({ ry: rot, uv: 0.4 }));
     };
@@ -612,6 +619,7 @@ export function buildSugarland(): World {
   // the giant gingerbread man lying on a chocolate hill slope near the north fence
   cookie(-15.0, -17.6, 4.2, 0.0, "lean", 0.5);
 
+  TT("the cake (centre)");
   // ---------------- the cake (centre) ----------------
   {
     const cx = 0, cz = -6.2;
@@ -626,7 +634,7 @@ export function buildSugarland(): World {
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2;
         B.lathe(cream, [[0, 0], [0.16, 0], [0.17, 0.06], [0.12, 0.14], [0.06, 0.2], [0, 0.24]], cx + Math.cos(a) * (r - 0.2), y + h - 0.02, cz + Math.sin(a) * (r - 0.2), { seg: 8, ry: a });
-        if (y === 0) B.sphere(cream, 0.16, cx + Math.cos(a + 0.3) * (r + 0.02), 0.1, cz + Math.sin(a + 0.3) * (r + 0.02), { ws: 10, hs: 6, s: [1, 0.8, 1] });
+        if (y === 0) B.sphere(cream, 0.16, cx + Math.cos(a + 0.3) * (r + 0.02), 0.1, cz + Math.sin(a + 0.3) * (r + 0.02), { ws: 8, hs: 5, s: [1, 0.8, 1] });
         if (i % 2 === 0) {
           const bx = cx + Math.cos(a) * (r - 0.2), bz = cz + Math.sin(a) * (r - 0.2);
           B.lathe(berry, [[0, 0], [0.1, 0.03], [0.16, 0.12], [0.17, 0.22], [0.13, 0.3], [0, 0.33]], bx, y + h + 0.12, bz, { seg: 12, rx: 0.3 * Math.sin(a), rz: -0.3 * Math.cos(a) });
@@ -661,6 +669,7 @@ export function buildSugarland(): World {
     k.room("Cake Plaza", -9, 9, -14, 4);
   }
 
+  TT("chocolate hills (eas");
   // ---------------- chocolate hills (east of the river) ----------------
   const chocHill = (x: number, z: number, r: number, hy: number) => {
     const g = new THREE.SphereGeometry(r, 36, 14, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -688,6 +697,7 @@ export function buildSugarland(): World {
   chocBarProp(-6.0, 17.5, 1.5, 2.2, 0.2, -0.12, chocBar);
   k.room("Chocolate River", 8, 17, -21, 21);
 
+  TT("lollipop & candy-can");
   // ---------------- lollipop & candy-cane forest (north-west / north) ----------------
   cottonTree(-7.4, -17.0, 6.5, cottonP);
   cottonTree(5.6, -15.8, 5.4, cottonB);
@@ -705,11 +715,12 @@ export function buildSugarland(): World {
   cane(-18.8, -15.6, 3.2, 0.18, stripeP, -0.8);
   cane(4.5, 16.9, 3.0, 0.18, stripeR, 1.9, 0.1);
   cane(16.8, -16.5, 3.8, 0.22, stripeR, -2.4, 0.07);
-  cane(-23.0, 3.6, 3.4, 0.2, stripeR, 1.0);
+  cane(7.4, -9.4, 3.4, 0.2, stripeR, 1.0);
   cane(22.8, 7.4, 3.2, 0.2, stripeG, -1.3, -0.08);
   cane(-6.4, 4.6, 2.6, 0.16, stripeP, 0.6, 0.12);
   k.room("Candy Forest", -13, 8, -21, -12);
 
+  TT("macaron & donut gard");
   // ---------------- macaron & donut garden (north-east) ----------------
   {
     let y = macaron(19.0, 0, -4.2, 1.5, 0);
@@ -736,6 +747,7 @@ export function buildSugarland(): World {
     k.room("Macaron Garden", 16, X1, -21, 0);
   }
 
+  TT("candy rocks, crystal");
   // ---------------- candy rocks, crystals, wrapped candies, peppermints ----------------
   candyRock(9.8, -9.6, 0.9, 0); candyRock(10.4, -8.2, 0.55, 1); candyRock(-3.2, 9.6, 0.8, 2); candyRock(-20.6, 18.4, 1.1, 3);
   candyRock(14.2, 17.8, 0.9, 4); candyRock(-1.6, -15.2, 0.7, 1); candyRock(22.4, 18.8, 0.8, 0); candyRock(-11.8, 5.0, 0.65, 4);
@@ -747,12 +759,13 @@ export function buildSugarland(): World {
     k.collider(x - 0.35, x + 0.35, z - 0.35, z + 0.35, 0, r * 1.9, false);
   }
 
+  TT("gumdrops everywhere");
   // ---------------- gumdrops everywhere ----------------
   const gd: [number, number, number][] = [
     [-7.2, 1.6, 1.2], [-6.2, 2.4, 0.8], [-12.2, -3.6, 1.0], [-15.6, -3.2, 0.7], [-22.4, 8.4, 1.4], [-23, 10.2, 0.9], [-11.4, 12.2, 0.9], [-16.4, 11.6, 1.1],
     [-9.2, 16.6, 1.3], [-8.0, 19.4, 0.9], [-14.6, 20.0, 1.0], [-18.0, 20.2, 1.5], [2.6, 16.2, 1.0], [6.0, 19.8, 1.2], [3.4, 20.2, 0.7],
     [7.6, -6.4, 1.1], [6.8, -4.8, 0.7], [-6.8, -13.8, 1.0], [-4.2, -20.2, 1.4], [3.0, -13.0, 0.9], [7.4, -20.0, 1.2],
-    [17.6, -2.2, 0.9], [23.0, 1.8, 1.3], [19.8, 17.8, 1.0], [16.8, 15.8, 0.8], [23.0, 20.0, 1.6], [-23.2, -1.6, 1.0], [-12.4, -20.3, 1.2],
+    [17.6, -2.2, 0.9], [23.0, 1.8, 1.3], [19.8, 17.8, 1.0], [16.8, 15.8, 0.8], [-12.4, -20.3, 1.2],
     [9.0, 7.4, 0.7], [8.4, 1.8, 0.9], [-2.2, -11.8, 0.6], [2.2, -11.9, 0.6],
   ];
   gd.forEach(([x, z, s], i) => gumdrop(x, z, s, i));
@@ -764,6 +777,7 @@ export function buildSugarland(): World {
     gumdrop(x, z, 0.25 + rnd() * 0.25, i + 3, false);
   }
 
+  TT("locker corner (south");
   // ---------------- locker corner (south-east) ----------------
   {
     const lx = 23.2, z0 = 14.0;
@@ -794,7 +808,6 @@ export function buildSugarland(): World {
     for (const dx of [-0.9, 0.9]) B.box(milk, 0.12, 0.45, 0.4, 20.4 + dx, 0, 16.9, {});
     k.collider(19.3, 21.5, 16.65, 17.15, 0, 0.57, true);
     // gym bags (big candies in a heap) and a sign
-    wrapped(21.6, 18.6, 0.6, 0, 0.2);
     gumdrop(19.0, 18.8, 0.6, 3);
     const lsign = new THREE.PlaneGeometry(2.4, 0.6);
     B.geo(k.mat(k.tex("sg-lsign", () => T.signboard("#fff2f8", "#ff4f8b", "LOCKERS", 256, 64)), "#ffffff", [1, 1], { roughness: 0.4, bump: 0 }), lsign, lx - 0.3, 2.55, 16.0, { ry: -Math.PI / 2 });
@@ -803,6 +816,7 @@ export function buildSugarland(): World {
     k.room("Locker Corner", 17, X1, 13, Z1);
   }
 
+  TT("boundary: wafer fenc");
   // ---------------- boundary: wafer fences & candy-cane posts ----------------
   const fence = (x0: number, z0: number, x1: number, z1: number) => {
     const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 2.4));
@@ -810,12 +824,12 @@ export function buildSugarland(): World {
     for (let i = 0; i < n; i++) {
       const u = (i + 0.5) / n, x = x0 + (x1 - x0) * u, z = z0 + (z1 - z0) * u;
       B.box(wafer, L / n - 0.3, 0.95, 0.16, x, 0.18, z, { ry, uv: 0.5 });
-      B.box(icing, L / n - 0.3, 0.06, 0.2, x, 1.13, z, { ry });
+      B.box(icing, L / n - 0.3, 0.06, 0.2, x, 1.13, z, { ry, flat: true });
     }
     for (let i = 0; i <= n; i++) {
       const u = i / n, x = x0 + (x1 - x0) * u, z = z0 + (z1 - z0) * u;
       B.cyl(stripeR, 0.1, 0.1, 1.35, x, 0, z, { seg: 12, sv: 2 });
-      B.lathe(gums[i % gums.length], gumProfile, x, 1.33, z, { s: 0.32, seg: 12 });
+      B.lathe(gums[i % gums.length], gumProfile, x, 1.33, z, { s: 0.32, seg: 9 });
     }
   };
   // south edge (with the entrance gap), north edge, west & east edges; the river passes through gaps
@@ -843,9 +857,10 @@ export function buildSugarland(): World {
     k.room("Entrance", -6, 6, 14, Z1);
   }
 
+  TT("beyond the fences: f");
   // ---------------- beyond the fences: frosting hills, candy mountains, clouds, giant candies ----------------
   const hill = (x: number, z: number, r: number, hy: number, mi: number) => {
-    const g = new THREE.SphereGeometry(r, 32, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+    const g = new THREE.SphereGeometry(r, 24, 7, 0, Math.PI * 2, 0, Math.PI / 2);
     B.geo(hillMats[Math.abs(mi) % 2], g, x, 0, z, { s: [1, hy, 1] });
   };
   for (let i = 0; i < 22; i++) {
@@ -897,13 +912,14 @@ export function buildSugarland(): World {
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2 + 0.4, d = 45 + rnd() * 35, y = 26 + rnd() * 18;
     const cx = Math.cos(a) * d, cz = Math.sin(a) * d;
-    for (let j = 0; j < 5; j++) B.sphere(j % 3 === 0 ? cottonP : cloudM, 3 + rnd() * 2.5, cx + (j - 2) * 3.2, y + Math.sin(j * 1.3) * 1.2, cz + (rnd() - 0.5) * 3, { ws: 14, hs: 10, s: [1, 0.7, 1] });
+    for (let j = 0; j < 5; j++) B.sphere(j % 3 === 0 ? cottonP : cloudM, 3 + rnd() * 2.5, cx + (j - 2) * 3.2, y + Math.sin(j * 1.3) * 1.2, cz + (rnd() - 0.5) * 3, { ws: 12, hs: 8, s: [1, 0.7, 1] });
   }
   B.opt(cottonP, {});
 
   // haze band on the horizon (pastel pink air)
   {
     const tex = S.sgHaze().texture;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
     const hm = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, side: THREE.BackSide });
     const hz = new THREE.Mesh(new THREE.CylinderGeometry(150, 150, 70, 48, 1, true), hm);
     hz.position.set(0, 18, 0);
@@ -911,10 +927,15 @@ export function buildSugarland(): World {
     k.group.add(hz);
   }
 
+  TT("preCookies");
   // place cookies (after everything else so collider list is complete)
   for (const c of cookies) placeCookie(c);
+  TT("cookies");
   B.flush();
+  TT("flush");
+  (globalThis as any).__sgT = __tl;
 
+  TT("spawns & lighting");
   // ---------------- spawns & lighting ----------------
   const hiders: THREE.Vector3[] = [];
   for (let i = 0; i < 24; i++) hiders.push(new THREE.Vector3(-3.25 + (i % 6) * 1.3, 0, 3.3 + Math.floor(i / 6) * 1.2));
@@ -937,7 +958,7 @@ export function buildSugarland(): World {
         { pos: [-19.8, 2.2, 0.5], color: "#ffc27a", int: 10, dist: 7 },
         { pos: [0, 5.2, -6.2], color: "#ffcf8a", int: 8, dist: 7 },
       ],
-      exposure: 1.05,
+      exposure: 0.95,
       hdri: "sky",
       env: 0.8,
       hdriBackground: 0.04,

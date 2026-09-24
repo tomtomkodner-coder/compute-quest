@@ -144,7 +144,14 @@ export function buildMansion(): World {
     for (const sy of [-1, 1]) for (const sz of [-1, 1]) quad([-A, sy * b, sz * C], [A, sy * b, sz * C], [A, sy * B, sz * c], [-A, sy * B, sz * c]);
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
-    g.computeVertexNormals();
+    // "rounded" shading like RoundedBox: normal = direction from the inner core box to the vertex
+    const NN = new Float32Array(P.length);
+    for (let i = 0; i < P.length; i += 3) {
+      const ox = P[i] - Math.max(-A, Math.min(A, P[i])), oy = P[i + 1] - Math.max(-B, Math.min(B, P[i + 1])), oz = P[i + 2] - Math.max(-C, Math.min(C, P[i + 2]));
+      const il = 1 / (Math.hypot(ox, oy, oz) || 1);
+      NN[i] = ox * il; NN[i + 1] = oy * il; NN[i + 2] = oz * il;
+    }
+    g.setAttribute("normal", new THREE.BufferAttribute(NN, 3));
     chamferCache.set(key, g);
     return g;
   }
