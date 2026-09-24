@@ -196,6 +196,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   const [touch, setTouch] = useState(false);
   const [icons, setIcons] = useState<Record<string, string>>({});
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [missedOpen, setMissedOpen] = useState(false);
   const poseHover = useRef<PoseId | null>(null);
 
   useEffect(() => {
@@ -221,6 +222,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         eng.onOptions = () => setOptionsOpen((v) => !v);
         eng.onInteract = () => setSettingsOpen(true);
         eng.onChatKey = () => setChatOpen(true);
+        eng.onTab = () => setMissedOpen((v) => !v);
         engineRef.current = eng;
         try {
           const num = (k: string) => { const v = localStorage.getItem(k); return v === null ? null : Number(v); };
@@ -330,7 +332,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           </div>
 
           {/* שמאל: לשונית "Missed-Spot Ranking" */}
-          {hud.settings.missed && (hud.phase === "hide" || hud.phase === "hunt") && !hud.paintMode && <MissedTab hud={hud} />}
+          {hud.settings.missed && (hud.phase === "hide" || hud.phase === "hunt") && !hud.paintMode && <MissedTab hud={hud} open={missedOpen} setOpen={setMissedOpen} />}
 
           {/* ימין: רשימת המקשים עם האייקונים, כמו במשחק */}
           {!touch && !hud.paintMode && (hud.phase === "hide" || hud.phase === "hunt" || hud.phase === "check") && <KeyColumn hud={hud} hider={hider} hunter={hunter} />}
@@ -571,18 +573,17 @@ function BottomChips({ hud, hider }: { hud: HudState; hider: boolean }) {
   );
   return (
     <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 flex gap-3 pointer-events-none" style={{ textShadow: "0 1px 2px rgba(0,0,0,.9)" }}>
-      {hud.attached ? <>{chip("S", "Detach", "#27c93f")}{chip("CTRL", "Move Down", "#fff")}{chip("SPACE", "Move Up", "#fff")}</>
+      {hud.attached ? <>{chip("SHIFT", "Detach", "#27c93f")}{chip("CTRL", "Move Down", "#fff")}{chip("SPACE", "Move Up", "#fff")}</>
         : <>{hider && chip("CTRL", hud.crouch ? "Stand Up" : "Crouch", "#ffc21a")}{chip("SPACE", "Climb", "#4ee6e6")}{hider && chip("Q", "Clone", "#4ee6e6")}</>}
     </div>
   );
 }
 
-function MissedTab({ hud }: { hud: HudState }) {
-  const [open, setOpen] = useState(false);
+function MissedTab({ hud, open, setOpen }: { hud: HudState; open: boolean; setOpen: (f: (v: boolean) => boolean) => void }) {
   return (
     <div className="absolute left-0 top-[40%] z-20" style={{ textShadow: "0 1px 2px rgba(0,0,0,.9)" }}>
       <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 bg-black/30 rounded-r px-2 py-1 text-[12px]">
-        <span className="w-3 h-3 rounded-sm bg-white text-black text-[8px] font-black grid place-items-center">{open ? "◀" : "▶"}</span>{t("Missed-Spot Ranking")}
+        <span className="rounded-sm bg-white text-black text-[8px] font-black px-1 h-3 grid place-items-center">Tab</span>{t("Missed-Spot Ranking")}
       </button>
       {open && (
         <div className="bg-black/45 rounded-r px-2 py-1.5 min-w-[170px] text-[11px]">

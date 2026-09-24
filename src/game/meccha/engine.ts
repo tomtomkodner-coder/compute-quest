@@ -369,6 +369,7 @@ export class Engine {
   onPoseMenu: ((open: boolean) => void) | null = null;
   onInteract: (() => void) | null = null;
   onChatKey: (() => void) | null = null;
+  onTab: (() => void) | null = null;
   onOptions: (() => void) | null = null;
 
   // צביעה וסנכרון
@@ -1654,7 +1655,7 @@ export class Engine {
     const h = 1.7 * (m.armed ? 1 : sizeScale(m.size));
     const v = SPEED.climb * dt;
     const ctrl = this.keys.has("ControlLeft") || this.keys.has("ControlRight");
-    if (iy < -0.5) { // מתרחקים מהקיר
+    if (iy < -0.5 || this.keys.has("ShiftLeft") || this.keys.has("ShiftRight")) { // Shift (כמו במשחק) או S: מתרחקים מהקיר
       this.detach();
       m.pos.addScaledVector(n, 0.25);
       return;
@@ -2646,6 +2647,7 @@ export class Engine {
         case "Digit5": this.toggleFreeLook(); break;
         case "KeyG": this.giveLike(); break;
         case "KeyY": this.voteSkip(); break;
+        case "Tab": e.preventDefault(); this.onTab?.(); break;
         case "KeyT": e.preventDefault(); this.unlockPointerIfNeeded(); this.onChatKey?.(); break;
         case "KeyE": if (this.nearPlay()) { this.unlockPointerIfNeeded(); this.onInteract?.(); } break;
         case "KeyV": if (this.hud.paintMode) this.setShadow(!this.shadow); break;
