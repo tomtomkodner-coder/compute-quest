@@ -51,12 +51,31 @@ function pixels(g: CanvasRenderingContext2D, w: number, h: number, f: (u: number
   g.putImageData(img, 0, 0);
 }
 
+/** noise field painted at low resolution (res²) and smoothly upscaled onto the canvas — fast, still tileable */
+function field(g: CanvasRenderingContext2D, w: number, h: number, res: number, f: (u: number, v: number, out: number[]) => void) {
+  const c = document.createElement("canvas");
+  c.width = c.height = res + 2;
+  const cg = c.getContext("2d")!;
+  const img = cg.createImageData(res + 2, res + 2);
+  const o = [0, 0, 0, 255];
+  for (let y = 0; y < res + 2; y++)
+    for (let x = 0; x < res + 2; x++) {
+      o[3] = 255;
+      f((((x - 1 + res) % res) / res), (((y - 1 + res) % res) / res), o);
+      const i = (y * (res + 2) + x) * 4;
+      img.data[i] = o[0]; img.data[i + 1] = o[1]; img.data[i + 2] = o[2]; img.data[i + 3] = o[3];
+    }
+  cg.putImageData(img, 0, 0);
+  g.imageSmoothingEnabled = true;
+  g.drawImage(c, 1 - 0.5, 1 - 0.5, res, res, 0, 0, w, h);
+}
+
 /** fine sand with wave ripples, darker patches and tiny shell bits */
 export const sand = (seed = 3) =>
   makeTex(512, 512, (g, w, h) => {
     const n = fbm(seed, 4, 4), m = vnoise(64, seed + 5), q = vnoise(8, seed + 9);
     const A = hex("#d9c9a0"), B = hex("#b3a078");
-    pixels(g, w, h, (u, v, o) => {
+    field(g, w, h, 160, (u, v, o) => {
       const warp = q(u, v) * 1.6;
       const rip = Math.sin((v * 10 + u * 2 + warp) * Math.PI * 2) * 0.5 + 0.5;
       const t = Math.min(1, Math.max(0, n(u, v) * 0.9 + rip * 0.25 + (m(u, v) - 0.5) * 0.35 - 0.1));
@@ -113,7 +132,7 @@ export const rock = (base = "#6d6f68", seed = 4, algae = 0.45) =>
   makeTex(256, 256, (g, w, h) => {
     const n = fbm(seed, 5, 4), c = fbm(seed + 2, 3, 12), a = fbm(seed + 7, 3, 3);
     const B = hex(base), G = hex("#56703c"), P = hex("#9a6f7d");
-    pixels(g, w, h, (u, v, o) => {
+    field(g, w, h, 128, (u, v, o) => {
       const t = n(u, v);
       const pit = c(u, v);
       const sh = 0.55 + t * 0.75 - Math.max(0, pit - 0.62) * 1.4;
@@ -138,7 +157,7 @@ export const hullPlanks = (seed = 5, base = "#7a624a") =>
   makeTex(512, 512, (g, w, h) => {
     const r = rng(seed);
     const rows = 8, ph = h / rows;
-    const gr = fbm(seed + 3, 4, 4);
+    const gr = fbm(seed + 3, 3, 4);
     for (let i = 0; i < rows; i++) {
       const tone = (r() - 0.5) * 30;
       const B = hex(base);
@@ -160,17 +179,15 @@ export const hullPlanks = (seed = 5, base = "#7a624a") =>
       g.fillStyle = "rgba(40,30,20,0.9)";
       for (const x of [j - 10, j + 12]) { g.beginPath(); g.arc(x, i * ph + ph * 0.3, 2.2, 0, 7); g.arc(x, i * ph + ph * 0.7, 2.2, 0, 7); g.fill(); }
     }
-    const img = g.getImageData(0, 0, w, h);
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        const t = gr(x / w, y / h);
-        const al = Math.max(0, Math.min(1, (t - 0.52) * 3.5));
-        img.data[i] = img.data[i] * (1 - al * 0.6) + 70 * al * 0.6;
-        img.data[i + 1] = img.data[i + 1] * (1 - al * 0.6) + 95 * al * 0.6;
-        img.data[i + 2] = img.data[i + 2] * (1 - al * 0.6) + 55 * al * 0.6;
-      }
-    g.putImageData(img, 0, 0);
+    const lay = document.createElement("canvas");
+    lay.width = w; lay.height = h;
+    const lg = lay.getContext("2d")!;
+    field(lg, w, h, 96, (u, v, o) => {
+      const t = gr(u, v);
+      o[0] = 70; o[1] = 98; o[2] = 55;
+      o[3] = Math.max(0, Math.min(1, (t - 0.5) * 3.2)) * 170;
+    });
+    g.drawImage(lay, 0, 0);
   });
 
 /** barrel staves (vertical along V) with two iron hoops */
@@ -208,7 +225,7 @@ export const marble = (seed = 7, base = "#e6e1d6", stain = true) =>
   makeTex(256, 256, (g, w, h) => {
     const n = fbm(seed, 4, 3), vn = fbm(seed + 4, 3, 2), fine = vnoise(48, seed + 9);
     const B = hex(base);
-    pixels(g, w, h, (u, v, o) => {
+    field(g, w, h, 128, (u, v, o) => {
       const t = n(u, v);
       const sv = Math.sin((u * 2 + v * 1.2 + vn(u, v) * 2.5) * Math.PI * 2);
       const vein = 1 - 0.12 * Math.exp(-sv * sv * 60);
@@ -243,18 +260,16 @@ export const paving = (seed = 8) =>
         x += sw;
       }
     }
-    const img = g.getImageData(0, 0, w, h);
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        const t = n(x / w, y / h);
-        const s = Math.max(0, Math.min(1, (t - 0.45) * 3));
-        const k = 0.85 + (t - 0.5) * 0.3;
-        img.data[i] = img.data[i] * k * (1 - s) + 205 * s;
-        img.data[i + 1] = img.data[i + 1] * k * (1 - s) + 190 * s;
-        img.data[i + 2] = img.data[i + 2] * k * (1 - s) + 150 * s;
-      }
-    g.putImageData(img, 0, 0);
+    const lay = document.createElement("canvas");
+    lay.width = w; lay.height = h;
+    const lg = lay.getContext("2d")!;
+    field(lg, w, h, 96, (u, v, o) => {
+      const t = n(u, v);
+      const sd = Math.max(0, Math.min(1, (t - 0.45) * 3));
+      o[0] = 205 * sd + 30 * (1 - sd); o[1] = 190 * sd + 30 * (1 - sd); o[2] = 150 * sd + 25 * (1 - sd);
+      o[3] = (sd * 0.95 + (1 - sd) * Math.max(0, 0.5 - t) * 0.5) * 255;
+    });
+    g.drawImage(lay, 0, 0);
   });
 
 /** brain coral maze grooves */
@@ -480,7 +495,7 @@ export const sail = (seed = 13) =>
   makeTex(256, 256, (g, w, h) => {
     const r = rng(seed);
     const n = fbm(seed, 4, 3);
-    pixels(g, w, h, (u, v, o) => {
+    field(g, w, h, 128, (u, v, o) => {
       const t = n(u, v);
       const hole = t > 0.64 || (v > 0.8 && t > 0.5) ? 0 : 255;
       o[0] = 196 * (0.8 + t * 0.3); o[1] = 184 * (0.8 + t * 0.3); o[2] = 150 * (0.8 + t * 0.3);

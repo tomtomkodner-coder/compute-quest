@@ -135,7 +135,11 @@ export function buildSewer(): World {
   const cone = k.mat(null, "#d9531e", [1, 1], { roughness: 0.6 });
   const cardboard = k.mat(k.tex("s-card", () => S.burlap("#8a6a44", 51)), "#fff", [1, 1], { roughness: 0.95, bump: 0.3 });
   const door = k.mat(k.tex("s-door", () => S.paintedMetal("#4a5a52", 61)), "#fff", [1, 1], { metalness: 0.6, roughness: 0.5, bump: 0.5 });
-  const puddle = k.mat(null, "#1a1f14", [1, 1], { roughness: 0.04, metalness: 0.4 });
+  // shallow puddles: a thin, glossy, semi-transparent film (not an opaque black disc)
+  const puddle = k.mat(null, "#2c3326", [1, 1], { roughness: 0.03, metalness: 0.15 });
+  puddle.m.transparent = true;
+  puddle.m.opacity = 0.6;
+  puddle.m.depthWrite = false;
   const moss = k.mat(k.tex("s-moss", S.slime), "#6f8a4a", [1, 1], { roughness: 0.9, bump: 0.8 });
   for (const m of [lampWarm, lampCold, lampFlicker, shaftLight, grafA, grafA2, grafB, grafB2, puddle, waterM]) B.opt(m, { noShadow: true });
 

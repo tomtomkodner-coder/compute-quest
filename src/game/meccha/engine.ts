@@ -11,6 +11,7 @@ import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { buildMap, MAPS, type World } from "./maps";
 import { buildNav, type Nav } from "./nav";
 import { loadHdri } from "./hdri";
+import { t } from "./i18n";
 import {
   buildCharacter, applyPose, poseBox, setSize, sizeScale, paintSphere, paintSegment, restPoint, vertexWorld, invalidatePaint, fillPart, resetPaint, copyPaint, samplePart,
   setLabel, setGlow, disposeCharacter, POSES, SIZES, BODY_TYPES,
@@ -862,7 +863,7 @@ export class Engine {
     }
     const wasHost = this.isHost();
     this.hostId = host?.id ?? this.me.id;
-    if (!wasHost && this.isHost() && this.net.kind !== "local") this.toast("You are now the host");
+    if (!wasHost && this.isHost() && this.net.kind !== "local") this.toast(t("You are now the host"));
 
     const keep = new Set<string>([this.me.id]);
     for (const pr of peers) {
@@ -873,7 +874,7 @@ export class Engine {
         p = this.makePlayer(pr.id, String(pr.p.n ?? "Player").slice(0, 16), HEX.test(String(pr.p.c)) ? String(pr.p.c) : "#ffffff", false, false);
         const pos = pr.p.p as number[] | undefined;
         if (Array.isArray(pos) && pos.length === 3 && pos.every(Number.isFinite)) { p.pos.set(pos[0], pos[1], pos[2]); p.tpos.copy(p.pos); }
-        this.addChat("", "#aaaaaa", `${p.name} joined`);
+        this.addChat("", "#aaaaaa", t("{n} joined", { n: p.name }));
         this.onRS();
       }
       this.readPresence(p, pr.p);
@@ -887,7 +888,7 @@ export class Engine {
     for (const id of [...this.players.keys()]) {
       if (keep.has(id)) continue;
       const p = this.players.get(id)!;
-      if (!p.bot) this.addChat("", "#aaaaaa", `${p.name} left`);
+      if (!p.bot) this.addChat("", "#aaaaaa", t("{n} left", { n: p.name }));
       this.removePlayer(id);
     }
   }
@@ -1303,7 +1304,7 @@ export class Engine {
   startCountdown() {
     if (!this.isHost() || this.rs.ph !== "lobby") return;
     this.ensureBots();
-    if (this.players.size < 2) { this.toast("Need at least 2 players (add Bots in Settings)"); this.emit(); return; }
+    if (this.players.size < 2) { this.toast(t("Need at least 2 players (add Bots in Settings)")); this.emit(); return; }
     this.rs.ph = "countdown";
     this.setTimer(COUNTDOWN);
     this.pushRS();
@@ -1403,7 +1404,7 @@ export class Engine {
   private frame = (now: number) => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
-    const real = Math.min(0.25, (now - this.last) / 1000);
+    const real = Math.max(0, Math.min(0.25, (now - this.last) / 1000));
     this.last = now;
     try {
       this.update(Math.min(0.05, real), real);
@@ -1796,7 +1797,7 @@ export class Engine {
     const rs = this.rs;
     const m = this.me;
     if (!m.armed || rs.ph !== "hunt" || !m.alive) return;
-    if (rs.s.ammoLimit && m.ammo <= 0) { this.toast("Out of ammo"); this.emit(); return; }
+    if (rs.s.ammoLimit && m.ammo <= 0) { this.toast(t("Out of ammo")); this.emit(); return; }
     const now = performance.now();
     if (now - this.lastShot < SHOT_CD) return;
     this.lastShot = now;

@@ -461,8 +461,8 @@ export function buildEgypt(): World {
     const hx = (len / 2) * c + r * s, hz = (len / 2) * s + r * c;
     k.collider(x - hx * 0.9, x + hx * 0.9, z - hz * 0.9, z + hz * 0.9, 0, r * 1.7, true);
   };
-  drum(-7.6, 0.6, 0.35, 1.5);
-  drum(-9.4, -1.2, 1.2, 1.2);
+  drum(-9.0, -0.6, 1.2, 1.5);
+  drum(-7.2, -1.2, 0.2, 1.2);
   b.add(mCap, place(lathe([[0.72, 0], [0.9, 0.25], [1.2, 0.65], [1.42, 1.0], [1.5, 1.15], [1.46, 1.22], [0, 1.22]], 32), -4.6, 1.45, -0.6, 1.9, 0.3, 0.2));
   k.collider(-5.6, -3.7, -1.6, 0.3, 0, 1.6, true);
   // rubble heap under the collapsed bay + roof blocks
@@ -557,6 +557,9 @@ export function buildEgypt(): World {
       P(new THREE.SphereGeometry(0.055, 10, 8), sx * 0.075, 0.03, 0.23, m, 0, 0, 0, [1, 0.6, 1.4]);
       P(new THREE.ConeGeometry(0.05, 0.13, 10), sx * 0.065, 1.05, -0.02, m, -0.1, 0, sx * -0.2, [1, 1, 0.45]);
     }
+    for (const sx of [-1, 1]) P(new THREE.SphereGeometry(0.16, 14, 10), sx * 0.13, 0.15, -0.1, m, 0, 0, 0, [0.7, 1, 1.25]);
+    P(new THREE.SphereGeometry(0.15, 14, 10), 0, 0.55, 0.08, m, 0, 0, 0, [0.9, 1.2, 0.8]);
+    for (const sx of [-1, 1]) P(new THREE.SphereGeometry(0.022, 8, 6), sx * 0.045, 0.95, 0.105, trim, 0, 0, 0, [1.3, 0.7, 0.6]);
     P(new THREE.SphereGeometry(0.115, 16, 12), 0, 0.93, 0.02, m, 0, 0, 0, [1, 0.95, 1]);
     P(new THREE.SphereGeometry(0.055, 12, 8), 0, 0.9, 0.12, m, 0, 0, 0, [1, 0.8, 1]);
     P(new THREE.TorusGeometry(0.105, 0.018, 6, 20), 0, 0.8, -0.02, trim, Math.PI / 2 - 0.2, 0, 0, [1, 1.2, 1]);
@@ -630,7 +633,7 @@ export function buildEgypt(): World {
     b.add(mGold, f.put(new THREE.BoxGeometry(w + 0.03, 0.04, d + 0.03), 0, 0.08, 0));
     let top = h + 0.08;
     if (curved) {
-      b.add(mEbony, f.put(new THREE.CylinderGeometry(d / 2, d / 2, w, 16, 1, false, 0, Math.PI), 0, h + 0.08, 0, 0, 0, Math.PI / 2, [1, 1, 0.5 / (d / 2) * 0.35]));
+      b.add(mEbony, f.put(new THREE.CylinderGeometry(d / 2, d / 2, w, 16, 1, false, 0, Math.PI), 0, h + 0.08, 0, 0, 0, Math.PI / 2, [0.36 / d, 1, 1]));
       top += 0.18;
     } else b.add(mEbony, f.put(boxGeo(w + 0.04, 0.08, d + 0.04), 0, h + 0.12, 0));
     b.add(mGold, f.put(new THREE.SphereGeometry(0.035, 8, 6), 0, h * 0.7, d / 2 + 0.02));
@@ -646,6 +649,24 @@ export function buildEgypt(): World {
     if (r > 0.25) k.collider(x - r, x + r, z - r, z + r, y, y + h, true);
   };
   const food: Inst[] = [];
+  /** lumpy heap of gold with loose coins */
+  const goldHeap = (x: number, y: number, z: number, r: number, n: number) => {
+    const geo = new THREE.SphereGeometry(r, 22, 9, 0, Math.PI * 2, 0, Math.PI / 2);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const vy = p.getY(i);
+      if (vy < 0.01) continue;
+      const f = 1 + (Math.sin(p.getX(i) * 13 + z) * Math.cos(p.getZ(i) * 11 + x)) * 0.09 + rr(-0.04, 0.04);
+      p.setXYZ(i, p.getX(i) * f, vy * f, p.getZ(i) * f);
+    }
+    geo.computeVertexNormals();
+    b.add(mGold, place(geo, x, y, z, 0, rnd() * 6, 0, [1, 0.55, 1]));
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * 6.28, d = Math.sqrt(rnd()) * r * 1.25;
+      const hh = Math.max(0, r * 0.55 * Math.sqrt(Math.max(0, 1 - (d / r) ** 2)));
+      coins.push({ pos: [x + Math.cos(a) * d, y + hh + 0.012, z + Math.sin(a) * d], rotX: rr(-0.5, 0.5), rotZ: rr(-0.5, 0.5), rotY: rr(0, 3), scale: [rr(0.9, 1.4), 1, rr(0.9, 1.4)] });
+    }
+  };
   const coins: Inst[] = [];
   const offeringTable = (x: number, z: number, ry: number) => {
     const f = new Frame(x, z, ry);
@@ -727,12 +748,12 @@ export function buildEgypt(): World {
   brazier(-5.4, -8.3);
   brazier(5.4, -8.3);
   potCluster(-12.1, -8.2, 6, 0.7);
-  potCluster(12.2, 3.0, 5, 0.6);
+  potCluster(12.3, 3.2, 4, 0.45);
   potCluster(11.8, -7.6, 5, 0.7, [mPot, mAlab]);
   basket(-12.3, 0, 3.3, 0.32, 0.4, "#c89a4a");
   basket(-11.7, 0, 3.4, 0.26, 0.34, null);
   chest(12.2, 0, -4.8, 1.0, 0.55, 0.62, Math.PI / 2, true, true);
-  chest(-4.6, 0, 3.4, 0.9, 0.5, 0.55, 0.2, false, false, mChest2);
+  chest(8.4, 0, 3.35, 0.9, 0.5, 0.55, 0.2, false, false, mChest2);
   b.add(mMat, place(new THREE.BoxGeometry(2.4, 0.02, 1.6), 5.2, 0.01, 3.0, 0, 0.15, 0), 1);
   for (const [x, z] of [[4.6, 2.7], [5.8, 3.3]] as const) pot(x, 0.02, z, 1.0, 2, mClay);
   // torches on the hall side walls (point lights near them)
@@ -802,10 +823,8 @@ export function buildEgypt(): World {
     }
     k.collider(-2.2, 2.2, -20.5, -20.2, 1.2, 3.6, true);
     // gold piles on the dais
-    for (const [x, z, r] of [[-2.2, -17.3, 0.45], [2.4, -17.6, 0.38]] as const) {
-      b.add(mGold, place(new THREE.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), x, 1.2, z, 0, 0, 0, [1, 0.55, 1]));
-      for (let i = 0; i < 16; i++) coins.push({ pos: [x + rr(-r, r), 1.22 + rr(0, r * 0.4), z + rr(-r, r)], rotX: rr(-0.5, 0.5), rotZ: rr(-0.5, 0.5) });
-    }
+    goldHeap(-2.2, 1.2, -17.3, 0.45, 40);
+    goldHeap(2.4, 1.2, -17.6, 0.38, 34);
   }
 
   // ======================================================================
@@ -939,11 +958,10 @@ export function buildEgypt(): World {
     });
     // gold heaps with coins, golden cats, vases, model boat, chariot wheel, shields
     for (const [x, z, r] of [[16.4, -19.4, 0.9], [18.6, -15.2, 0.7], [14.4, -12.8, 0.6]] as const) {
-      b.add(mGold, place(new THREE.SphereGeometry(r, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), x, 0, z, 0, 0, 0, [1, 0.55, 1]));
+      goldHeap(x, 0, z, r, 110);
       k.collider(x - r * 0.8, x + r * 0.8, z - r * 0.8, z + r * 0.8, 0, r * 0.5, true);
-      for (let i = 0; i < 40; i++) { const a = rnd() * 6.28, d = rr(0, r * 1.3); const hh = Math.max(0, r * 0.55 * (1 - (d / r) ** 2)); coins.push({ pos: [x + Math.cos(a) * d, hh + 0.01, z + Math.sin(a) * d], rotX: rr(-0.6, 0.6), rotZ: rr(-0.6, 0.6) }); }
     }
-    for (const z of [-17.7, -12.3]) {
+    for (const z of [-16.85, -13.15]) {
       boxAt(mBlock, 10.3, 11.5, 0, 0.8, z - 0.6, z + 0.6, 2);
       cat(10.9, z, 0.8, 1.1, Math.PI / 2, mGold, mLapis);
     }
@@ -1014,7 +1032,7 @@ export function buildEgypt(): World {
       k.collider(x - 0.62, x + 0.62, z - 0.62, z + 0.62, 0, h + 0.4, true);
     }
     drum(14.3, 13.3, 0.4, 1.0, 0.6);
-    drum(14.3, 17.1, 1.3, 1.0, 0.6);
+    drum(17.4, 10.6, 0.0, 1.0, 0.6);
     b.add(mCap, place(lathe([[0.55, 0], [0.7, 0.2], [0.95, 0.5], [1.1, 0.8], [1.15, 0.9], [0, 0.92]], 28), 16.9, 1.05, 13.3, 1.7, 0.6, 0.1));
     k.collider(16.0, 17.8, 12.4, 14.2, 0, 1.2, true);
     addRubble(12.5, 16.2, 3.4, 45, 0.55);
@@ -1035,9 +1053,9 @@ export function buildEgypt(): World {
       const top = new V3(-Math.sin(lean) * h, Math.cos(lean) * h, 0);
       for (let i = 0; i < 11; i++) {
         const a = (i / 11) * Math.PI * 2 + rr(-0.2, 0.2);
-        const fl = new THREE.PlaneGeometry(3.2, 0.9, 10, 1);
+        const fl = new THREE.PlaneGeometry(3.2, 1.1, 10, 1);
         const p = fl.attributes.position;
-        for (let j = 0; j < p.count; j++) { const t = (p.getX(j) + 1.6) / 3.2; p.setZ(j, -t * t * 1.3 + t * 0.5); }
+        for (let j = 0; j < p.count; j++) { const t = (p.getX(j) + 1.6) / 3.2; p.setZ(j, t * t * 1.4 - t * 0.45); }
         fl.translate(1.6, 0, 0);
         fl.rotateX(Math.PI / 2 + rr(-0.3, 0.3));
         fl.rotateZ(rr(-0.1, 0.25));
@@ -1107,10 +1125,24 @@ export function buildEgypt(): World {
     }
   }
 
+  // ---------------- sky dome + sun disk (render only, not paintable) ----------------
+  {
+    const skyTex = E.skyGrad().texture;
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(460, 32, 16), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+    sky.renderOrder = -10;
+    k.group.add(sky);
+    const sd = new V3(...SUN).normalize().multiplyScalar(440);
+    const sun = new THREE.Mesh(new THREE.CircleGeometry(14, 32), new THREE.MeshBasicMaterial({ color: "#fff1cf", fog: false, depthWrite: false }));
+    sun.position.copy(sd);
+    sun.lookAt(0, 0, 0);
+    sun.renderOrder = -9;
+    k.group.add(sun);
+  }
+
   // ---------------- flush ----------------
   if (rubble.length) k.instances(new THREE.BoxGeometry(1, 1, 1), mBlockShade, rubble);
   if (food.length) k.instances(new THREE.SphereGeometry(1, 10, 8), mFood, food);
-  if (coins.length) k.instances(new THREE.CylinderGeometry(0.035, 0.035, 0.008, 10), mGold, coins, { noShadow: true });
+  if (coins.length) k.instances(new THREE.CylinderGeometry(0.04, 0.04, 0.01, 12), mGoldPale, coins, { noShadow: true });
   b.flush(k);
   if (rays.length) {
     const g2 = rays.length > 1 ? (() => { const cl = rays.map((g) => (g.index ? g.toNonIndexed() : g)); return mergeAll(cl); })() : rays[0];
@@ -1127,7 +1159,7 @@ export function buildEgypt(): World {
     bounds: { minX: -20.45, maxX: 20.45, minZ: -20.45, maxZ: 20.45 },
     hunterSpawns: grid(0, 17.6, 9, 1.15),
     hiderSpawns: hiders,
-    preview: { pos: [11.5, 5.2, 19.6], look: [-1.5, 4.2, 5.5], fov: 62 },
+    preview: { pos: [7.6, 3.4, 19.7], look: [-1.2, 4.0, 6.0], fov: 64 },
     lighting: {
       sky: "#e7b98a",
       hemi: ["#ffe0b5", "#6a4f33", 0.45],
@@ -1144,7 +1176,6 @@ export function buildEgypt(): World {
       exposure: 1.0,
       env: 0.4,
       hdri: "sunset",
-      hdriBackground: 0.04,
       envRotation: 0,
     },
   });

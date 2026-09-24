@@ -246,7 +246,7 @@ function stoneBase(g: C, w: number, h: number, r: () => number, base: string, jo
   g.fillRect(0, 0, w, h);
   blotches(g, w, h, r, 70, "#7a5a36", 0.08, 60);
   blotches(g, w, h, r, 40, "#fff0d0", 0.07, 50);
-  speckle(g, w, h, r, 3500, 0.1);
+  speckle(g, w, h, r, 1200, 0.12);
   if (joints) {
     for (let y = 0; y < h; y += course) {
       g.fillStyle = "rgba(70,45,20,0.28)"; g.fillRect(0, y, w, 2);
@@ -289,7 +289,7 @@ export const sandstone = (base = "#cfa877", seed = 3) =>
     }
     blotches(g, w, h, r, 90, "#6b4b2a", 0.09, 45);
     blotches(g, w, h, r, 50, "#f6e2bb", 0.08, 45);
-    speckle(g, w, h, r, 9000, 0.12);
+    speckle(g, w, h, r, 2600, 0.14);
     // chipped corners / erosion pits
     for (let i = 0; i < 80; i++) {
       g.fillStyle = `rgba(80,50,20,${0.2 + r() * 0.3})`;
@@ -359,7 +359,7 @@ export const relief = (seed = 1, painted = false, base = "#d4b183") =>
     g.fillStyle = painted ? "#6b3b25" : "rgba(90,60,30,0.28)";
     g.fillRect(0, 458, w, 54);
     if (painted) { g.fillStyle = "#c7902e"; g.fillRect(0, 458, w, 5); g.fillStyle = "#2d5a9a"; g.fillRect(0, 466, w, 4); }
-    speckle(g, w, h, r, 4000, 0.09);
+    speckle(g, w, h, r, 1200, 0.1);
     // damage: flaked areas where paint & surface lost
     for (let i = 0; i < 14; i++) {
       g.fillStyle = painted ? `rgba(215,190,150,${0.5 + r() * 0.4})` : `rgba(180,145,100,${0.25 + r() * 0.3})`;
@@ -474,7 +474,7 @@ export const paving = (seed = 5) =>
     }
     blotches(g, w, h, r, 80, "#6e5030", 0.1, 50);
     blotches(g, w, h, r, 60, "#f0d9ac", 0.1, 40);
-    speckle(g, w, h, r, 9000, 0.12);
+    speckle(g, w, h, r, 2600, 0.14);
     // cracks
     g.strokeStyle = "rgba(60,38,15,0.45)"; g.lineWidth = 1.2;
     for (let i = 0; i < 12; i++) { g.beginPath(); let x = r() * w, y = r() * h; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.5) * 40; y += (r() - 0.5) * 40; g.lineTo(x, y); } g.stroke(); }
@@ -501,7 +501,7 @@ export const sand = (seed = 2, base = "#d8b27a") =>
       for (let x = 0; x <= w; x += 8) g.lineTo(x, y0 + 2 + Math.sin((x / w) * Math.PI * 4 + i) * 3);
       g.stroke();
     }
-    speckle(g, w, h, r, 5000, 0.12);
+    speckle(g, w, h, r, 2000, 0.13);
   });
 
 /** hammered gold (greyscale detail; material colour gives the gold) */
@@ -575,7 +575,7 @@ export const basalt = (base = "#1d1b1a", seed = 12) =>
   makeTex(256, 256, (g, w, h) => {
     const r = rng(seed);
     g.fillStyle = base; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 5000; i++) { const v = r(); g.fillStyle = v > 0.8 ? "rgba(200,190,170,0.18)" : "rgba(0,0,0,0.25)"; g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2); }
+    for (let i = 0; i < 2500; i++) { const v = r(); g.fillStyle = v > 0.8 ? "rgba(200,190,170,0.18)" : "rgba(0,0,0,0.25)"; g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2); }
     blotches(g, w, h, r, 20, "#4a4038", 0.15, 40);
   });
 
@@ -584,7 +584,7 @@ export const granite = (seed = 13) =>
   makeTex(256, 256, (g, w, h) => {
     const r = rng(seed);
     g.fillStyle = "#9a5b45"; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 7000; i++) { const v = r(); g.fillStyle = v > 0.7 ? "rgba(40,25,25,0.45)" : v > 0.45 ? "rgba(230,190,170,0.35)" : "rgba(120,60,45,0.4)"; g.fillRect(r() * w, r() * h, 1 + r() * 3, 1 + r() * 2); }
+    for (let i = 0; i < 3500; i++) { const v = r(); g.fillStyle = v > 0.7 ? "rgba(40,25,25,0.45)" : v > 0.45 ? "rgba(230,190,170,0.35)" : "rgba(120,60,45,0.4)"; g.fillRect(r() * w, r() * h, 1 + r() * 3, 1 + r() * 2); }
     blotches(g, w, h, r, 20, "#5a3528", 0.15, 40);
   });
 
@@ -633,13 +633,26 @@ export const frond = () =>
     g.clearRect(0, 0, w, h);
     g.strokeStyle = "#5b6a2a"; g.lineWidth = 3;
     g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
-    for (let x = 6; x < w - 4; x += 5) {
-      const l = (h / 2 - 2) * Math.sin((x / w) * Math.PI * 0.9 + 0.2);
+    for (let x = 4; x < w - 4; x += 4) {
+      const l = (h / 2 - 2) * Math.sin((x / w) * Math.PI * 0.92 + 0.15);
       for (const s of [-1, 1]) {
-        g.strokeStyle = x % 10 ? "#6f8a34" : "#5a7428"; g.lineWidth = 2.2;
-        g.beginPath(); g.moveTo(x, h / 2); g.lineTo(x + 10, h / 2 + s * l); g.stroke();
+        g.fillStyle = (x / 4) % 3 ? "#6f8a34" : "#56702a";
+        g.beginPath(); g.moveTo(x - 2, h / 2); g.lineTo(x + 12, h / 2 + s * l); g.lineTo(x + 15, h / 2 + s * l * 0.9); g.lineTo(x + 3, h / 2); g.fill();
       }
     }
+  });
+
+/** golden-hour sky dome gradient (v = 1 zenith .. 0 nadir) */
+export const skyGrad = () =>
+  makeTex(16, 256, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0.0, "#4f76a8");
+    grd.addColorStop(0.25, "#8fa9c4");
+    grd.addColorStop(0.4, "#e9c7a0");
+    grd.addColorStop(0.49, "#f6b27a");
+    grd.addColorStop(0.52, "#e3b184");
+    grd.addColorStop(1.0, "#c89a6c");
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
   });
 
 /** god-ray gradient (bright centre fading to the bottom) */

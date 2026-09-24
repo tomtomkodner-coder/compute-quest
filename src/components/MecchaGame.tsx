@@ -5,6 +5,22 @@ import type { Engine, HudState, Settings } from "@/game/meccha/engine";
 import type { PoseId, SizeId, BodyType } from "@/game/meccha/character";
 import type { Net } from "@/game/meccha/net";
 import { setMuted as setSoundMuted, setVolume as setSoundVolume, sfxClick } from "@/lib/sound";
+import { t, getLang, setLang, onLang, isRtl, type Lang } from "@/game/meccha/i18n";
+
+/** מרנדר מחדש כשמחליפים שפה */
+function useLang() {
+  const [, force] = useState(0);
+  useEffect(() => onLang(() => force((x) => x + 1)), []);
+  return getLang();
+}
+
+function LangToggle({ dark }: { dark?: boolean }) {
+  const l = useLang();
+  const b = (v: Lang, n: string) => (
+    <button key={v} onClick={() => setLang(v)} className={`px-2.5 py-1 rounded-lg text-xs font-black ${l === v ? (dark ? "bg-white text-black" : "bg-black text-white") : dark ? "text-white/80" : "text-black/70"}`}>{n}</button>
+  );
+  return <div className={`inline-flex gap-1 rounded-xl p-1 ${dark ? "bg-black/40" : "bg-black/10"}`} aria-label="Language">{b("en", "English")}{b("he", "עברית")}</div>;
+}
 
 // מחרוזות הממשק לקוחות מהגרסה האנגלית של המשחק המקורי (בלי תרגומים מומצאים)
 const FONT = `"M PLUS Rounded 1c", "Nunito", system-ui, sans-serif`;
@@ -53,6 +69,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "
 type Conn = { kind: "local" } | { kind: "room" } | { kind: "p2p"; code: string; host: boolean };
 
 export function MecchaGame() {
+  useLang();
   const [screen, setScreen] = useState<"menu" | "game">("menu");
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
@@ -94,12 +111,15 @@ export function MecchaGame() {
   return (
     <div onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }} className="relative min-h-screen overflow-hidden" dir="ltr" style={{ fontFamily: FONT, background: "radial-gradient(circle at 30% 20%, #ffe36e 0, #ff9f1c 35%, #ff4d6d 70%, #7b2cbf 100%)" }}>
       <div className="absolute inset-0 opacity-25 pointer-events-none" style={{ backgroundImage: "radial-gradient(#fff 2px, transparent 2px)", backgroundSize: "26px 26px" }} />
-      <div className="relative z-10 mx-auto max-w-md px-4 py-6 text-black">
+      <div className="relative z-10 mx-auto max-w-md px-4 py-6 text-black" dir={isRtl() ? "rtl" : "ltr"}>
         <div className="flex items-center justify-between mb-6">
-          <Link to="/" className="rounded-xl bg-black/30 text-white px-3 py-2 text-sm font-bold inline-flex items-center gap-2"><Home className="w-4 h-4" /> Home</Link>
-          <button onClick={toggleMute} className="rounded-xl bg-black/30 text-white p-2.5" aria-label="Mute">
-            {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </button>
+          <Link to="/" className="rounded-xl bg-black/30 text-white px-3 py-2 text-sm font-bold inline-flex items-center gap-2"><Home className="w-4 h-4" /> {t("Home")}</Link>
+          <div className="flex items-center gap-2">
+            <LangToggle dark />
+            <button onClick={toggleMute} className="rounded-xl bg-black/30 text-white p-2.5" aria-label="Mute">
+              {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
         <div className="text-center mb-7 select-none">
           <div className="text-[44px] sm:text-[56px] leading-[0.95] font-black text-white tracking-tight" style={{ textShadow: "0 5px 0 #000, 3px 0 0 #000, -3px 0 0 #000, 0 -3px 0 #000" }}>
@@ -109,7 +129,7 @@ export function MecchaGame() {
 
         <div className="rounded-3xl bg-white/90 border-[3px] border-black p-4 mb-4 grid gap-3 shadow-[0_6px_0_#000]">
           <label className="grid gap-1">
-            <span className="font-extrabold text-sm">Name</span>
+            <span className="font-extrabold text-sm">{t("Name")}</span>
             <input id="meccha-name" value={name} maxLength={14} onChange={(e) => setName(e.target.value)}
               className="bg-white border-2 border-black rounded-xl px-3 py-2 text-base font-bold outline-none" />
           </label>
@@ -122,34 +142,34 @@ export function MecchaGame() {
         </div>
 
         <div className="grid gap-3">
-          {roomNet && <button onClick={() => go({ kind: "room" })} className={`${btn} bg-[#8ef56b]`}>Join This Page&apos;s Server</button>}
+          {roomNet && <button onClick={() => go({ kind: "room" })} className={`${btn} bg-[#8ef56b]`}>{t("Join This Page's Server")}</button>}
           <button onClick={async () => { const { randomCode } = await import("@/game/meccha/net"); go({ kind: "p2p", code: randomCode(), host: true }); }}
-            className={`${btn} bg-[#ffd23f]`}>Create Server</button>
+            className={`${btn} bg-[#ffd23f]`}>{t("Create Server")}</button>
           {!search ? (
-            <button onClick={() => setSearch(true)} className={`${btn} bg-[#4cc9f0]`}>Search Server</button>
+            <button onClick={() => setSearch(true)} className={`${btn} bg-[#4cc9f0]`}>{t("Search Server")}</button>
           ) : (
             <div className="flex gap-2">
-              <input id="meccha-code" autoFocus value={joinCode} placeholder="CODE"
+              <input id="meccha-code" autoFocus value={joinCode} placeholder={t("CODE")} dir="ltr"
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5))}
                 className="flex-1 min-w-0 bg-white border-[3px] border-black rounded-2xl px-3 text-2xl tracking-[0.3em] text-center font-black outline-none" />
               <button disabled={joinCode.length !== 5} onClick={() => go({ kind: "p2p", code: joinCode, host: false })}
-                className={`${btn} !w-auto px-5 bg-[#4cc9f0] disabled:opacity-40`}>Join</button>
+                className={`${btn} !w-auto px-5 bg-[#4cc9f0] disabled:opacity-40`}>{t("Join")}</button>
             </div>
           )}
-          <button onClick={() => go({ kind: "local" })} className={`${btn} bg-white`}>Practice (Solo + Bots)</button>
-          {roomNet === undefined && <p className="text-xs text-white/80 text-center">Checking for a shared server…</p>}
+          <button onClick={() => go({ kind: "local" })} className={`${btn} bg-white`}>{t("Practice (Solo + Bots)")}</button>
+          {roomNet === undefined && <p className="text-xs text-white/80 text-center">{t("Checking for a shared server…")}</p>}
         </div>
 
         <details className="mt-5 rounded-2xl bg-black/35 text-white p-4 text-sm leading-relaxed">
-          <summary className="font-extrabold cursor-pointer">Controls</summary>
+          <summary className="font-extrabold cursor-pointer">{t("Controls")}</summary>
           <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[13px]">
             {[
-              ["WASD", "Move"], ["Mouse", "Camera (click to lock)"], ["Space", "Jump / Stick to wall (mid-air)"], ["Shift", "Leave wall"],
-              ["Ctrl", "Crouch"], ["F", "Paint mode"], ["Hold Space", "Eyedropper (paint mode)"], ["Right drag", "Brush size"],
+              ["WASD", "Move"], ["Mouse", "Camera (click to lock)"], ["Shift", "Sprint"], ["Space", "Jump / Climb (jump into a wall, hold Space)"],
+              ["Ctrl", "Crouch / climb down"], ["F", "Paint mode"], ["Hold Space", "Eyedropper (paint mode)"], ["Right drag", "Brush size"],
               ["V", "Shadow on/off (paint mode)"], ["Hold R", "Pose wheel"], ["Q / X", "Place clone / remove clones"], ["1", "Whistle"],
-              ["2", "Nameplates"], ["3", "X-ray"], ["4 / 5", "Spectate next / free camera"], ["LMB / RMB", "Hunter: shoot / TPS"],
-              ["G", "Like (answer check)"], ["Y", "Vote to skip"], ["T", "Chat"], ["E", "Interact (PLAY)"],
-            ].map(([k, v]) => (<Fragment key={k}><b>{k}</b><span>{v}</span></Fragment>))}
+              ["2", "Nameplates"], ["3", "See-through"], ["5 / 4", "Free camera / move free camera"], ["LMB / RMB", "Hunter: shoot / FPS-TPS"],
+              ["G", "Like (answer check)"], ["Y", "Vote to skip"], ["T", "Chat"], ["E", "Interact (PLAY)"], ["Esc", "Settings"],
+            ].map(([k, v]) => (<Fragment key={k}><b dir="ltr">{k}</b><span>{t(v)}</span></Fragment>))}
           </div>
         </details>
       </div>
@@ -162,6 +182,7 @@ export function MecchaGame() {
 function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   conn: Conn; roomNet: Net | null; name: string; color: string; muted: boolean; onToggleMute: () => void; onExit: () => void;
 }) {
+  useLang();
   const mountRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const [hud, setHud] = useState<HudState | null>(null);
@@ -246,7 +267,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   const hider = !!hud && hud.alive && hud.myRole === "hider" && hud.phase !== "check";
   const hunter = !!hud && hud.myRole === "hunter" && (hud.phase === "hide" || hud.phase === "hunt");
   const phaseTitle = !hud ? "" : {
-    lobby: "LOBBY", countdown: "GET READY", hide: hud.myRole === "hunter" ? "HUNTER WAIT TIME" : "HIDE!", hunt: "SEARCH TIME", check: "ANSWER CHECK",
+    lobby: t("LOBBY"), countdown: t("GET READY"), hide: hud.myRole === "hunter" ? t("HUNTER WAIT TIME") : t("HIDE!"), hunt: t("SEARCH TIME"), check: t("ANSWER CHECK"),
   }[hud.phase];
 
   return (
@@ -258,17 +279,17 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         <div className="absolute inset-0 z-50 grid place-items-center bg-black/80 p-6">
           <div className="rounded-2xl bg-white text-black p-5 max-w-sm text-center font-bold">
             <p className="mb-3">{error}</p>
-            <button onClick={onExit} className="rounded-xl bg-black text-white px-4 py-2">Back</button>
+            <button onClick={onExit} className="rounded-xl bg-black text-white px-4 py-2">{t("Back")}</button>
           </div>
         </div>
       )}
-      {!hud && !error && <div className="absolute inset-0 grid place-items-center text-2xl font-black" style={{ textShadow: OUTLINE }}>Loading…</div>}
+      {!hud && !error && <div className="absolute inset-0 grid place-items-center text-2xl font-black" style={{ textShadow: OUTLINE }}>{t("Loading…")}</div>}
 
       {hud && (
         <>
           {/* למעלה: שלב + שעון + אייקוני המתחבאים */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none">
-            <div className="text-sm font-black tracking-wide" style={{ textShadow: OUTLINE }}>{phaseTitle}{hud.phase !== "lobby" && ` · ${hud.mapName}`}</div>
+            <div className="text-sm font-black tracking-wide" style={{ textShadow: OUTLINE }}>{phaseTitle}{hud.phase !== "lobby" && ` · ${t(hud.mapName)}`}</div>
             {hud.phase !== "lobby" && (
               <div className={`text-4xl font-black tabular-nums leading-none ${hud.phase === "hunt" && hud.time <= 10 ? "text-[#ff4d4d]" : ""}`} style={{ textShadow: OUTLINE }}>
                 {hud.phase === "countdown" ? hud.time : fmt(hud.time)}
@@ -284,33 +305,33 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
                 ))}
               </div>
             )}
-            {hud.room && hud.room !== hud.mapName && hud.phase !== "lobby" && hud.phase !== "countdown" && <div className="text-xs font-bold mt-1 opacity-90" style={{ textShadow: OUTLINE }}>{hud.room}</div>}
+            {hud.room && hud.room !== hud.mapName && hud.phase !== "lobby" && hud.phase !== "countdown" && <div className="text-xs font-bold mt-1 opacity-90" style={{ textShadow: OUTLINE }}>{t(hud.room)}</div>}
           </div>
 
           {/* שמאל למעלה: יציאה, קוד, שחקנים */}
           <div className="absolute top-2 left-2 z-20 flex flex-col gap-1.5 items-start">
             <div className="flex gap-1.5">
-              <button onClick={onExit} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1.5 text-xs font-bold"><X className="w-4 h-4 inline" /> Leave</button>
+              <button onClick={onExit} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1.5 text-xs font-bold"><X className="w-4 h-4 inline" /> {t("Leave")}</button>
               <button onClick={onToggleMute} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Mute">{muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
               <button onClick={() => setOptionsOpen(true)} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Settings"><Gear className="w-4 h-4" /></button>
             </div>
             {hud.code && (
               <button onClick={() => navigator.clipboard?.writeText(hud.code!).catch(() => {})} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1 text-xs font-bold inline-flex items-center gap-1">
-                Code: <span className="tracking-widest text-sm text-[#ffd23f]">{hud.code}</span> <Copy className="w-3 h-3" />
+                {t("Code:")} <span className="tracking-widest text-sm text-[#ffd23f]">{hud.code}</span> <Copy className="w-3 h-3" />
               </button>
             )}
             <div className="rounded-xl bg-black/40 px-2 py-1.5 text-[11px] font-bold grid gap-0.5 max-w-[190px]">
               {hud.players.map((p) => (
                 <div key={p.id} className={`flex items-center gap-1.5 ${!p.alive ? "opacity-50" : ""}`}>
                   <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black" style={{ background: p.color }} />
-                  <span className="truncate" style={{ color: p.role === "hunter" ? "#ffb703" : undefined }}>{p.name}{p.me ? " (You)" : ""}</span>
+                  <span className="truncate" style={{ color: p.role === "hunter" ? "#ffb703" : undefined }}>{p.name}{p.me ? ` ${t("(You)")}` : ""}</span>
                   {p.host && <span className="text-[#ffd23f]">★</span>}
                   {p.onPad && !p.bot && <span className="text-[#ff4d4d]">HUNTER</span>}
                   {p.likes > 0 && <span className="ml-auto opacity-80">👍{p.likes}</span>}
                 </div>
               ))}
             </div>
-            {!hud.connected && <div className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold">Disconnected</div>}
+            {!hud.connected && <div className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold">{t("Disconnected")}</div>}
           </div>
 
           {/* ימין למעלה: נקודות, תחמושת, דירוג נקודות ההחמצה */}
@@ -318,10 +339,10 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             {hunter && hud.phase === "hunt" && (
               <div className="flex items-center gap-1 text-xl font-black"><Search className="w-6 h-6 text-[#ff3b3b]" strokeWidth={3} /> {hud.finds}</div>
             )}
-            {hunter && hud.settings.ammoLimit && <div className="text-lg">Ammo: {hud.ammo}</div>}
+            {hunter && hud.settings.ammoLimit && <div className="text-lg">{t("Ammo")}: {hud.ammo}</div>}
             {hud.ranking.length > 0 && (
               <div className="rounded-xl bg-black/45 px-2 py-1.5 min-w-[150px]" style={{ textShadow: "none" }}>
-                <div className="text-[11px] font-black text-center mb-0.5">Missed Points</div>
+                <div className="text-[11px] font-black text-center mb-0.5">{t("Missed Points")}</div>
                 {hud.ranking.map((r, i) => (
                   <div key={r.id} className={`flex items-center gap-1.5 text-[11px] ${r.me ? "text-[#ffd23f]" : ""}`}>
                     <span className="w-3 opacity-70">{i + 1}</span>
@@ -332,10 +353,10 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
                 ))}
               </div>
             )}
-            {hud.attached && <div className="text-[#8ef56b]">Climbing · Space up · Ctrl down · S let go</div>}
-            {hud.freeLook && <div className="text-[#4cc9f0]">FREE CAMERA {hud.freeCam ? "· moving (4)" : "· 4 to move"}</div>}
-            {hud.xray && <div className="text-[#4cc9f0]">SEE-THROUGH</div>}
-            {!hud.nameplates && <div>Nameplates OFF</div>}
+            {hud.attached && <div className="text-[#8ef56b]">{t("Climbing · Space up · Ctrl down · S let go")}</div>}
+            {hud.freeLook && <div className="text-[#4cc9f0]">{t("FREE CAMERA")} {hud.freeCam ? t("· moving (4)") : t("· 4 to move")}</div>}
+            {hud.xray && <div className="text-[#4cc9f0]">{t("SEE-THROUGH")}</div>}
+            {!hud.nameplates && <div>{t("Nameplates OFF")}</div>}
           </div>
 
           {/* היהלומים הירוקים: זמינות השכפולים */}
@@ -368,26 +389,26 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-none">
               {hud.nearPlay ? (
                 <div className="rounded-2xl bg-black/60 px-4 py-2 text-lg font-black pointer-events-auto cursor-pointer" onClick={() => setSettingsOpen(true)}>
-                  <Key k="E" /> {hud.isHost ? "Game Settings / Start" : "Game Settings"}
+                  <Key k="E" /> {hud.isHost ? t("Game Settings / Start") : t("Game Settings")}
                 </div>
               ) : (
                 <div className="text-sm font-bold text-center" style={{ textShadow: OUTLINE }}>
-                  Walk to <b className="text-[#ffd23f]">PLAY</b> and press <Key k="E" /> · Stand on the red <b className="text-[#ff4d4d]">HUNTER</b> pad to be a hunter
+                  {t("Walk to")} <b className="text-[#ffd23f]">PLAY</b> {t("and press")} <Key k="E" /> · {t("Stand on the red")} <b className="text-[#ff4d4d]">HUNTER</b> {t("pad to be a hunter")}
                 </div>
               )}
-              {hud.onPad && <div className="text-xl font-black text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>You will be a HUNTER</div>}
+              {hud.onPad && <div className="text-xl font-black text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>{t("You will be a HUNTER")}</div>}
               <div className="flex gap-2 pointer-events-auto">
-                <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-black border-2 border-black">Settings</button>
-                <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-black border-2 border-black">Character</button>
+                <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-black border-2 border-black">{t("Settings")}</button>
+                <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-black border-2 border-black">{t("Character")}</button>
               </div>
             </div>
           )}
 
           {hud.phase === "hide" && hud.myRole === "hunter" && (
-            <Banner>Wait in the lobby until the chameleons finish hiding · F paint · RMB third person</Banner>
+            <Banner>{t("Wait in the lobby until the chameleons finish hiding · F paint · RMB third person")}</Banner>
           )}
           {hud.spectating !== null && hud.phase !== "check" && !hud.freeLook && (
-            <Banner>{hud.spectating ? `Spectating ${hud.spectating}` : "Free camera"} · click next · 4 move · Shift fast · Space up · Ctrl down</Banner>
+            <Banner>{hud.spectating ? t("Spectating {n}", { n: hud.spectating }) : t("Free camera")} · {t("click next · 4 move · Shift fast · Space up · Ctrl down")}</Banner>
           )}
 
           {/* צייד: כוונת */}
@@ -412,12 +433,12 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
 
           {/* מגע: ביטול נעילה */}
           {hud.locked && !hud.paintMode && hud.phase !== "check" && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-[11px] font-bold opacity-80" style={{ textShadow: OUTLINE }}>Esc to release the mouse</div>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-[11px] font-bold opacity-80" style={{ textShadow: OUTLINE }}>{t("Esc to release the mouse")}</div>
           )}
 
           {/* בלובי: כפתור השתקה בפינה הימנית התחתונה (כמו במשחק) */}
           {hud.phase === "lobby" && !overlayOpen && (
-            <button onClick={onToggleMute} className="absolute bottom-3 right-3 z-30 rounded-full bg-black/55 border-2 border-white/70 p-2.5" aria-label={muted ? "Unmute" : "Mute"}>
+            <button onClick={onToggleMute} className="absolute bottom-3 right-3 z-30 rounded-full bg-black/55 border-2 border-white/70 p-2.5" aria-label={muted ? t("Unmute") : t("Mute")}>
               {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
           )}
@@ -425,10 +446,10 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           {/* מקשים */}
           {!touch && !hud.paintMode && hud.phase !== "check" && (
             <div className={`absolute ${hud.phase === "lobby" ? "bottom-16" : "bottom-2"} right-2 z-10 text-[11px] font-bold grid gap-0.5 text-right pointer-events-none`} style={{ textShadow: OUTLINE }}>
-              {hider && <><span><Key k="F" /> Paint</span><span><Key k="R" /> Pose</span><span><Key k="Q" /> Clone <Key k="X" /> Remove</span><span><Key k="1" /> Whistle</span><span><Key k="Shift" /> Sprint</span><span><Key k="Space" /> Jump / Climb</span><span><Key k="Ctrl" /> Crouch</span><span><Key k="5" /> Free camera</span></>}
-              {hunter && <><span><Key k="LMB" /> Shoot</span>{(hud.phase === "hide" || hud.settings.hunterTps) && <span><Key k="RMB" /> FPS / TPS</span>}<span><Key k="Shift" /> Sprint</span></>}
-              {(hud.phase === "hide") && <span><Key k="Y" /> Skip ({hud.votes.have}/{hud.votes.need})</span>}
-              <span><Key k="T" /> Chat</span>
+              {hider && <><span><Key k="F" /> {t("Paint")}</span><span><Key k="R" /> {t("Pose")}</span><span><Key k="Q" /> {t("Clone")} <Key k="X" /> {t("Remove")}</span><span><Key k="1" /> {t("Whistle")}</span><span><Key k="Shift" /> {t("Sprint")}</span><span><Key k="Space" /> {t("Jump / Climb")}</span><span><Key k="Ctrl" /> {t("Crouch")}</span><span><Key k="5" /> {t("Free camera")}</span></>}
+              {hunter && <><span><Key k="LMB" /> {t("Shoot")}</span>{(hud.phase === "hide" || hud.settings.hunterTps) && <span><Key k="RMB" /> {t("FPS / TPS")}</span>}<span><Key k="Shift" /> {t("Sprint")}</span></>}
+              {(hud.phase === "hide") && <span><Key k="Y" /> {t("Skip")} ({hud.votes.have}/{hud.votes.need})</span>}
+              <span><Key k="T" /> {t("Chat")}</span>
             </div>
           )}
 
@@ -468,7 +489,7 @@ function Banner({ children }: { children: React.ReactNode }) {
 function Panel({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-black/40 p-3" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} max-h-[92vh] overflow-auto rounded-3xl bg-white text-black border-[3px] border-black shadow-[0_6px_0_#000] p-4`}>
+      <div dir={isRtl() ? "rtl" : "ltr"} className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} max-h-[92vh] overflow-auto rounded-3xl bg-white text-black border-[3px] border-black shadow-[0_6px_0_#000] p-4`}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-black">{title}</h2>
           <button onClick={onClose} className="rounded-full bg-black text-white p-1" aria-label="Close"><X className="w-4 h-4" /></button>
@@ -486,17 +507,17 @@ function Opt<T extends string | number | boolean>({ label, value, options, onCha
   const step = (d: number) => onChange(options[(i + d + options.length) % options.length].v);
   return (
     <div className="flex items-center justify-between gap-2 py-1 border-b border-black/10">
-      <span className="text-sm font-bold">{label}</span>
+      <span className="text-sm font-bold">{t(label)}</span>
       <div className="flex items-center gap-1">
-        <button disabled={disabled} onClick={() => step(-1)} className="w-7 h-7 rounded-lg bg-black text-white font-black disabled:opacity-30">‹</button>
-        <span className="min-w-[128px] text-center text-sm font-black truncate">{options[i]?.n}</span>
-        <button disabled={disabled} onClick={() => step(1)} className="w-7 h-7 rounded-lg bg-black text-white font-black disabled:opacity-30">›</button>
+        <button disabled={disabled} onClick={() => step(isRtl() ? 1 : -1)} className="w-7 h-7 rounded-lg bg-black text-white font-black disabled:opacity-30">‹</button>
+        <span className="min-w-[128px] text-center text-sm font-black truncate" dir="ltr">{t(options[i]?.n ?? "")}</span>
+        <button disabled={disabled} onClick={() => step(isRtl() ? -1 : 1)} className="w-7 h-7 rounded-lg bg-black text-white font-black disabled:opacity-30">›</button>
       </div>
     </div>
   );
 }
 
-const secs = (list: number[]) => list.map((v) => ({ v, n: v >= 60 ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}` : `${v}s` }));
+const secs = (list: number[]) => list.map((v) => ({ v, n: v >= 60 ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}` : isRtl() ? `${v} שנ׳` : `${v}s` }));
 const nums = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => ({ v: a + i, n: String(a + i) }));
 const onOff = [{ v: true, n: "ON" }, { v: false, n: "OFF" }];
 
@@ -509,48 +530,48 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
   const h = "text-sm font-black mb-2";
   return (
     <div className="absolute inset-0 z-40 bg-black/50 p-2 sm:p-4 grid place-items-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div className="relative w-full max-w-5xl h-full max-h-[640px] rounded-3xl bg-[#ffe7a3] text-black border-[3px] border-black shadow-[0_6px_0_#000] p-3 flex flex-col gap-2">
+      <div dir={isRtl() ? "rtl" : "ltr"} className="relative w-full max-w-5xl h-full max-h-[640px] rounded-3xl bg-[#ffe7a3] text-black border-[3px] border-black shadow-[0_6px_0_#000] p-3 flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black">Configure Map</h2>
+          <h2 className="text-xl font-black">{t("Configure Map")}</h2>
           <button onClick={onClose} className="rounded-full bg-black text-white p-1" aria-label="Close"><X className="w-4 h-4" /></button>
         </div>
-        {dis && <p className="text-xs font-bold text-black/60 -mt-1">Only the host can change the settings.</p>}
+        {dis && <p className="text-xs font-bold text-black/60 -mt-1">{t("Only the host can change the settings.")}</p>}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-1 min-h-0 overflow-auto md:overflow-hidden">
           {/* מפה */}
           <div className={col}>
-            <div className={h}>Map</div>
+            <div className={h}>{t("Map")}</div>
             <button disabled={dis} onClick={() => set({ map: "random" })}
-              className={`w-full text-left rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-black ${s.map === "random" ? "border-black bg-[#ffd23f]" : "border-black/15"}`}>🎲 Random</button>
+              className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-black ${s.map === "random" ? "border-black bg-[#ffd23f]" : "border-black/15"}`}>🎲 {t("Random")}</button>
             {MAP_LIST.map((m) => (
               <div key={m.id} className={`flex items-center gap-1.5 rounded-xl border-2 px-2 py-1 mb-1 ${s.map === m.id ? "border-black bg-[#4cc9f0]" : "border-black/15"}`}>
-                <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-left text-sm font-bold truncate">{m.name}</button>
-                <label className="flex items-center gap-1 text-[10px] font-bold text-black/60" title="Include in Random">
+                <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-start text-sm font-bold truncate">{t(m.name)}</button>
+                <label className="flex items-center gap-1 text-[10px] font-bold text-black/60" title={t("Include in Random")}>
                   <input type="checkbox" disabled={dis} checked={s.pool.includes(m.id)}
-                    onChange={(ev) => set({ pool: ev.target.checked ? [...s.pool, m.id] : s.pool.filter((x) => x !== m.id) })} /> random
+                    onChange={(ev) => set({ pool: ev.target.checked ? [...s.pool, m.id] : s.pool.filter((x) => x !== m.id) })} /> {t("random")}
                 </label>
               </div>
             ))}
           </div>
           {/* מצב + פילטרים */}
           <div className={col}>
-            <div className={h}>Game Mode</div>
+            <div className={h}>{t("Game Mode")}</div>
             {MODES.map((m) => (
               <button key={m.id} disabled={dis} onClick={() => set({ mode: m.id })}
-                className={`w-full text-left rounded-xl border-2 px-2 py-1.5 mb-1 ${s.mode === m.id ? "border-black bg-[#8ef56b]" : "border-black/15"}`}>
-                <div className="text-sm font-black">{m.name}</div>
-                <div className="text-[11px] font-bold text-black/60 leading-tight">{m.desc}</div>
+                className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 ${s.mode === m.id ? "border-black bg-[#8ef56b]" : "border-black/15"}`}>
+                <div className="text-sm font-black">{t(m.name)}</div>
+                <div className="text-[11px] font-bold text-black/60 leading-tight">{t(m.desc)}</div>
               </button>
             ))}
-            <div className={`${h} mt-3`}>Filters</div>
+            <div className={`${h} mt-3`}>{t("Filters")}</div>
             {([["mono", "Monochrome"], ["horror", "Horror"], ["mosaic", "Mosaic"]] as const).map(([k, n]) => (
               <label key={k} className="flex items-center gap-2 rounded-xl border-2 border-black/15 px-2 py-1.5 mb-1 text-sm font-bold">
-                <input type="checkbox" disabled={dis} checked={s.filters[k]} onChange={(ev) => set({ filters: { ...s.filters, [k]: ev.target.checked } })} /> {n}
+                <input type="checkbox" disabled={dis} checked={s.filters[k]} onChange={(ev) => set({ filters: { ...s.filters, [k]: ev.target.checked } })} /> {t(n)}
               </label>
             ))}
           </div>
           {/* חוקים */}
           <div className={col}>
-            <div className={h}>Rules</div>
+            <div className={h}>{t("Rules")}</div>
             <Opt label="Number of Hunters" value={s.hunters} disabled={dis || s.mode === "double"} options={nums(1, 6)} onChange={(v) => set({ hunters: v })} />
             <Opt label="Hunter Wait Time" value={s.hideTime} disabled={dis} options={secs([30, 45, 60, 75, 90, 120, 150, 180, 200, 240, 300])} onChange={(v) => set({ hideTime: v })} />
             <Opt label="Search Time" value={s.huntTime} disabled={dis} options={secs([60, 90, 120, 150, 180, 200, 240, 300, 420, 600])} onChange={(v) => set({ huntTime: v })} />
@@ -563,7 +584,7 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
             <Opt label="Hunter TPS" value={s.hunterTps} disabled={dis} options={onOff} onChange={(v) => set({ hunterTps: v })} />
             {solo && (
               <>
-                <div className="text-[11px] font-black mt-3 text-black/60">Practice (solo only)</div>
+                <div className="text-[11px] font-black mt-3 text-black/60">{t("Practice (solo only)")}</div>
                 <Opt label="Bots" value={s.bots} disabled={dis} options={nums(1, 8)} onChange={(v) => set({ bots: v })} />
                 <Opt label="Bot Level" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />
               </>
@@ -573,10 +594,10 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
         <div className="flex items-center gap-3">
           {hud.isHost && (
             <button onClick={() => { engine?.startCountdown(); onClose(); }} className="rounded-2xl bg-[#8ef56b] border-[3px] border-black shadow-[0_4px_0_#000] px-8 py-2.5 text-xl font-black">
-              Start
+              {t("Start")}
             </button>
           )}
-          <span className="text-xs font-bold text-black/60">{hud.players.length} players · {s.map === "random" ? "Random map" : MAP_LIST.find((m) => m.id === s.map)?.name}</span>
+          <span className="text-xs font-bold text-black/60">{t("{n} players", { n: hud.players.length })} · {s.map === "random" ? t("Random map") : t(MAP_LIST.find((m) => m.id === s.map)?.name ?? "")}</span>
         </div>
       </div>
     </div>
@@ -584,28 +605,28 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
 }
 
 function CharPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | null; onClose: () => void }) {
-  const mapName = hud.settings.map === "random" ? "Random" : MAP_LIST.find((m) => m.id === hud.settings.map)?.name;
+  const mapName = t(hud.settings.map === "random" ? "Random" : MAP_LIST.find((m) => m.id === hud.settings.map)?.name ?? "");
   return (
-    <Panel title={hud.phase === "countdown" ? `Starting in ${hud.time}` : "Character"} onClose={onClose}>
-      {hud.phase === "countdown" && <p className="text-sm font-bold mb-2">Map: <b>{mapName}</b></p>}
-      <p className="text-sm font-black mb-1.5">Size</p>
+    <Panel title={hud.phase === "countdown" ? t("Starting in {n}", { n: hud.time }) : t("Character")} onClose={onClose}>
+      {hud.phase === "countdown" && <p className="text-sm font-bold mb-2">{t("Map:")} <b>{mapName}</b></p>}
+      <p className="text-sm font-black mb-1.5">{t("Size")}</p>
       <div className="grid grid-cols-2 gap-2 mb-3">
         {SIZE_LIST.map((z) => {
           const off = z.id === "petit" && !hud.settings.allowPetit;
           return (
             <button key={z.id} disabled={off} onClick={() => engine?.setMySize(z.id)}
-              className={`rounded-xl border-[3px] py-2 text-sm font-black disabled:opacity-30 ${hud.size === z.id ? "border-black bg-[#4cc9f0]" : "border-black/20"}`}>{z.name}{z.id === "petit" ? " ×0.5" : ""}</button>
+              className={`rounded-xl border-[3px] py-2 text-sm font-black disabled:opacity-30 ${hud.size === z.id ? "border-black bg-[#4cc9f0]" : "border-black/20"}`}>{t(z.name)}{z.id === "petit" ? " ×0.5" : ""}</button>
           );
         })}
       </div>
-      <p className="text-sm font-black mb-1.5">Body Type</p>
+      <p className="text-sm font-black mb-1.5">{t("Body Type")}</p>
       <div className="grid grid-cols-3 gap-2">
         {BODY_LIST.map((b) => (
           <button key={b.id} onClick={() => engine?.setMyBody(b.id)}
-            className={`rounded-xl border-[3px] py-2 font-black ${hud.bodyType === b.id ? "border-black bg-[#ffd23f]" : "border-black/20"}`}>{b.name}</button>
+            className={`rounded-xl border-[3px] py-2 font-black ${hud.bodyType === b.id ? "border-black bg-[#ffd23f]" : "border-black/20"}`}>{t(b.name)}</button>
         ))}
       </div>
-      <button onClick={onClose} className="mt-4 w-full rounded-2xl bg-black text-white py-2.5 font-black">OK</button>
+      <button onClick={onClose} className="mt-4 w-full rounded-2xl bg-black text-white py-2.5 font-black">{t("OK")}</button>
     </Panel>
   );
 }
@@ -618,16 +639,17 @@ function OptionsPanel({ engine, muted, onToggleMute, onClose, onLeave }: { engin
   const [perf, setPerf] = useState(() => load("meccha_perf", 0) === 1);
   const save = (k: string, v: number) => { try { localStorage.setItem(k, String(v)); } catch { /* ignore */ } };
   return (
-    <Panel title="Settings" onClose={onClose}>
-      <Slider id="o-sens" label="Mouse Sensitivity" value={sens} min={0.2} max={3} step={0.05} onChange={(v) => { setSens(v); save("meccha_sens", v); engine?.setSensitivity(v); }} />
+    <Panel title={t("Settings")} onClose={onClose}>
+      <div className="flex items-center justify-between mb-3"><span className="text-sm font-bold">{t("Language")}</span><LangToggle /></div>
+      <Slider id="o-sens" label={t("Mouse Sensitivity")} value={sens} min={0.2} max={3} step={0.05} onChange={(v) => { setSens(v); save("meccha_sens", v); engine?.setSensitivity(v); }} />
       <div className="h-2" />
-      <Slider id="o-vol" label="Volume" value={vol} min={0} max={1} step={0.05} onChange={(v) => { setVol(v); save("meccha_vol", v); setSoundVolume(v); }} />
-      <label className="flex items-center gap-2 mt-3 text-sm font-bold"><input type="checkbox" checked={muted} onChange={onToggleMute} /> Mute</label>
+      <Slider id="o-vol" label={t("Volume")} value={vol} min={0} max={1} step={0.05} onChange={(v) => { setVol(v); save("meccha_vol", v); setSoundVolume(v); }} />
+      <label className="flex items-center gap-2 mt-3 text-sm font-bold"><input type="checkbox" checked={muted} onChange={onToggleMute} /> {t("Mute")}</label>
       <Opt label="Shadow Quality" value={shadow} options={[{ v: 0 as const, n: "Off" }, { v: 1 as const, n: "Low" }, { v: 2 as const, n: "High" }]} onChange={(v) => { setShadow(v); save("meccha_shadow", v); engine?.setShadowQuality(v); }} />
       <Opt label="Performance Mode" value={perf} options={onOff} onChange={(v) => { setPerf(v); save("meccha_perf", v ? 1 : 0); engine?.setPerformance(v); }} />
       <div className="flex gap-2 mt-4">
-        <button onClick={onClose} className="flex-1 rounded-2xl bg-black text-white py-2.5 font-black">Back to Game</button>
-        <button onClick={onLeave} className="rounded-2xl border-[3px] border-black px-4 py-2 font-black">Leave</button>
+        <button onClick={onClose} className="flex-1 rounded-2xl bg-black text-white py-2.5 font-black">{t("Back to Game")}</button>
+        <button onClick={onLeave} className="rounded-2xl border-[3px] border-black px-4 py-2 font-black">{t("Leave")}</button>
       </div>
     </Panel>
   );
@@ -635,23 +657,23 @@ function OptionsPanel({ engine, muted, onToggleMute, onClose, onLeave }: { engin
 
 function CheckPanel({ hud, onLike }: { hud: HudState; onLike: () => void }) {
   const res = hud.results ?? [];
-  const winText = hud.win === "hiders" ? "HIDERS WIN" : hud.win === "hunters" ? "HUNTERS WIN" : res.find((r) => r.id === hud.win)?.n ? `${res.find((r) => r.id === hud.win)!.n} WINS` : "";
+  const winText = hud.win === "hiders" ? t("HIDERS WIN") : hud.win === "hunters" ? t("HUNTERS WIN") : res.find((r) => r.id === hud.win)?.n ? t("{n} WINS", { n: res.find((r) => r.id === hud.win)!.n }) : "";
   return (
     <>
       <div className="absolute top-[92px] left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
         <div className="text-3xl font-black text-[#ffd23f]" style={{ textShadow: OUTLINE }}>{winText}</div>
         <div className="text-xs font-bold" style={{ textShadow: OUTLINE }}>
-          <span className="text-[#ff5a5a]">■ Red</span> = not found · <span className="text-[#5a8dff]">■ Blue</span> = found
+          <span className="text-[#ff5a5a]">■ {t("Red")}</span> {t("= not found")} · <span className="text-[#5a8dff]">■ {t("Blue")}</span> {t("= found")}
         </div>
       </div>
       <div className="absolute right-2 top-24 z-20 w-56 rounded-2xl bg-black/55 p-2 text-xs font-bold grid gap-0.5">
-        <div className="text-center font-black mb-0.5">{hud.settings.mode === "double" ? "Finds" : hud.settings.missed ? "Missed Points" : "Results"}</div>
+        <div className="text-center font-black mb-0.5">{t(hud.settings.mode === "double" ? "Finds" : hud.settings.missed ? "Missed Points" : "Results")}</div>
         {res.map((r, i) => (
           <div key={r.id} className="flex items-center gap-1.5">
             <span className="w-4 opacity-70">{i + 1}</span>
             <span className="w-2.5 h-2.5 rounded-full border border-black" style={{ background: r.c }} />
             <span className="truncate" style={{ color: r.r === "hunter" ? "#ffb703" : undefined }}>{r.n}</span>
-            {r.r === "hider" && hud.settings.mode !== "double" && <span className={r.found ? "text-[#5a8dff]" : "text-[#ff5a5a]"}>{r.found ? "found" : "safe"}</span>}
+            {r.r === "hider" && hud.settings.mode !== "double" && <span className={r.found ? "text-[#5a8dff]" : "text-[#ff5a5a]"}>{t(r.found ? "found" : "safe")}</span>}
             <span className="ml-auto tabular-nums">{r.p}</span>
           </div>
         ))}
@@ -660,9 +682,9 @@ function CheckPanel({ hud, onLike }: { hud: HudState; onLike: () => void }) {
         {hud.likeTarget && !hud.likedThisRound && (
           <button onClick={onLike} className="rounded-2xl bg-black/60 px-4 py-2 text-lg font-black"><Key k="G" /> 👍 {hud.likeTarget}</button>
         )}
-        {hud.likedThisRound && <div className="text-sm font-bold" style={{ textShadow: OUTLINE }}>👍 Sent</div>}
+        {hud.likedThisRound && <div className="text-sm font-bold" style={{ textShadow: OUTLINE }}>👍 {t("Sent")}</div>}
         <div className="text-xs font-bold" style={{ textShadow: OUTLINE }}>
-          <Key k="Y" /> Skip ({hud.votes.have}/{hud.votes.need}) · WASD / E / Q free camera
+          <Key k="Y" /> {t("Skip")} ({hud.votes.have}/{hud.votes.need}) · {t("WASD / Space / Ctrl free camera")}
         </div>
       </div>
     </>
@@ -675,7 +697,7 @@ function ChatInput({ onSend, onClose }: { onSend: (m: string) => void; onClose: 
     <form className="flex gap-1 mt-0.5" onSubmit={(ev) => { ev.preventDefault(); if (v.trim()) onSend(v); setV(""); onClose(); }}>
       <input id="meccha-chat" autoFocus value={v} maxLength={120} onChange={(ev) => setV(ev.target.value)}
         onKeyDown={(ev) => { if (ev.key === "Escape") onClose(); ev.stopPropagation(); }} onBlur={() => { if (!v) onClose(); }}
-        className="flex-1 min-w-0 rounded-lg bg-black/70 border border-white/40 px-2 py-1 text-white outline-none" placeholder="Chat" />
+        className="flex-1 min-w-0 rounded-lg bg-black/70 border border-white/40 px-2 py-1 text-white outline-none" placeholder={t("Chat")} dir="auto" />
       <button className="rounded-lg bg-white text-black px-2" aria-label="Send"><Send className="w-4 h-4" /></button>
     </form>
   );
@@ -794,7 +816,7 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
   const hsv = hexToHsv(hud.color);
   const set = (color: string) => engine?.setBrush({ color });
   return (
-    <div className={`absolute z-20 left-2 ${touch ? "top-2 max-h-[calc(100dvh-16px)]" : "top-28 max-h-[calc(100dvh-130px)]"} w-[228px] overflow-auto rounded-2xl bg-white/95 text-black border-[3px] border-black p-2.5 grid gap-2 text-[11px]`}>
+    <div dir={isRtl() ? "rtl" : "ltr"} className={`absolute z-20 left-2 ${touch ? "top-2 max-h-[calc(100dvh-16px)]" : "top-28 max-h-[calc(100dvh-130px)]"} w-[228px] overflow-auto rounded-2xl bg-white/95 text-black border-[3px] border-black p-2.5 grid gap-2 text-[11px]`}>
       <div className="flex items-center gap-2">
         <ColorWheel color={hud.color} onChange={set} />
         <div className="grid gap-1.5 flex-1">
@@ -802,22 +824,22 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
           {touch && (
             <button onPointerDown={() => engine?.setPicking(!hud.picking)}
               className={`rounded-xl border-2 border-black py-1 font-black inline-flex items-center justify-center gap-1 ${hud.picking ? "bg-[#ffd23f]" : "bg-white"}`}>
-              <Pipette className="w-3.5 h-3.5" /> Pick
+              <Pipette className="w-3.5 h-3.5" /> {t("Pick")}
             </button>
           )}
         </div>
       </div>
-      <Slider id="pv" label="Brightness" value={hsv.v} min={0} max={1} step={0.01} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} />
-      <Slider id="pm" label="Metallic" value={hud.metal} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ metal: v })} />
-      <Slider id="pro" label="Roughness" value={hud.rough} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ rough: v })} />
-      <Slider id="pe" label="Emissive" value={hud.emis} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ emis: v })} />
+      <Slider id="pv" label={t("Brightness")} value={hsv.v} min={0} max={1} step={0.01} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} />
+      <Slider id="pm" label={t("Metallic")} value={hud.metal} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ metal: v })} />
+      <Slider id="pro" label={t("Roughness")} value={hud.rough} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ rough: v })} />
+      <Slider id="pe" label={t("Emissive")} value={hud.emis} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ emis: v })} />
       {hud.history.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {hud.history.map((c) => <button key={c} onClick={() => set(c)} className={`w-6 h-6 rounded-md border-2 ${c === hud.color ? "border-black" : "border-black/30"}`} style={{ background: c }} aria-label={c} />)}
         </div>
       )}
-      <button onClick={() => engine?.setShadow(!hud.shadow)} className={`rounded-lg border-2 border-black py-0.5 font-black ${!hud.shadow ? "bg-black text-white" : ""}`}>V Shadow {hud.shadow ? "ON" : "OFF"}</button>
-      {!touch && <div className="text-[10px] font-bold text-black/60 leading-tight">LMB paint · hold Space = eyedropper · RMB drag = brush size · MMB / Alt+LMB rotate · wheel zoom (Space+wheel = colours) · F close</div>}
+      <button onClick={() => engine?.setShadow(!hud.shadow)} className={`rounded-lg border-2 border-black py-0.5 font-black ${!hud.shadow ? "bg-black text-white" : ""}`}>{t(hud.shadow ? "V Shadow ON" : "V Shadow OFF")}</button>
+      {!touch && <div className="text-[10px] font-bold text-black/60 leading-tight">{t("LMB paint · hold Space = eyedropper · RMB drag = brush size · MMB / Alt+LMB rotate · wheel zoom (Space+wheel = colours) · F close")}</div>}
     </div>
   );
 }
@@ -832,17 +854,17 @@ function TouchControls({ hud, engine, onPose, onChat }: { hud: HudState; engine:
     <>
       {!hud.paintMode && <Joystick onChange={(x, y) => engine?.setJoystick(x, y)} />}
       <div className="absolute right-3 bottom-4 z-20 grid grid-cols-3 gap-2 items-end">
-        {hunter && <button className={`${b} !w-20 !h-20 !bg-[#ff4d4d] col-span-3 justify-self-end`} onPointerDown={() => engine?.fire()}>FIRE</button>}
-        {hider && <button className={b} onClick={() => engine?.togglePaint()}>{hud.paintMode ? "Done" : "Paint"}</button>}
-        {hider && !hud.paintMode && <button className={b} onClick={onPose}>Pose</button>}
-        {hider && !hud.paintMode && <button className={b} onClick={() => engine?.placeClone()}>Clone</button>}
+        {hunter && <button className={`${b} !w-20 !h-20 !bg-[#ff4d4d] col-span-3 justify-self-end`} onPointerDown={() => engine?.fire()}>{t("FIRE")}</button>}
+        {hider && <button className={b} onClick={() => engine?.togglePaint()}>{t(hud.paintMode ? "Done" : "Paint")}</button>}
+        {hider && !hud.paintMode && <button className={b} onClick={onPose}>{t("Pose")}</button>}
+        {hider && !hud.paintMode && <button className={b} onClick={() => engine?.placeClone()}>{t("Clone")}</button>}
         {hider && !hud.paintMode && <button className={b} onClick={() => engine?.whistle()}>♪</button>}
-        {hud.attached && <button className={b} onClick={() => engine?.detach()}>Leave</button>}
-        {!hud.paintMode && <button className={`${b} !bg-[#8ef56b]`} onClick={() => engine?.jump()}>Jump</button>}
+        {hud.attached && <button className={b} onClick={() => engine?.detach()}>{t("Leave")}</button>}
+        {!hud.paintMode && <button className={`${b} !bg-[#8ef56b]`} onClick={() => engine?.jump()}>{t("Jump")}</button>}
         {hud.phase === "check" && <button className={b} onClick={() => engine?.giveLike()}>👍</button>}
-        {(hud.phase === "hide" || hud.phase === "check") && <button className={b} onClick={() => engine?.voteSkip()}>Skip</button>}
-        {hud.spectating !== null && <button className={b} onClick={() => engine?.cycleSpectate()}>Next</button>}
-        <button className={b} onClick={onChat}>Chat</button>
+        {(hud.phase === "hide" || hud.phase === "check") && <button className={b} onClick={() => engine?.voteSkip()}>{t("Skip")}</button>}
+        {hud.spectating !== null && <button className={b} onClick={() => engine?.cycleSpectate()}>{t("Next")}</button>}
+        <button className={b} onClick={onChat}>{t("Chat")}</button>
       </div>
     </>
   );

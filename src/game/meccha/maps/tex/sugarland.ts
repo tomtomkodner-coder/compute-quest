@@ -12,12 +12,12 @@ const SPR = ["#ff4f8b", "#ffd23f", "#3bceac", "#5e7bff", "#ff8c42", "#b56bff", "
 export const sgGround = () =>
   makeTex(512, 512, (g, w, h) => {
     const r = rng(3);
-    g.fillStyle = "#8fdcb2";
+    g.fillStyle = "#7fd6a6";
     g.fillRect(0, 0, w, h);
     for (let i = 0; i < 30; i++) {
       const x = r() * w, y = r() * h, rad = 40 + r() * 120;
       const gr = g.createRadialGradient(x, y, 0, x, y, rad);
-      const c = r() < 0.5 ? "110,200,155" : "175,235,200";
+      const c = r() < 0.5 ? "95,190,140" : "160,228,190";
       gr.addColorStop(0, `rgba(${c},${0.25 + r() * 0.25})`);
       gr.addColorStop(1, `rgba(${c},0)`);
       g.fillStyle = gr;

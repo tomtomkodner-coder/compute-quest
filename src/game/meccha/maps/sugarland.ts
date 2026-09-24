@@ -74,7 +74,8 @@ class Batch {
   }
   tube(m: Mat, pts: V3t[], r: number, o: { seg?: number; rs?: number; closed?: boolean; su?: number; sv?: number } = {}) {
     const c = new THREE.CatmullRomCurve3(pts.map((p) => new V3(...p)), !!o.closed, "centripetal");
-    return this.geo(m, new THREE.TubeGeometry(c, o.seg ?? Math.max(8, pts.length * 6), r, o.rs ?? 8, !!o.closed), 0, 0, 0, { su: o.su, sv: o.sv });
+    const su = o.su === -1 ? c.getLength() / (2 * Math.PI * r) : o.su;
+    return this.geo(m, new THREE.TubeGeometry(c, o.seg ?? Math.max(8, pts.length * 6), r, o.rs ?? 8, !!o.closed), 0, 0, 0, { su, sv: o.sv });
   }
   /** cylinder between two points */
   rod(m: Mat, r: number, a: V3t, b: V3t, seg = 10) {
@@ -292,7 +293,7 @@ export function buildSugarland(): World {
     for (const s of [-1, 1]) {
       const rail: V3t[] = [];
       for (let i = 0; i <= 16; i++) { const u = i / 16; rail.push([bx0 + 0.2 + u * (L - 0.4), 0.2 + Math.sin(u * Math.PI) * 0.75 + 0.85, bz + s * (W / 2 - 0.08)]); }
-      B.tube(stripeR, rail, 0.06, { seg: 60, su: 14 });
+      B.tube(stripeR, rail, 0.06, { seg: 60, su: -1 });
       for (let i = 0; i <= 4; i++) {
         const u = 0.05 + i * 0.225, x = bx0 + u * L, h = 0.2 + Math.sin(u * Math.PI) * 0.75;
         B.cyl(stripeR, 0.07, 0.07, 0.95, x, h - 0.1, bz + s * (W / 2 - 0.08), { seg: 12, sv: 2 });
@@ -330,7 +331,7 @@ export function buildSugarland(): World {
     pts.push([hook * 2.05, h - hook - 0.25, 0]);
     const c = new THREE.CatmullRomCurve3(pts.map((p) => new V3(...p)), false, "centripetal");
     const g = new THREE.TubeGeometry(c, 50, r, 10, false);
-    scaleUV(g, (c.getLength() / (r * 7)), 1);
+    scaleUV(g, c.getLength() / (2 * Math.PI * r), 1);
     B.geo(m, g, x, 0, z, { ry, rz: lean });
     // cap
     k.collider(x - r - 0.1, x + r + 0.1, z - r - 0.1, z + r + 0.1, 0, h * 0.8, false);
@@ -430,8 +431,8 @@ export function buildSugarland(): World {
     // twisted candy trunk + branches
     const trunk: V3t[] = [];
     for (let i = 0; i <= 10; i++) { const t = i / 10; trunk.push([x + Math.sin(t * 5) * 0.25, -0.2 + t * h * 0.72, z + Math.cos(t * 4) * 0.2]); }
-    B.tube(stripeP, trunk, 0.32, { seg: 60, rs: 14, su: 12 });
-    B.cyl(stripeP, 0.5, 0.75, 0.5, x, -0.1, z, { seg: 16 });
+    B.tube(stripeP, trunk, 0.32, { seg: 60, rs: 14, su: -1 });
+    B.cyl(milk, 0.5, 0.75, 0.5, x, -0.1, z, { seg: 16 });
     const blobs: [number, number, number, number][] = [[0, 1, 0, 1.9], [1.5, 0.6, 0.5, 1.4], [-1.4, 0.7, -0.4, 1.5], [0.4, 0.5, -1.5, 1.35], [-0.5, 0.4, 1.5, 1.35], [0.2, 2.2, 0.1, 1.3], [1.2, 1.7, -0.9, 1.0], [-1.1, 1.8, 0.9, 1.0]];
     for (const [bx, by, bz, br] of blobs) {
       if (Math.hypot(bx, bz) > 0.5) B.rod(stripeP, 0.12, [x, h * 0.6, z], [x + bx * 0.8, h * 0.72 + by * 0.5, z + bz * 0.8], 8);
@@ -845,7 +846,7 @@ export function buildSugarland(): World {
       for (let i = 1; i <= 10; i++) { const a = (i / 10) * Math.PI * 0.5; pts.push([s * (ax - 1.2 + Math.cos(a) * 1.2), 5.2 + Math.sin(a) * 1.2, az]); }
       const c = new THREE.CatmullRomCurve3(pts.map((p) => new V3(...p)), false, "centripetal");
       const g = new THREE.TubeGeometry(c, 60, 0.3, 14);
-      scaleUV(g, c.getLength() / 2.2, 1);
+      scaleUV(g, c.getLength() / (2 * Math.PI * 0.3), 1);
       B.geo(stripeR, g, 0, 0, 0);
       k.collider(s * ax - 0.35, s * ax + 0.35, az - 0.35, az + 0.35, 0, 6, false);
       B.lathe(gums[s > 0 ? 3 : 0], gumProfile, s * ax, 0, az, { s: 1.1, seg: 20 });
@@ -951,7 +952,7 @@ export function buildSugarland(): World {
     lighting: {
       sky: "#ffd6ec",
       hemi: ["#fff1f8", "#ffc2dc", 0.55],
-      sun: { color: "#fff4e6", int: 2.6, pos: [14, 30, 12] },
+      sun: { color: "#fff1e0", int: 2.3, pos: [14, 30, 12] },
       fog: ["#ffd9ee", 45, 190],
       points: [
         { pos: [-17.5, 2.2, -11.5], color: "#ffc27a", int: 10, dist: 7 },
@@ -960,7 +961,7 @@ export function buildSugarland(): World {
       ],
       exposure: 0.95,
       hdri: "sky",
-      env: 0.8,
+      env: 0.62,
       hdriBackground: 0.04,
     },
   });
