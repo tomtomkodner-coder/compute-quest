@@ -673,7 +673,15 @@ export class Engine {
     const g = new THREE.Group();
     sg.group.rotation.y = Math.PI; // הקנה קדימה (-Z של המצלמה)
     g.add(sg.group);
-    g.position.set(0.2, -0.2, -0.36);
+    // האמה הלבנה של הדמות (במשחק רואים אותה גדולה מימין לרובה)
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.26, 8, 20), new THREE.MeshStandardMaterial({ color: "#f2f2f0", roughness: 0.7 }));
+    arm.position.set(0.15, 0.02, 0.04);
+    arm.rotation.set(Math.PI / 2 - 0.25, 0.55, 0);
+    arm.scale.set(1.25, 1, 0.9);
+    g.add(arm);
+    g.position.set(0.22, -0.23, -0.42);
+    sg.group.rotation.x = -0.04;
+    sg.group.rotation.y = Math.PI + 0.1; // הקנה נוטה מעט אל מרכז המסך, כמו במשחק
     g.userData.pump = sg.pump;
     g.userData.muzzle = sg.muzzle;
     g.userData.pump0 = sg.pump.position.z;
@@ -695,7 +703,7 @@ export class Engine {
     }
     this.gunBob += dt * (this.me.moving ? 9 : 0);
     const bob = this.me.moving ? 1 : 0;
-    g.position.set(0.2 + Math.sin(this.gunBob) * 0.012 * bob, -0.2 - Math.abs(Math.cos(this.gunBob)) * 0.012 * bob - kick * 0.02, -0.36 + kick * 0.09);
+    g.position.set(0.22 + Math.sin(this.gunBob) * 0.012 * bob, -0.23 - Math.abs(Math.cos(this.gunBob)) * 0.012 * bob - kick * 0.02, -0.42 + kick * 0.09);
     g.rotation.set(kick * 0.22 + pump * 0.08, 0, -roll);
     const p = g.userData.pump as THREE.Object3D;
     p.position.z = (g.userData.pump0 as number) - pump * 0.11;
@@ -1578,7 +1586,7 @@ export class Engine {
       if (this.stepT <= 0) { this.stepT = sprint ? 0.26 : this.crouch ? 0.55 : 0.38; this.fx.stepSound(undefined, this.crouch); }
     } else this.stepT = 0.05;
     if (m.armed) m.yaw = this.camYaw + Math.PI;
-    else if (moving && !this.attached) {
+    else if (moving && !this.attached && !this.rmb) { // קליק ימני מוחזק = Rotation Lock (הדמות לא מסתובבת לכיוון התנועה)
       let d = Math.atan2(dx, dz) - m.yaw;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       m.yaw += d * Math.min(1, dt * 12);

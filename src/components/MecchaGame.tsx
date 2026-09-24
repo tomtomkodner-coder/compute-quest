@@ -24,6 +24,7 @@ function LangToggle({ dark }: { dark?: boolean }) {
 
 // מחרוזות הממשק לקוחות מהגרסה האנגלית של המשחק המקורי (בלי תרגומים מומצאים)
 const FONT = `"M PLUS Rounded 1c", "Nunito", system-ui, sans-serif`;
+const SERIF = `"Noto Serif", "Times New Roman", serif`;
 const OUTLINE = "0 2px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 6px rgba(0,0,0,.6)";
 const PLAYER_COLORS = ["#ff006e", "#3a86ff", "#ffbe0b", "#8338ec", "#fb5607", "#06d6a0", "#ef476f", "#118ab2"];
 const MAP_LIST = [
@@ -43,8 +44,8 @@ const MAP_LIST = [
   { id: "museum", name: "Art Museum" },
 ];
 const MODES: { id: Settings["mode"]; name: string; desc: string }[] = [
-  { id: "normal", name: "Basic", desc: "Hunters must find every chameleon before time runs out." },
-  { id: "infection", name: "Infection", desc: "Chameleons that get hit join the hunters." },
+  { id: "normal", name: "Basic", desc: "Players split into two teams: hunters and runners.\nHide until the end to win" },
+  { id: "infection", name: "Infection", desc: "If you get caught, you become a hunter.\nHide until the end to win" },
   { id: "double", name: "Double", desc: "Everyone hides, then everyone hunts. Most finds wins." },
   { id: "rcr", name: "Reverse Chicken Race", desc: "Hunters see what every chameleon looks like. First to find scores; most points wins." },
 ];
@@ -255,6 +256,13 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   }, [toastId]);
 
   const phase = hud?.phase;
+  const [announce, setAnnounce] = useState<string | null>(null);
+  useEffect(() => {
+    if (phase !== "hunt") return;
+    setAnnounce(t("Search Start!"));
+    const tm = window.setTimeout(() => setAnnounce(null), 2600);
+    return () => window.clearTimeout(tm);
+  }, [phase]);
   useEffect(() => {
     if (phase !== "lobby") setSettingsOpen(false);
     if (phase === "countdown") setCharOpen(true);
@@ -287,77 +295,63 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
 
       {hud && (
         <>
-          {/* למעלה: שלב + שעון + אייקוני המתחבאים */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none">
-            <div className="text-sm font-black tracking-wide" style={{ textShadow: OUTLINE }}>{phaseTitle}{hud.phase !== "lobby" && ` · ${t(hud.mapName)}`}</div>
-            {hud.phase !== "lobby" && (
-              <div className={`text-4xl font-black tabular-nums leading-none ${hud.phase === "hunt" && hud.time <= 10 ? "text-[#ff4d4d]" : ""}`} style={{ textShadow: OUTLINE }}>
-                {hud.phase === "countdown" ? hud.time : fmt(hud.time)}
-              </div>
-            )}
-            {hud.hiderIcons.length > 0 && (
-              <div className="flex gap-1 mt-1.5">
-                {hud.hiderIcons.map((h) => (
-                  <svg key={h.id} width="18" height="22" viewBox="0 0 18 22" aria-label={h.found ? "found" : "hiding"}>
-                    <circle cx="9" cy="5" r="4.2" fill={h.found ? "#ff3b3b" : "#fff"} stroke="#000" strokeWidth="1.6" />
-                    <path d="M2.5 21 C2.5 12 15.5 12 15.5 21 Z" fill={h.found ? "#ff3b3b" : "#fff"} stroke="#000" strokeWidth="1.6" />
-                  </svg>
-                ))}
-              </div>
-            )}
-            {hud.room && hud.room !== hud.mapName && hud.phase !== "lobby" && hud.phase !== "countdown" && <div className="text-xs font-bold mt-1 opacity-90" style={{ textShadow: OUTLINE }}>{t(hud.room)}</div>}
-          </div>
+          {/* למעלה באמצע (כמו במשחק): זיקיות לבנות · שעון חול ירוק · ציידים אדומים, מתחת מספר השניות ותווית השלב */}
+          {hud.phase !== "lobby" && <TopHud hud={hud} />}
+          {hud.phase === "lobby" && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 text-sm font-bold tracking-wide pointer-events-none" style={{ textShadow: OUTLINE }}>{t("Lobby")}</div>
+          )}
 
-          {/* שמאל למעלה: יציאה, קוד, שחקנים */}
+          {/* שמאל למעלה: בלובי בלבד — יציאה, קוד, שחקנים */}
           <div className="absolute top-2 left-2 z-20 flex flex-col gap-1.5 items-start">
-            <div className="flex gap-1.5">
-              <button onClick={onExit} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1.5 text-xs font-bold"><X className="w-4 h-4 inline" /> {t("Leave")}</button>
-              <button onClick={onToggleMute} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Mute">{muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
-              <button onClick={() => setOptionsOpen(true)} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Settings"><Gear className="w-4 h-4" /></button>
-            </div>
-            {hud.code && (
+            {(hud.phase === "lobby" || touch) && (
+              <div className="flex gap-1.5">
+                <button onClick={onExit} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1.5 text-xs font-bold"><X className="w-4 h-4 inline" /> {t("Leave")}</button>
+                <button onClick={() => setOptionsOpen(true)} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Settings"><Gear className="w-4 h-4" /></button>
+              </div>
+            )}
+            {hud.code && hud.phase === "lobby" && (
               <button onClick={() => navigator.clipboard?.writeText(hud.code!).catch(() => {})} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1 text-xs font-bold inline-flex items-center gap-1">
                 {t("Code:")} <span className="tracking-widest text-sm text-[#ffd23f]">{hud.code}</span> <Copy className="w-3 h-3" />
               </button>
             )}
-            <div className="rounded-xl bg-black/40 px-2 py-1.5 text-[11px] font-bold grid gap-0.5 max-w-[190px]">
-              {hud.players.map((p) => (
-                <div key={p.id} className={`flex items-center gap-1.5 ${!p.alive ? "opacity-50" : ""}`}>
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black" style={{ background: p.color }} />
-                  <span className="truncate" style={{ color: p.role === "hunter" ? "#ffb703" : undefined }}>{p.name}{p.me ? ` ${t("(You)")}` : ""}</span>
-                  {p.host && <span className="text-[#ffd23f]">★</span>}
-                  {p.onPad && !p.bot && <span className="text-[#ff4d4d]">HUNTER</span>}
-                  {p.likes > 0 && <span className="ml-auto opacity-80">👍{p.likes}</span>}
-                </div>
-              ))}
-            </div>
-            {!hud.connected && <div className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold">{t("Disconnected")}</div>}
-          </div>
-
-          {/* ימין למעלה: נקודות, תחמושת, דירוג נקודות ההחמצה */}
-          <div className="absolute top-2 right-2 z-20 flex flex-col items-end gap-1 text-xs font-bold pointer-events-none" style={{ textShadow: OUTLINE }}>
-            {hunter && hud.phase === "hunt" && (
-              <div className="flex items-center gap-1 text-xl font-black"><Search className="w-6 h-6 text-[#ff3b3b]" strokeWidth={3} /> {hud.finds}</div>
-            )}
-            {hunter && hud.settings.ammoLimit && <div className="text-lg">{t("Ammo")}: {hud.ammo}</div>}
-            {hud.ranking.length > 0 && (
-              <div className="rounded-xl bg-black/45 px-2 py-1.5 min-w-[150px]" style={{ textShadow: "none" }}>
-                <div className="text-[11px] font-black text-center mb-0.5">{t("Missed Points")}</div>
-                {hud.ranking.map((r, i) => (
-                  <div key={r.id} className={`flex items-center gap-1.5 text-[11px] ${r.me ? "text-[#ffd23f]" : ""}`}>
-                    <span className="w-3 opacity-70">{i + 1}</span>
-                    <span className="w-2 h-2 rounded-full border border-black" style={{ background: r.color }} />
-                    <span className="truncate max-w-[90px]">{r.name}</span>
-                    <span className="ml-auto tabular-nums">{r.pts}</span>
+            {hud.phase === "lobby" && (
+              <div className="rounded-xl bg-black/40 px-2 py-1.5 text-[11px] font-bold grid gap-0.5 max-w-[190px]">
+                {hud.players.map((p) => (
+                  <div key={p.id} className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black" style={{ background: p.color }} />
+                    <span className="truncate">{p.name}{p.me ? ` ${t("(You)")}` : ""}</span>
+                    {p.host && <span className="text-[#ffd23f]">★</span>}
+                    {p.onPad && !p.bot && <span className="text-[#ff4d4d]">HUNTER</span>}
                   </div>
                 ))}
               </div>
             )}
-            {hud.attached && <div className="text-[#8ef56b]">{t("Climbing · Space up · Ctrl down · S let go")}</div>}
-            {hud.freeLook && <div className="text-[#4cc9f0]">{t("FREE CAMERA")} {hud.freeCam ? t("· moving (4)") : t("· 4 to move")}</div>}
-            {hud.xray && <div className="text-[#4cc9f0]">{t("SEE-THROUGH")}</div>}
-            {!hud.nameplates && <div>{t("Nameplates OFF")}</div>}
+            {!hud.connected && <div className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold">{t("Disconnected")}</div>}
           </div>
+
+          {/* שמאל: לשונית "Missed-Spot Ranking" */}
+          {hud.settings.missed && (hud.phase === "hide" || hud.phase === "hunt") && <MissedTab hud={hud} />}
+
+          {/* ימין: רשימת המקשים עם האייקונים, כמו במשחק */}
+          {!touch && !hud.paintMode && (hud.phase === "hide" || hud.phase === "hunt" || hud.phase === "check") && <KeyColumn hud={hud} hider={hider} hunter={hunter} />}
+
+          {/* ימין למטה: שם מצב המשחק בירוק + ההסבר */}
+          {(hud.phase === "hide" || hud.phase === "hunt") && !hud.paintMode && <ModeText mode={hud.settings.mode} />}
+
+          {/* למטה באמצע: צ'יפים של מקשים (Climb / Detach · Move Down · Move Up) */}
+          {!touch && (hud.phase === "hide" || hud.phase === "hunt") && !hud.paintMode && hud.alive && <BottomChips hud={hud} hider={hider} />}
+
+          {/* תחמושת / מציאות (צייד) */}
+          {hunter && (hud.settings.ammoLimit || hud.phase === "hunt") && (
+            <div className="absolute bottom-24 right-4 z-20 flex flex-col items-end gap-1 font-bold pointer-events-none" style={{ textShadow: OUTLINE }}>
+              {hud.phase === "hunt" && <div className="flex items-center gap-1 text-xl"><Search className="w-6 h-6 text-[#ff3b3b]" strokeWidth={3} /> {hud.finds}</div>}
+              {hud.settings.ammoLimit && <div className="text-lg">{t("Ammo")}: {hud.ammo}</div>}
+            </div>
+          )}
+          {hud.freeLook && <div className="absolute top-24 left-1/2 -translate-x-1/2 z-20 text-xs font-bold text-[#4cc9f0] pointer-events-none" style={{ textShadow: OUTLINE }}>{t("FREE CAMERA")} {hud.freeCam ? t("· moving (4)") : t("· 4 to move")}</div>}
+
+          {/* "Search Start!" */}
+          {announce && <div className="absolute top-[15%] left-1/2 -translate-x-1/2 z-30 text-5xl font-medium pointer-events-none" style={{ fontFamily: SERIF, textShadow: "0 2px 8px rgba(0,0,0,.7)" }}>{announce}</div>}
 
           {/* היהלומים הירוקים: זמינות השכפולים */}
           {hider && (hud.phase === "hide" || hud.phase === "hunt") && (
@@ -408,7 +402,11 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             <Banner>{t("Wait in the lobby until the chameleons finish hiding · F paint · RMB third person")}</Banner>
           )}
           {hud.spectating !== null && hud.phase !== "check" && !hud.freeLook && (
-            <Banner>{hud.spectating ? t("Spectating {n}", { n: hud.spectating }) : t("Free camera")} · {t("click next · 4 move · Shift fast · Space up · Ctrl down")}</Banner>
+            <div className="absolute bottom-3 left-4 z-20 pointer-events-none" style={{ textShadow: "0 2px 6px rgba(0,0,0,.7)" }}>
+              <div className="text-[11px] font-bold opacity-80">{t("click next · 4 move · Shift fast · Space up · Ctrl down")}</div>
+              <div className="text-4xl" style={{ fontFamily: SERIF }}>{t("Spectating")}</div>
+              {hud.spectating && <div className="text-lg -mt-1 text-center">{hud.spectating}</div>}
+            </div>
           )}
 
           {/* צייד: כוונת */}
@@ -443,16 +441,6 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             </button>
           )}
 
-          {/* מקשים */}
-          {!touch && !hud.paintMode && hud.phase !== "check" && (
-            <div className={`absolute ${hud.phase === "lobby" ? "bottom-16" : "bottom-2"} right-2 z-10 text-[11px] font-bold grid gap-0.5 text-right pointer-events-none`} style={{ textShadow: OUTLINE }}>
-              {hider && <><span><Key k="F" /> {t("Paint")}</span><span><Key k="R" /> {t("Pose")}</span><span><Key k="Q" /> {t("Clone")} <Key k="X" /> {t("Remove")}</span><span><Key k="1" /> {t("Whistle")}</span><span><Key k="Shift" /> {t("Sprint")}</span><span><Key k="Space" /> {t("Jump / Climb")}</span><span><Key k="Ctrl" /> {t("Crouch")}</span><span><Key k="5" /> {t("Free camera")}</span></>}
-              {hunter && <><span><Key k="LMB" /> {t("Shoot")}</span>{(hud.phase === "hide" || hud.settings.hunterTps) && <span><Key k="RMB" /> {t("FPS / TPS")}</span>}<span><Key k="Shift" /> {t("Sprint")}</span></>}
-              {(hud.phase === "hide") && <span><Key k="Y" /> {t("Skip")} ({hud.votes.have}/{hud.votes.need})</span>}
-              <span><Key k="T" /> {t("Chat")}</span>
-            </div>
-          )}
-
           {hud.paintMode && <PaintPanel hud={hud} engine={e} touch={touch} />}
           {poseMenu && <PoseWheel icons={icons} current={hud.pose} hover={poseHover} onPick={(p) => e?.setPose(p)} onClose={() => setPoseMenu(false)} touch={touch} />}
           {optionsOpen && <OptionsPanel engine={e} muted={muted} onToggleMute={onToggleMute} onClose={() => setOptionsOpen(false)} onLeave={onExit} />}
@@ -473,6 +461,137 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
 
           {touch && <TouchControls hud={hud} engine={e} onPose={() => setPoseMenu((v) => !v)} onChat={() => setChatOpen(true)} />}
         </>
+      )}
+    </div>
+  );
+}
+
+/** פיקטוגרמת שחקן (כמו האייקונים למעלה במשחק) */
+function Person({ color, size = 22 }: { color: string; size?: number }) {
+  return (
+    <svg width={size * 0.55} height={size} viewBox="0 0 11 20" aria-hidden>
+      <circle cx="5.5" cy="2.6" r="2.3" fill={color} />
+      <path d="M2.2 5.6 h6.6 a1.2 1.2 0 0 1 1.2 1.2 v5.4 a.9 .9 0 0 1 -1.8 0 v-4.4 h-.3 v11.2 a1.1 1.1 0 0 1 -2.2 0 v-6.4 h-.4 v6.4 a1.1 1.1 0 0 1 -2.2 0 v-11.2 h-.3 v4.4 a.9 .9 0 0 1 -1.8 0 v-5.4 a1.2 1.2 0 0 1 1.2 -1.2 z" fill={color} />
+    </svg>
+  );
+}
+
+function Hourglass({ frac }: { frac: number }) {
+  const f = Math.max(0, Math.min(1, frac));
+  return (
+    <svg width="22" height="30" viewBox="0 0 22 30" aria-hidden>
+      <rect x="2" y="1" width="18" height="2.4" rx="1" fill="#e9f5ea" />
+      <rect x="2" y="26.6" width="18" height="2.4" rx="1" fill="#e9f5ea" />
+      <path d="M4.5 3.4 h13 c0 6-4.5 8-5.2 11.6 c.7 3.6 5.2 5.6 5.2 11.6 h-13 c0-6 4.5-8 5.2-11.6 c-.7-3.6-5.2-5.6-5.2-11.6 z" fill="rgba(255,255,255,.18)" stroke="#e9f5ea" strokeWidth="1.1" />
+      <clipPath id="hgTop"><rect x="0" y={3.4 + 11.6 * (1 - f)} width="22" height={11.6 * f} /></clipPath>
+      <clipPath id="hgBot"><rect x="0" y={26.6 - 11.6 * (1 - f)} width="22" height={11.6 * (1 - f)} /></clipPath>
+      <path d="M5.3 3.9 h11.4 c-.4 5-4.2 7-4.9 11.1 h-1.6 c-.7-4.1-4.5-6.1-4.9-11.1 z" fill="#2fd05a" clipPath="url(#hgTop)" />
+      <path d="M10.2 15 h1.6 c.7 4.1 4.5 6.1 4.9 11.1 h-11.4 c.4-5 4.2-7 4.9-11.1 z" fill="#2fd05a" clipPath="url(#hgBot)" />
+    </svg>
+  );
+}
+
+const PHASE_LEN: Record<string, (s: Settings) => number> = { hide: (s) => s.hideTime, hunt: (s) => s.huntTime, check: (s) => s.checkTime, countdown: () => 15 };
+
+function TopHud({ hud }: { hud: HudState }) {
+  const hunters = hud.players.filter((p) => p.role === "hunter").length;
+  const left = hud.hiderIcons.filter((h) => !h.found).length;
+  const total = PHASE_LEN[hud.phase]?.(hud.settings) ?? 1;
+  const label = { countdown: "Until Search Starts", hide: "Until Search Starts", hunt: "Search Time", check: "Answer Check", lobby: "" }[hud.phase];
+  return (
+    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none" style={{ textShadow: "0 1px 3px rgba(0,0,0,.8)" }}>
+      <div className="flex items-end gap-1.5">
+        <div className="flex gap-[3px] items-end">{Array.from({ length: left }, (_, i) => <Person key={i} color="#fff" />)}</div>
+        <Hourglass frac={hud.time / Math.max(1, total)} />
+        <div className="flex gap-[3px] items-end">{Array.from({ length: hunters }, (_, i) => <Person key={i} color="#e8262c" />)}</div>
+      </div>
+      <div className={`text-[22px] leading-none mt-0.5 tabular-nums font-light ${hud.phase === "hunt" && hud.time <= 10 ? "text-[#ff4d4d]" : ""}`}>{Math.max(0, Math.ceil(hud.time))}</div>
+      <div className="text-[12px] leading-tight">{t(label)}</div>
+      {hud.room && hud.room !== hud.mapName && hud.phase !== "countdown" && <div className="text-[11px] opacity-80 mt-0.5">{t(hud.room)}</div>}
+    </div>
+  );
+}
+
+function KeyBox({ k, on, color }: { k: string; on?: boolean; color?: string }) {
+  return <span className="inline-grid place-items-center min-w-[16px] h-[16px] px-[3px] rounded-[3px] text-[10px] font-black leading-none text-black" style={{ background: color ?? (on ? "#27c93f" : "#fff") }}>{k}</span>;
+}
+
+/** אייקוני הרשימה בימין — ציור פשוט בסגנון המשחק */
+function Ico({ kind }: { kind: "chat" | "bell" | "pose" | "paint" | "lock" }) {
+  const c = "#fff";
+  if (kind === "bell") return <svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0z" fill="#ffc21a" /></svg>;
+  if (kind === "chat") return <svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 5h18v11H9l-5 4v-4H3z" fill={c} /></svg>;
+  if (kind === "pose") return <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke={c} strokeWidth="1.8" /><circle cx="13" cy="6.5" r="1.8" fill={c} /><path d="M7 11l4-2 3 1 3-2M11 9l-1 5 3 2-1 4M10 14l-3 3" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  if (kind === "paint") return <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5" fill="none" stroke={c} strokeWidth="1.8" /><path d="M12 20V11M12 11l-4-6M12 11l4-6M12 11V4" stroke={c} strokeWidth="1.8" strokeLinecap="round" /></svg>;
+  return <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 3v4M12 7a2 2 0 1 0 0.01 0M12 9v11M6 14a6 6 0 0 0 12 0M4 14h4M16 14h4" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" /></svg>;
+}
+
+function KeyColumn({ hud, hider, hunter }: { hud: HudState; hider: boolean; hunter: boolean }) {
+  const row = (key: React.ReactNode, label: string, icon?: React.ReactNode) => (
+    <div className="flex items-center justify-end gap-1.5">
+      <div className="flex flex-col items-end">{key}<span className="text-[9px] leading-tight mt-[1px]">{t(label)}</span></div>
+      {icon && <span className="w-6 grid place-items-center">{icon}</span>}
+    </div>
+  );
+  return (
+    <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 grid gap-2 pointer-events-none" style={{ textShadow: "0 1px 2px rgba(0,0,0,.9)" }}>
+      <div className="flex items-center justify-end gap-1"><Ico kind="chat" /><KeyBox k="T" /></div>
+      {hider && row(<KeyBox k="1" color="#ffc21a" />, "Taunt", <Ico kind="bell" />)}
+      {hider && row(<KeyBox k="R" />, "Pose", <Ico kind="pose" />)}
+      {(hider || hunter) && row(<KeyBox k="F" />, "Paint Mode", <Ico kind="paint" />)}
+      {hider && row(<KeyBox k="RMB" />, "Rotation Lock", <Ico kind="lock" />)}
+      {row(<KeyBox k="2" on={hud.nameplates} />, "Toggle Nameplate Display")}
+      {row(<KeyBox k="3" on={hud.xray} />, "Toggle X-Ray Rendering")}
+      {hider && row(<KeyBox k="5" color={hud.freeLook ? "#27c93f" : "#ff7ad9"} />, "Switch to Free Camera")}
+      {hud.phase === "hide" && row(<KeyBox k="Y" on={hud.votes.mine} />, `Skip (${hud.votes.have}/${hud.votes.need})`)}
+      {hunter && hud.phase === "hunt" && hud.settings.hunterTps && row(<KeyBox k="RMB" />, "FPS / TPS")}
+    </div>
+  );
+}
+
+function ModeText({ mode }: { mode: Settings["mode"] }) {
+  const m = MODES.find((x) => x.id === mode) ?? MODES[0];
+  return (
+    <div className="absolute bottom-3 right-4 z-10 text-center pointer-events-none" style={{ textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
+      <div className="text-[17px] font-bold text-[#3ee03a] leading-tight">{t(m.name)}</div>
+      {t(m.desc).split("\n").map((l, i) => <div key={i} className="text-[12px] leading-snug">{l}</div>)}
+    </div>
+  );
+}
+
+function BottomChips({ hud, hider }: { hud: HudState; hider: boolean }) {
+  const chip = (k: string, label: string, color: string) => (
+    <div className="flex flex-col items-center gap-[2px]">
+      <span className="rounded-[3px] px-1.5 h-[14px] grid place-items-center text-[8px] font-black text-black" style={{ background: color }}>{k}</span>
+      <span className="text-[9px]">{t(label)}</span>
+    </div>
+  );
+  return (
+    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10 flex gap-3 pointer-events-none" style={{ textShadow: "0 1px 2px rgba(0,0,0,.9)" }}>
+      {hud.attached ? <>{chip("S", "Detach", "#27c93f")}{chip("CTRL", "Move Down", "#fff")}{chip("SPACE", "Move Up", "#fff")}</>
+        : <>{hider && chip("CTRL", hud.crouch ? "Stand Up" : "Crouch", "#ffc21a")}{chip("SPACE", "Climb", "#4ee6e6")}{hider && chip("Q", "Clone", "#4ee6e6")}</>}
+    </div>
+  );
+}
+
+function MissedTab({ hud }: { hud: HudState }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="absolute left-0 top-[40%] z-20" style={{ textShadow: "0 1px 2px rgba(0,0,0,.9)" }}>
+      <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 bg-black/30 rounded-r px-2 py-1 text-[12px]">
+        <span className="w-3 h-3 rounded-sm bg-white text-black text-[8px] font-black grid place-items-center">{open ? "◀" : "▶"}</span>{t("Missed-Spot Ranking")}
+      </button>
+      {open && (
+        <div className="bg-black/45 rounded-r px-2 py-1.5 min-w-[170px] text-[11px]">
+          {hud.ranking.length === 0 && <div className="opacity-70">—</div>}
+          {hud.ranking.map((r, i) => (
+            <div key={r.id} className={`flex items-center gap-1.5 ${r.me ? "text-[#ffd23f]" : ""}`}>
+              <span className="w-3 opacity-70">{i + 1}</span>
+              <span className="truncate max-w-[100px]">{r.name}</span>
+              <span className="ml-auto tabular-nums">{r.pts}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
