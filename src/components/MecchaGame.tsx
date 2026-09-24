@@ -1,17 +1,16 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Volume2, VolumeX, Home, Copy, X, Pipette, Send } from "lucide-react";
+import { Volume2, VolumeX, Home, Copy, X, Pipette, Send, Settings as Gear, Search } from "lucide-react";
 import type { Engine, HudState, Settings } from "@/game/meccha/engine";
 import type { PoseId, SizeId, BodyType } from "@/game/meccha/character";
 import type { Net } from "@/game/meccha/net";
-import { setMuted as setSoundMuted } from "@/lib/sound";
+import { setMuted as setSoundMuted, setVolume as setSoundVolume, sfxClick } from "@/lib/sound";
 
 // מחרוזות הממשק לקוחות מהגרסה האנגלית של המשחק המקורי (בלי תרגומים מומצאים)
 const FONT = `"M PLUS Rounded 1c", "Nunito", system-ui, sans-serif`;
 const OUTLINE = "0 2px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 6px rgba(0,0,0,.6)";
 const PLAYER_COLORS = ["#ff006e", "#3a86ff", "#ffbe0b", "#8338ec", "#fb5607", "#06d6a0", "#ef476f", "#118ab2"];
 const MAP_LIST = [
-  { id: "random", name: "Random" },
   { id: "mansion", name: "Hide-and-Seek Mansion" },
   { id: "country", name: "Indoor Country" },
   { id: "sewer", name: "Sewer" },
@@ -19,24 +18,28 @@ const MAP_LIST = [
   { id: "penguin", name: "Penguin Hotel" },
   { id: "sugarland", name: "Sugarland" },
   { id: "osaka", name: "Osaka" },
+  { id: "egypt", name: "Egypt" },
+  { id: "deathburger", name: "Death Burger" },
+  { id: "greece", name: "Greece" },
+  { id: "deepsea", name: "Deep Sea" },
+  { id: "mall", name: "Shopping Mall" },
+  { id: "kyoto", name: "Kyoto" },
+  { id: "museum", name: "Art Museum" },
 ];
-const MODES: { id: Settings["mode"]; name: string }[] = [
-  { id: "normal", name: "Normal" },
-  { id: "infection", name: "Infection" },
-  { id: "double", name: "Double" },
+const MODES: { id: Settings["mode"]; name: string; desc: string }[] = [
+  { id: "normal", name: "Basic", desc: "Hunters must find every chameleon before time runs out." },
+  { id: "infection", name: "Infection", desc: "Chameleons that get hit join the hunters." },
+  { id: "double", name: "Double", desc: "Everyone hides, then everyone hunts. Most finds wins." },
+  { id: "rcr", name: "Reverse Chicken Race", desc: "Hunters see what every chameleon looks like. First to find scores; most points wins." },
 ];
-const POSE_PAGES: PoseId[][] = [
-  ["stand", "sit", "lie", "spread", "lump", "cactus", "surrender", "side"],
-  ["crosslegged", "bridge", "onehand", "bend", "tpose", "hips", "handstand", "banzai"],
+// סדר התנוחות זהה ל־POSES במנוע (3 עמודים בגלגל)
+const ALL_POSES: PoseId[] = [
+  "stand", "sit", "lie", "spread", "lump", "cactus", "surrender", "side", "crosslegged", "bridge", "onehand", "bend",
+  "tpose", "hips", "handstand", "banzai", "zazen", "airplane", "thinker", "bolt", "glico", "kneel", "prone", "curl",
+  "squat", "run", "salute", "armscross", "point", "wave", "hugknees", "flamingo", "fly", "dab", "lean",
 ];
-const POSE_NAME: Record<PoseId, string> = {
-  stand: "Stand", sit: "Sit", lie: "Lie Down", spread: "Spread", lump: "Lump", cactus: "Cactus", surrender: "Surrender", side: "Side",
-  crosslegged: "Cross-legged", bridge: "Bridge", onehand: "One Hand", bend: "Bend", tpose: "T-Pose", hips: "Hands on Hips",
-  handstand: "Handstand", banzai: "Banzai", crouch: "Crouch",
-};
-const SIZE_LIST: { id: SizeId; name: string }[] = [
-  { id: "petit", name: "Petit" }, { id: "small", name: "Small" }, { id: "normal", name: "Normal" }, { id: "large", name: "Large" }, { id: "huge", name: "Huge" },
-];
+const POSE_PAGES: PoseId[][] = [ALL_POSES.slice(0, 12), ALL_POSES.slice(12, 24), ALL_POSES.slice(24)];
+const SIZE_LIST: { id: SizeId; name: string }[] = [{ id: "normal", name: "Normal" }, { id: "petit", name: "Petit Chameleon" }];
 const BODY_LIST: { id: BodyType; name: string }[] = [{ id: "normal", name: "Normal" }, { id: "cube", name: "Cube" }, { id: "plump", name: "Plump" }];
 
 function loadName() {
@@ -89,7 +92,7 @@ export function MecchaGame() {
 
   const btn = "w-full rounded-2xl py-3.5 text-lg font-extrabold transition hover:scale-[1.02] active:scale-95 border-[3px] border-black shadow-[0_4px_0_#000]";
   return (
-    <div className="relative min-h-screen overflow-hidden" dir="ltr" style={{ fontFamily: FONT, background: "radial-gradient(circle at 30% 20%, #ffe36e 0, #ff9f1c 35%, #ff4d6d 70%, #7b2cbf 100%)" }}>
+    <div onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }} className="relative min-h-screen overflow-hidden" dir="ltr" style={{ fontFamily: FONT, background: "radial-gradient(circle at 30% 20%, #ffe36e 0, #ff9f1c 35%, #ff4d6d 70%, #7b2cbf 100%)" }}>
       <div className="absolute inset-0 opacity-25 pointer-events-none" style={{ backgroundImage: "radial-gradient(#fff 2px, transparent 2px)", backgroundSize: "26px 26px" }} />
       <div className="relative z-10 mx-auto max-w-md px-4 py-6 text-black">
         <div className="flex items-center justify-between mb-6">
@@ -170,6 +173,8 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   const [chatOpen, setChatOpen] = useState(false);
   const [touch, setTouch] = useState(false);
   const [icons, setIcons] = useState<Record<string, string>>({});
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const poseHover = useRef<PoseId | null>(null);
 
   useEffect(() => {
     setTouch(window.matchMedia("(pointer: coarse)").matches);
@@ -183,12 +188,25 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         else if (conn.kind === "p2p") net = await netMod.createP2PNet(conn.code, conn.host);
         else net = netMod.createLocalNet();
         const { Engine } = await import("@/game/meccha/engine");
+        await (await import("@/game/meccha/character")).loadCharacterModels();
         if (!alive || !mountRef.current) { if (net.kind === "p2p") net.close(); return; }
         eng = new Engine(mountRef.current, net, { name, color, muted, defaultBots: net.kind === "local" ? 3 : 0, onHud: setHud });
-        eng.onPoseMenu = (open) => setPoseMenu(open);
+        eng.onPoseMenu = (open) => {
+          if (open) { poseHover.current = null; setPoseMenu(true); return; }
+          if (poseHover.current) eng?.setPose(poseHover.current); // משחררים R = בוחרים
+          setPoseMenu(false);
+        };
+        eng.onOptions = () => setOptionsOpen((v) => !v);
         eng.onInteract = () => setSettingsOpen(true);
         eng.onChatKey = () => setChatOpen(true);
         engineRef.current = eng;
+        try {
+          const num = (k: string) => { const v = localStorage.getItem(k); return v === null ? null : Number(v); };
+          const sens = num("meccha_sens"); if (sens !== null) eng.setSensitivity(sens);
+          const vol = num("meccha_vol"); if (vol !== null) setSoundVolume(vol);
+          const sh = num("meccha_shadow"); if (sh !== null) eng.setShadowQuality(sh as 0 | 1 | 2);
+          if (num("meccha_perf") === 1) eng.setPerformance(true);
+        } catch { /* ignore */ }
         try { setIcons(eng.poseIcons()); } catch { /* אין אייקונים */ }
         if (import.meta.env.DEV) (window as unknown as { __meccha: Engine }).__meccha = eng;
       } catch (e) {
@@ -224,15 +242,16 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   }, [phase]);
 
   const e = engineRef.current;
-  const overlayOpen = settingsOpen || charOpen || chatOpen;
+  const overlayOpen = settingsOpen || charOpen || chatOpen || optionsOpen;
   const hider = !!hud && hud.alive && hud.myRole === "hider" && hud.phase !== "check";
   const hunter = !!hud && hud.myRole === "hunter" && (hud.phase === "hide" || hud.phase === "hunt");
   const phaseTitle = !hud ? "" : {
-    lobby: "LOBBY", countdown: "GET READY", hide: hud.myRole === "hunter" ? "WAIT" : "HIDE!", hunt: hud.myRole === "hunter" ? "HUNT!" : "HUNTING TIME", check: "ANSWER CHECK",
+    lobby: "LOBBY", countdown: "GET READY", hide: hud.myRole === "hunter" ? "HUNTER WAIT TIME" : "HIDE!", hunt: "SEARCH TIME", check: "ANSWER CHECK",
   }[hud.phase];
 
   return (
-    <div className="fixed inset-0 bg-black select-none overflow-hidden text-white" dir="ltr" style={{ fontFamily: FONT }}>
+    <div className="fixed inset-0 bg-black select-none overflow-hidden text-white" dir="ltr" style={{ fontFamily: FONT }}
+      onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>
       <div ref={mountRef} className="absolute inset-0" />
 
       {error && (
@@ -273,6 +292,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             <div className="flex gap-1.5">
               <button onClick={onExit} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1.5 text-xs font-bold"><X className="w-4 h-4 inline" /> Leave</button>
               <button onClick={onToggleMute} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Mute">{muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
+              <button onClick={() => setOptionsOpen(true)} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Settings"><Gear className="w-4 h-4" /></button>
             </div>
             {hud.code && (
               <button onClick={() => navigator.clipboard?.writeText(hud.code!).catch(() => {})} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1 text-xs font-bold inline-flex items-center gap-1">
@@ -293,18 +313,55 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             {!hud.connected && <div className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold">Disconnected</div>}
           </div>
 
-          {/* ימין למעלה: נקודות ומצבים */}
+          {/* ימין למעלה: נקודות, תחמושת, דירוג נקודות ההחמצה */}
           <div className="absolute top-2 right-2 z-20 flex flex-col items-end gap-1 text-xs font-bold pointer-events-none" style={{ textShadow: OUTLINE }}>
-            {hud.settings.missed && hud.myRole === "hider" && (hud.phase === "hunt" || hud.phase === "hide") && <div className="text-base">Missed Points: {hud.pts}</div>}
+            {hunter && hud.phase === "hunt" && (
+              <div className="flex items-center gap-1 text-xl font-black"><Search className="w-6 h-6 text-[#ff3b3b]" strokeWidth={3} /> {hud.finds}</div>
+            )}
             {hunter && hud.settings.ammoLimit && <div className="text-lg">Ammo: {hud.ammo}</div>}
-            {hud.likes > 0 && <div>👍 {hud.likes}</div>}
-            {hud.attached && <div className="text-[#8ef56b]">Sticking to wall · Shift to leave</div>}
-            {hud.crouch && <div>Crouching</div>}
-            {hud.clones > 0 && <div>Clones: {hud.clones}/2</div>}
-            {hud.xray && <div className="text-[#4cc9f0]">X-RAY</div>}
+            {hud.ranking.length > 0 && (
+              <div className="rounded-xl bg-black/45 px-2 py-1.5 min-w-[150px]" style={{ textShadow: "none" }}>
+                <div className="text-[11px] font-black text-center mb-0.5">Missed Points</div>
+                {hud.ranking.map((r, i) => (
+                  <div key={r.id} className={`flex items-center gap-1.5 text-[11px] ${r.me ? "text-[#ffd23f]" : ""}`}>
+                    <span className="w-3 opacity-70">{i + 1}</span>
+                    <span className="w-2 h-2 rounded-full border border-black" style={{ background: r.color }} />
+                    <span className="truncate max-w-[90px]">{r.name}</span>
+                    <span className="ml-auto tabular-nums">{r.pts}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {hud.attached && <div className="text-[#8ef56b]">Climbing · Space up · Ctrl down · S let go</div>}
+            {hud.freeLook && <div className="text-[#4cc9f0]">FREE CAMERA {hud.freeCam ? "· moving (4)" : "· 4 to move"}</div>}
+            {hud.xray && <div className="text-[#4cc9f0]">SEE-THROUGH</div>}
             {!hud.nameplates && <div>Nameplates OFF</div>}
-            {hud.frozen && hider && hud.phase === "hunt" && <div className="text-[#8ef56b]">Still</div>}
           </div>
+
+          {/* היהלומים הירוקים: זמינות השכפולים */}
+          {hider && (hud.phase === "hide" || hud.phase === "hunt") && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 pointer-events-none">
+              {hud.cloneSlots.map((v, i) => (
+                <svg key={i} width="26" height="30" viewBox="0 0 26 30" aria-label={v >= 1 ? "clone ready" : "clone cooldown"}>
+                  <defs><clipPath id={`cd${i}`}><rect x="0" y={30 - 30 * v} width="26" height="30" /></clipPath></defs>
+                  <path d="M13 1 L25 15 L13 29 L1 15 Z" fill="rgba(0,0,0,.45)" stroke="#000" strokeWidth="1.5" />
+                  <path d="M13 1 L25 15 L13 29 L1 15 Z" fill={v >= 1 ? "#3ee07a" : "#1f8f4c"} stroke="#000" strokeWidth="1.5" clipPath={`url(#cd${i})`} />
+                </svg>
+              ))}
+            </div>
+          )}
+
+          {/* 逆算チキンレース: הציידים רואים את כל הזיקיות */}
+          {hunter && hud.portraits.length > 0 && (
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20 grid grid-cols-2 gap-1.5 pointer-events-none">
+              {hud.portraits.map((q) => (
+                <div key={q.id} className={`rounded-lg overflow-hidden border-2 ${q.found ? "border-[#5a8dff] opacity-50" : "border-white"}`}>
+                  <img src={q.url} alt="" className="w-16 h-16 block" />
+                  <div className="text-[9px] font-bold bg-black/60 px-1 truncate w-16">{q.name}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* מצב לובי */}
           {hud.phase === "lobby" && !overlayOpen && (
@@ -321,17 +378,16 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
               {hud.onPad && <div className="text-xl font-black text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>You will be a HUNTER</div>}
               <div className="flex gap-2 pointer-events-auto">
                 <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-black border-2 border-black">Settings</button>
-                <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-black border-2 border-black">Body / Size</button>
-                {hud.isHost && <button onClick={() => e?.startCountdown()} className="rounded-xl bg-[#8ef56b] text-black px-4 py-1.5 text-sm font-black border-2 border-black">Start</button>}
+                <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-black border-2 border-black">Character</button>
               </div>
             </div>
           )}
 
           {hud.phase === "hide" && hud.myRole === "hunter" && (
-            <Banner>The hunters are locked in until the hiding time ends</Banner>
+            <Banner>Wait in the lobby until the chameleons finish hiding · F paint · RMB third person</Banner>
           )}
-          {hud.spectating !== null && hud.phase !== "check" && (
-            <Banner>{hud.spectating ? `Spectating ${hud.spectating}` : "Free camera"} · 4 next · 5 free camera</Banner>
+          {hud.spectating !== null && hud.phase !== "check" && !hud.freeLook && (
+            <Banner>{hud.spectating ? `Spectating ${hud.spectating}` : "Free camera"} · click next · 4 move · Shift fast · Space up · Ctrl down</Banner>
           )}
 
           {/* צייד: כוונת */}
@@ -359,18 +415,26 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-[11px] font-bold opacity-80" style={{ textShadow: OUTLINE }}>Esc to release the mouse</div>
           )}
 
+          {/* בלובי: כפתור השתקה בפינה הימנית התחתונה (כמו במשחק) */}
+          {hud.phase === "lobby" && !overlayOpen && (
+            <button onClick={onToggleMute} className="absolute bottom-3 right-3 z-30 rounded-full bg-black/55 border-2 border-white/70 p-2.5" aria-label={muted ? "Unmute" : "Mute"}>
+              {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+          )}
+
           {/* מקשים */}
           {!touch && !hud.paintMode && hud.phase !== "check" && (
-            <div className="absolute bottom-2 right-2 z-10 text-[11px] font-bold grid gap-0.5 text-right pointer-events-none" style={{ textShadow: OUTLINE }}>
-              {hider && <><span><Key k="F" /> Paint</span><span><Key k="R" /> Pose</span><span><Key k="Q" /> Clone <Key k="X" /> Remove</span><span><Key k="1" /> Whistle</span></>}
-              {hunter && <><span><Key k="LMB" /> Shoot</span><span><Key k="RMB" /> TPS</span></>}
+            <div className={`absolute ${hud.phase === "lobby" ? "bottom-16" : "bottom-2"} right-2 z-10 text-[11px] font-bold grid gap-0.5 text-right pointer-events-none`} style={{ textShadow: OUTLINE }}>
+              {hider && <><span><Key k="F" /> Paint</span><span><Key k="R" /> Pose</span><span><Key k="Q" /> Clone <Key k="X" /> Remove</span><span><Key k="1" /> Whistle</span><span><Key k="Shift" /> Sprint</span><span><Key k="Space" /> Jump / Climb</span><span><Key k="Ctrl" /> Crouch</span><span><Key k="5" /> Free camera</span></>}
+              {hunter && <><span><Key k="LMB" /> Shoot</span>{(hud.phase === "hide" || hud.settings.hunterTps) && <span><Key k="RMB" /> FPS / TPS</span>}<span><Key k="Shift" /> Sprint</span></>}
               {(hud.phase === "hide") && <span><Key k="Y" /> Skip ({hud.votes.have}/{hud.votes.need})</span>}
               <span><Key k="T" /> Chat</span>
             </div>
           )}
 
           {hud.paintMode && <PaintPanel hud={hud} engine={e} touch={touch} />}
-          {poseMenu && <PoseWheel icons={icons} current={hud.pose} onPick={(p) => e?.setPose(p)} onClose={() => setPoseMenu(false)} touch={touch} />}
+          {poseMenu && <PoseWheel icons={icons} current={hud.pose} hover={poseHover} onPick={(p) => e?.setPose(p)} onClose={() => setPoseMenu(false)} touch={touch} />}
+          {optionsOpen && <OptionsPanel engine={e} muted={muted} onToggleMute={onToggleMute} onClose={() => setOptionsOpen(false)} onLeave={onExit} />}
           {settingsOpen && <SettingsPanel hud={hud} engine={e} onClose={() => setSettingsOpen(false)} />}
           {charOpen && <CharPanel hud={hud} engine={e} onClose={() => setCharOpen(false)} />}
 
@@ -440,52 +504,131 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
   const s = hud.settings;
   const dis = !hud.isHost;
   const set = (p: Partial<Settings>) => engine?.setSettings(p);
+  const solo = hud.net === "local";
+  const col = "rounded-2xl border-[3px] border-black bg-white p-3 min-h-0 overflow-auto";
+  const h = "text-sm font-black mb-2";
   return (
-    <Panel title="Game Settings" onClose={onClose} wide>
-      {dis && <p className="text-xs font-bold mb-2 text-black/60">Only the host can change the settings.</p>}
-      <Opt label="Map" value={s.map} disabled={dis} options={MAP_LIST.map((m) => ({ v: m.id, n: m.name }))} onChange={(v) => set({ map: v })} />
-      <Opt label="Mode" value={s.mode} disabled={dis} options={MODES.map((m) => ({ v: m.id, n: m.name }))} onChange={(v) => set({ mode: v })} />
-      <Opt label="Hiding Time" value={s.hideTime} disabled={dis} options={secs([30, 45, 60, 75, 90, 120, 150, 180, 240, 300])} onChange={(v) => set({ hideTime: v })} />
-      <Opt label="Hunting Time" value={s.huntTime} disabled={dis} options={secs([60, 90, 120, 180, 240, 300, 420, 600])} onChange={(v) => set({ huntTime: v })} />
-      <Opt label="Answer Check Time" value={s.checkTime} disabled={dis} options={secs([10, 20, 30, 45, 60, 90])} onChange={(v) => set({ checkTime: v })} />
-      <Opt label="Hunters" value={s.hunters} disabled={dis || s.mode === "double"} options={nums(1, 4)} onChange={(v) => set({ hunters: v })} />
-      <Opt label="Ammo Limit" value={s.ammoLimit} disabled={dis} options={onOff} onChange={(v) => set({ ammoLimit: v })} />
-      {s.ammoLimit && <Opt label="Ammo" value={s.ammo} disabled={dis} options={nums(1, 20)} onChange={(v) => set({ ammo: v })} />}
-      <Opt label="Forced Whistle" value={s.whistle} disabled={dis} options={[{ v: 0, n: "OFF" }, ...secs([15, 30, 45, 60, 90, 120])]} onChange={(v) => set({ whistle: v })} />
-      <Opt label="Missed Points" value={s.missed} disabled={dis} options={onOff} onChange={(v) => set({ missed: v })} />
-      <Opt label="Allow Petit" value={s.allowPetit} disabled={dis} options={onOff} onChange={(v) => set({ allowPetit: v })} />
-      <Opt label="Bots" value={s.bots} disabled={dis} options={nums(0, 8)} onChange={(v) => set({ bots: v })} />
-      <Opt label="Bot Difficulty" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />
-      {hud.isHost && (
-        <button onClick={() => { engine?.startCountdown(); onClose(); }} className="mt-3 w-full rounded-2xl bg-[#8ef56b] border-[3px] border-black shadow-[0_4px_0_#000] py-3 text-xl font-black">
-          Start
-        </button>
-      )}
-    </Panel>
+    <div className="absolute inset-0 z-40 bg-black/50 p-2 sm:p-4 grid place-items-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
+      <div className="relative w-full max-w-5xl h-full max-h-[640px] rounded-3xl bg-[#ffe7a3] text-black border-[3px] border-black shadow-[0_6px_0_#000] p-3 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-black">Configure Map</h2>
+          <button onClick={onClose} className="rounded-full bg-black text-white p-1" aria-label="Close"><X className="w-4 h-4" /></button>
+        </div>
+        {dis && <p className="text-xs font-bold text-black/60 -mt-1">Only the host can change the settings.</p>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-1 min-h-0 overflow-auto md:overflow-hidden">
+          {/* מפה */}
+          <div className={col}>
+            <div className={h}>Map</div>
+            <button disabled={dis} onClick={() => set({ map: "random" })}
+              className={`w-full text-left rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-black ${s.map === "random" ? "border-black bg-[#ffd23f]" : "border-black/15"}`}>🎲 Random</button>
+            {MAP_LIST.map((m) => (
+              <div key={m.id} className={`flex items-center gap-1.5 rounded-xl border-2 px-2 py-1 mb-1 ${s.map === m.id ? "border-black bg-[#4cc9f0]" : "border-black/15"}`}>
+                <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-left text-sm font-bold truncate">{m.name}</button>
+                <label className="flex items-center gap-1 text-[10px] font-bold text-black/60" title="Include in Random">
+                  <input type="checkbox" disabled={dis} checked={s.pool.includes(m.id)}
+                    onChange={(ev) => set({ pool: ev.target.checked ? [...s.pool, m.id] : s.pool.filter((x) => x !== m.id) })} /> random
+                </label>
+              </div>
+            ))}
+          </div>
+          {/* מצב + פילטרים */}
+          <div className={col}>
+            <div className={h}>Game Mode</div>
+            {MODES.map((m) => (
+              <button key={m.id} disabled={dis} onClick={() => set({ mode: m.id })}
+                className={`w-full text-left rounded-xl border-2 px-2 py-1.5 mb-1 ${s.mode === m.id ? "border-black bg-[#8ef56b]" : "border-black/15"}`}>
+                <div className="text-sm font-black">{m.name}</div>
+                <div className="text-[11px] font-bold text-black/60 leading-tight">{m.desc}</div>
+              </button>
+            ))}
+            <div className={`${h} mt-3`}>Filters</div>
+            {([["mono", "Monochrome"], ["horror", "Horror"], ["mosaic", "Mosaic"]] as const).map(([k, n]) => (
+              <label key={k} className="flex items-center gap-2 rounded-xl border-2 border-black/15 px-2 py-1.5 mb-1 text-sm font-bold">
+                <input type="checkbox" disabled={dis} checked={s.filters[k]} onChange={(ev) => set({ filters: { ...s.filters, [k]: ev.target.checked } })} /> {n}
+              </label>
+            ))}
+          </div>
+          {/* חוקים */}
+          <div className={col}>
+            <div className={h}>Rules</div>
+            <Opt label="Number of Hunters" value={s.hunters} disabled={dis || s.mode === "double"} options={nums(1, 6)} onChange={(v) => set({ hunters: v })} />
+            <Opt label="Hunter Wait Time" value={s.hideTime} disabled={dis} options={secs([30, 45, 60, 75, 90, 120, 150, 180, 200, 240, 300])} onChange={(v) => set({ hideTime: v })} />
+            <Opt label="Search Time" value={s.huntTime} disabled={dis} options={secs([60, 90, 120, 150, 180, 200, 240, 300, 420, 600])} onChange={(v) => set({ huntTime: v })} />
+            <Opt label="Answer Check Time" value={s.checkTime} disabled={dis} options={secs([15, 30, 45, 60, 90])} onChange={(v) => set({ checkTime: v })} />
+            <Opt label="Forced Taunt" value={s.whistle} disabled={dis} options={[{ v: 0, n: "OFF" }, ...secs([5, 10, 15, 20, 30, 45, 60, 90, 120])]} onChange={(v) => set({ whistle: v })} />
+            <Opt label="Missed-Points Ranking for Hunters" value={s.missed} disabled={dis} options={onOff} onChange={(v) => set({ missed: v })} />
+            <Opt label="Ammo Limit" value={s.ammoLimit} disabled={dis} options={onOff} onChange={(v) => set({ ammoLimit: v })} />
+            {s.ammoLimit && <Opt label="Ammo" value={s.ammo} disabled={dis} options={nums(1, 99)} onChange={(v) => set({ ammo: v })} />}
+            <Opt label="Allow Petit Chameleon" value={s.allowPetit} disabled={dis} options={onOff} onChange={(v) => set({ allowPetit: v })} />
+            <Opt label="Hunter TPS" value={s.hunterTps} disabled={dis} options={onOff} onChange={(v) => set({ hunterTps: v })} />
+            {solo && (
+              <>
+                <div className="text-[11px] font-black mt-3 text-black/60">Practice (solo only)</div>
+                <Opt label="Bots" value={s.bots} disabled={dis} options={nums(1, 8)} onChange={(v) => set({ bots: v })} />
+                <Opt label="Bot Level" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {hud.isHost && (
+            <button onClick={() => { engine?.startCountdown(); onClose(); }} className="rounded-2xl bg-[#8ef56b] border-[3px] border-black shadow-[0_4px_0_#000] px-8 py-2.5 text-xl font-black">
+              Start
+            </button>
+          )}
+          <span className="text-xs font-bold text-black/60">{hud.players.length} players · {s.map === "random" ? "Random map" : MAP_LIST.find((m) => m.id === s.map)?.name}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function CharPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | null; onClose: () => void }) {
+  const mapName = hud.settings.map === "random" ? "Random" : MAP_LIST.find((m) => m.id === hud.settings.map)?.name;
   return (
-    <Panel title={hud.phase === "countdown" ? `Starting in ${hud.time}` : "Body / Size"} onClose={onClose}>
+    <Panel title={hud.phase === "countdown" ? `Starting in ${hud.time}` : "Character"} onClose={onClose}>
+      {hud.phase === "countdown" && <p className="text-sm font-bold mb-2">Map: <b>{mapName}</b></p>}
+      <p className="text-sm font-black mb-1.5">Size</p>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {SIZE_LIST.map((z) => {
+          const off = z.id === "petit" && !hud.settings.allowPetit;
+          return (
+            <button key={z.id} disabled={off} onClick={() => engine?.setMySize(z.id)}
+              className={`rounded-xl border-[3px] py-2 text-sm font-black disabled:opacity-30 ${hud.size === z.id ? "border-black bg-[#4cc9f0]" : "border-black/20"}`}>{z.name}{z.id === "petit" ? " ×0.5" : ""}</button>
+          );
+        })}
+      </div>
       <p className="text-sm font-black mb-1.5">Body Type</p>
-      <div className="grid grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-3 gap-2">
         {BODY_LIST.map((b) => (
           <button key={b.id} onClick={() => engine?.setMyBody(b.id)}
             className={`rounded-xl border-[3px] py-2 font-black ${hud.bodyType === b.id ? "border-black bg-[#ffd23f]" : "border-black/20"}`}>{b.name}</button>
         ))}
       </div>
-      <p className="text-sm font-black mb-1.5">Size</p>
-      <div className="grid grid-cols-5 gap-1.5">
-        {SIZE_LIST.map((z) => {
-          const off = z.id === "petit" && !hud.settings.allowPetit;
-          return (
-            <button key={z.id} disabled={off} onClick={() => engine?.setMySize(z.id)}
-              className={`rounded-xl border-[3px] py-2 text-xs font-black disabled:opacity-30 ${hud.size === z.id ? "border-black bg-[#4cc9f0]" : "border-black/20"}`}>{z.name}</button>
-          );
-        })}
-      </div>
       <button onClick={onClose} className="mt-4 w-full rounded-2xl bg-black text-white py-2.5 font-black">OK</button>
+    </Panel>
+  );
+}
+
+function OptionsPanel({ engine, muted, onToggleMute, onClose, onLeave }: { engine: Engine | null; muted: boolean; onToggleMute: () => void; onClose: () => void; onLeave: () => void }) {
+  const load = (k: string, d: number) => { try { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && localStorage.getItem(k) !== null ? v : d; } catch { return d; } };
+  const [sens, setSens] = useState(() => load("meccha_sens", 1));
+  const [vol, setVol] = useState(() => load("meccha_vol", 1));
+  const [shadow, setShadow] = useState(() => load("meccha_shadow", 2) as 0 | 1 | 2);
+  const [perf, setPerf] = useState(() => load("meccha_perf", 0) === 1);
+  const save = (k: string, v: number) => { try { localStorage.setItem(k, String(v)); } catch { /* ignore */ } };
+  return (
+    <Panel title="Settings" onClose={onClose}>
+      <Slider id="o-sens" label="Mouse Sensitivity" value={sens} min={0.2} max={3} step={0.05} onChange={(v) => { setSens(v); save("meccha_sens", v); engine?.setSensitivity(v); }} />
+      <div className="h-2" />
+      <Slider id="o-vol" label="Volume" value={vol} min={0} max={1} step={0.05} onChange={(v) => { setVol(v); save("meccha_vol", v); setSoundVolume(v); }} />
+      <label className="flex items-center gap-2 mt-3 text-sm font-bold"><input type="checkbox" checked={muted} onChange={onToggleMute} /> Mute</label>
+      <Opt label="Shadow Quality" value={shadow} options={[{ v: 0 as const, n: "Off" }, { v: 1 as const, n: "Low" }, { v: 2 as const, n: "High" }]} onChange={(v) => { setShadow(v); save("meccha_shadow", v); engine?.setShadowQuality(v); }} />
+      <Opt label="Performance Mode" value={perf} options={onOff} onChange={(v) => { setPerf(v); save("meccha_perf", v ? 1 : 0); engine?.setPerformance(v); }} />
+      <div className="flex gap-2 mt-4">
+        <button onClick={onClose} className="flex-1 rounded-2xl bg-black text-white py-2.5 font-black">Back to Game</button>
+        <button onClick={onLeave} className="rounded-2xl border-[3px] border-black px-4 py-2 font-black">Leave</button>
+      </div>
     </Panel>
   );
 }
@@ -540,35 +683,35 @@ function ChatInput({ onSend, onClose }: { onSend: (m: string) => void; onClose: 
 
 // ---------- גלגל תנוחות ----------
 
-function PoseWheel({ icons, current, onPick, onClose, touch }: { icons: Record<string, string>; current: PoseId; onPick: (p: PoseId) => void; onClose: () => void; touch: boolean }) {
-  const [page, setPage] = useState(POSE_PAGES[1].includes(current) ? 1 : 0);
+function PoseWheel({ icons, current, hover, onPick, onClose, touch }: { icons: Record<string, string>; current: PoseId; hover: { current: PoseId | null }; onPick: (p: PoseId) => void; onClose: () => void; touch: boolean }) {
+  const [page, setPage] = useState(Math.max(0, POSE_PAGES.findIndex((pg) => pg.includes(current))));
+  const [hl, setHl] = useState<PoseId | null>(null);
   const list = POSE_PAGES[page];
-  const R = 128;
+  const R = 150;
+  const S = R * 2 + 100;
+  const fit = typeof window === "undefined" ? 1 : Math.min(1, (window.innerHeight - 16) / S, (window.innerWidth - 16) / S);
+  const pick = (p: PoseId) => { hover.current = p; setHl(p); };
   return (
-    <div className="absolute inset-0 z-30 grid place-items-center bg-black/25" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div className="relative" style={{ width: R * 2 + 90, height: R * 2 + 90 }}>
-        <div className="absolute inset-[45px] rounded-full bg-black/45 border-4 border-white/70" />
+    <div className="absolute inset-0 z-30 grid place-items-center bg-black/20" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
+      <div className="relative" style={{ width: S, height: S, transform: `scale(${fit})` }}>
+        <div className="absolute rounded-full bg-black/45 border-4 border-white/60" style={{ inset: 50 }} />
         {list.map((p, i) => {
           const a = (i / list.length) * Math.PI * 2 - Math.PI / 2;
-          const x = R + 45 + Math.cos(a) * R, y = R + 45 + Math.sin(a) * R;
-          const on = current === p;
+          const x = S / 2 + Math.cos(a) * R, y = S / 2 + Math.sin(a) * R;
+          const on = (hl ?? current) === p;
           return (
-            <button key={p} onPointerEnter={() => { if (!touch) onPick(p); }} onClick={() => { onPick(p); if (touch) onClose(); }}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 w-[76px] h-[76px] rounded-full border-4 grid place-items-center overflow-hidden transition ${on ? "bg-[#ffd23f] border-black scale-110" : "bg-white border-black/70"}`}
-              style={{ left: x, top: y }} aria-label={POSE_NAME[p]} title={POSE_NAME[p]}>
-              {icons[p] ? <img src={icons[p]} alt="" className="w-[70px] h-[70px] pointer-events-none" draggable={false} /> : <span className="text-[10px] font-black text-black">{POSE_NAME[p]}</span>}
+            <button key={p} onPointerEnter={() => { if (!touch) pick(p); }} onClick={() => { pick(p); onPick(p); if (touch) onClose(); }}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 w-[72px] h-[72px] rounded-full border-4 grid place-items-center overflow-hidden transition-transform ${on ? "bg-[#4cc9f0] border-[#0b5f8a] scale-110" : "bg-white/90 border-black/60"}`}
+              style={{ left: x, top: y }} aria-label={p}>
+              {icons[p] ? <img src={icons[p]} alt="" className="w-[66px] h-[66px] pointer-events-none" draggable={false} /> : null}
             </button>
           );
         })}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-          <div className="text-lg font-black" style={{ textShadow: OUTLINE }}>{POSE_NAME[current]}</div>
-          <div className="flex gap-1 justify-center mt-1.5">
-            {POSE_PAGES.map((_, i) => (
-              <button key={i} onClick={() => setPage(i)} className={`w-8 h-8 rounded-full font-black border-2 border-black ${page === i ? "bg-white text-black" : "bg-black/60"}`}>{i + 1}</button>
-            ))}
-          </div>
-          {!touch && <div className="text-[10px] font-bold mt-1 opacity-80">Hover to choose · release R</div>}
-        </div>
+        {/* לוחצים על המרכז כדי לעבור עמוד */}
+        <button onClick={() => { setPage((page + 1) % POSE_PAGES.length); setHl(null); hover.current = null; }}
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-black/60 border-4 border-white/70 font-black text-lg" aria-label="Next page">
+          {page + 1}/{POSE_PAGES.length}
+        </button>
       </div>
     </div>
   );
@@ -647,75 +790,34 @@ function Slider({ id, label, value, min, max, step, onChange, bg }: { id: string
 }
 
 function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | null; touch: boolean }) {
-  const [tab, setTab] = useState<"rgb" | "hsv">("rgb");
-  const [hexText, setHexText] = useState("");
   const col = hud.pickPreview && hud.picking ? hud.pickPreview : hud.color;
   const hsv = hexToHsv(hud.color);
-  const [r, g, b] = rgbOf(hud.color);
-  const aHex = hex2(hud.alpha * 255);
-  useEffect(() => { setHexText(`${hud.color.slice(1)}${aHex}`.toUpperCase()); }, [hud.color, aHex]);
   const set = (color: string) => engine?.setBrush({ color });
-  const applyHex = (t: string) => {
-    const v = t.replace(/[^0-9a-f]/gi, "");
-    if (v.length === 6 || v.length === 8) engine?.setBrush({ color: `#${v.slice(0, 6).toLowerCase()}`, ...(v.length === 8 ? { alpha: parseInt(v.slice(6), 16) / 255 } : {}) });
-  };
   return (
-    <div className={`absolute z-20 left-2 ${touch ? "top-2 max-h-[calc(100dvh-16px)]" : "top-28 max-h-[calc(100dvh-130px)]"} w-[248px] overflow-auto rounded-2xl bg-white/95 text-black border-[3px] border-black p-2.5 grid gap-2 text-[11px]`}>
-      <div className="flex items-center justify-between">
-        <span className="font-black text-sm">PAINT</span>
-        <button onClick={() => engine?.togglePaint()} className="rounded-lg bg-black text-white px-2 py-0.5 font-black">F Close</button>
-      </div>
+    <div className={`absolute z-20 left-2 ${touch ? "top-2 max-h-[calc(100dvh-16px)]" : "top-28 max-h-[calc(100dvh-130px)]"} w-[228px] overflow-auto rounded-2xl bg-white/95 text-black border-[3px] border-black p-2.5 grid gap-2 text-[11px]`}>
       <div className="flex items-center gap-2">
         <ColorWheel color={hud.color} onChange={set} />
         <div className="grid gap-1.5 flex-1">
-          <div className="h-10 rounded-xl border-2 border-black" style={{ background: col, opacity: Math.max(0.15, hud.alpha) }} />
-          <button onPointerDown={() => engine?.setPicking(!hud.picking)}
-            className={`rounded-xl border-2 border-black py-1 font-black inline-flex items-center justify-center gap-1 ${hud.picking ? "bg-[#ffd23f]" : "bg-white"}`}>
-            <Pipette className="w-3.5 h-3.5" /> {touch ? "Pick" : "Space"}
-          </button>
-          <button onClick={() => engine?.clearPaint()} className="rounded-xl border-2 border-black py-1 font-black">Reset</button>
+          <div className="h-12 rounded-xl border-2 border-black" style={{ background: col }} />
+          {touch && (
+            <button onPointerDown={() => engine?.setPicking(!hud.picking)}
+              className={`rounded-xl border-2 border-black py-1 font-black inline-flex items-center justify-center gap-1 ${hud.picking ? "bg-[#ffd23f]" : "bg-white"}`}>
+              <Pipette className="w-3.5 h-3.5" /> Pick
+            </button>
+          )}
         </div>
       </div>
-      <div className="flex gap-1">
-        {(["rgb", "hsv"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`flex-1 rounded-lg border-2 border-black font-black py-0.5 ${tab === t ? "bg-black text-white" : ""}`}>{t.toUpperCase()}</button>
-        ))}
-      </div>
-      {tab === "rgb" ? (
-        <div className="grid gap-1">
-          <Slider id="pr" label="R" value={r} min={0} max={255} step={1} onChange={(v) => set(`#${hex2(v)}${hex2(g)}${hex2(b)}`)} bg={`linear-gradient(90deg,#00${hex2(g)}${hex2(b)},#ff${hex2(g)}${hex2(b)})`} />
-          <Slider id="pg" label="G" value={g} min={0} max={255} step={1} onChange={(v) => set(`#${hex2(r)}${hex2(v)}${hex2(b)}`)} bg={`linear-gradient(90deg,#${hex2(r)}00${hex2(b)},#${hex2(r)}ff${hex2(b)})`} />
-          <Slider id="pb" label="B" value={b} min={0} max={255} step={1} onChange={(v) => set(`#${hex2(r)}${hex2(g)}${hex2(v)}`)} bg={`linear-gradient(90deg,#${hex2(r)}${hex2(g)}00,#${hex2(r)}${hex2(g)}ff)`} />
-        </div>
-      ) : (
-        <div className="grid gap-1">
-          <Slider id="ph" label="H" value={hsv.h} min={0} max={359} step={1} onChange={(v) => set(hsvToHex(v, hsv.s, hsv.v))} bg="linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)" />
-          <Slider id="ps" label="S" value={hsv.s} min={0} max={1} step={0.01} onChange={(v) => set(hsvToHex(hsv.h, v, hsv.v))} bg={`linear-gradient(90deg,${hsvToHex(hsv.h, 0, hsv.v)},${hsvToHex(hsv.h, 1, hsv.v)})`} />
-          <Slider id="pv" label="V" value={hsv.v} min={0} max={1} step={0.01} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} />
-        </div>
-      )}
-      <Slider id="pa" label="Alpha" value={hud.alpha} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ alpha: v })} />
-      <label className="flex items-center gap-1.5 font-bold">
-        <span className="w-[62px]">Hex sRGB</span>
-        <span>#</span>
-        <input id="phex" value={hexText} maxLength={8} onChange={(ev) => setHexText(ev.target.value.toUpperCase())}
-          onKeyDown={(ev) => { ev.stopPropagation(); if (ev.key === "Enter") applyHex(hexText); }} onBlur={() => applyHex(hexText)}
-          className="flex-1 min-w-0 rounded-md border-2 border-black px-1 font-mono text-[12px]" />
-      </label>
+      <Slider id="pv" label="Brightness" value={hsv.v} min={0} max={1} step={0.01} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} />
       <Slider id="pm" label="Metallic" value={hud.metal} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ metal: v })} />
       <Slider id="pro" label="Roughness" value={hud.rough} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ rough: v })} />
       <Slider id="pe" label="Emissive" value={hud.emis} min={0} max={1} step={0.01} onChange={(v) => engine?.setBrush({ emis: v })} />
-      <Slider id="psz" label="Brush Size" value={hud.brush} min={0.01} max={0.5} step={0.01} onChange={(v) => engine?.setBrushSize(v)} />
       {hud.history.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {hud.history.map((c) => <button key={c} onClick={() => set(c)} className="w-6 h-6 rounded-md border-2 border-black" style={{ background: c }} aria-label={c} />)}
+          {hud.history.map((c) => <button key={c} onClick={() => set(c)} className={`w-6 h-6 rounded-md border-2 ${c === hud.color ? "border-black" : "border-black/30"}`} style={{ background: c }} aria-label={c} />)}
         </div>
       )}
-      <div className="flex gap-1">
-        <button onClick={() => engine?.setShadow(!hud.shadow)} className={`flex-1 rounded-lg border-2 border-black py-0.5 font-black ${!hud.shadow ? "bg-black text-white" : ""}`}>V Shadow {hud.shadow ? "ON" : "OFF"}</button>
-        <button onClick={() => engine?.setXray(!hud.xray)} className={`flex-1 rounded-lg border-2 border-black py-0.5 font-black ${hud.xray ? "bg-[#4cc9f0]" : ""}`}>3 X-ray</button>
-      </div>
-      {!touch && <div className="text-[10px] font-bold text-black/60 leading-tight">LMB paint · RMB drag = brush size · Alt+LMB / MMB rotate · Wheel zoom · Space+Wheel = history</div>}
+      <button onClick={() => engine?.setShadow(!hud.shadow)} className={`rounded-lg border-2 border-black py-0.5 font-black ${!hud.shadow ? "bg-black text-white" : ""}`}>V Shadow {hud.shadow ? "ON" : "OFF"}</button>
+      {!touch && <div className="text-[10px] font-bold text-black/60 leading-tight">LMB paint · hold Space = eyedropper · RMB drag = brush size · MMB / Alt+LMB rotate · wheel zoom (Space+wheel = colours) · F close</div>}
     </div>
   );
 }

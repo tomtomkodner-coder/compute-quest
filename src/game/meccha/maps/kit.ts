@@ -1,7 +1,10 @@
 // ערכת בנייה משותפת לכל המפות: חומרים, קופסאות, קירות עם פתחים, חדר ציידים עם שער, תאורה.
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import * as T from "../textures";
 import type { PaintTex } from "../textures";
+import type { HdriName } from "../hdri";
 
 export interface Obstacle {
   minX: number; maxX: number; minZ: number; maxZ: number;
@@ -18,6 +21,10 @@ export interface Lighting {
   fog?: [string, number, number];
   points: { pos: [number, number, number]; color: string; int: number; dist: number }[];
   exposure?: number;
+  env?: number; // עוצמת החזרי הסביבה (PBR)
+  hdri?: HdriName; // סביבת HDR מצולמת לתאורה והשתקפויות
+  hdriBackground?: number; // >0: מציגים את ה־HDR כשמיים (מפות פתוחות), הערך = טשטוש
+  envRotation?: number; // סיבוב הסביבה ברדיאנים
 }
 
 export interface World {
@@ -30,6 +37,10 @@ export interface World {
   hunterSpawns: THREE.Vector3[];
   hiderSpawns: THREE.Vector3[];
   lobby?: { play: THREE.Vector3; pad: { x: number; z: number; r: number } };
+  /** מסגרות בלובי שמציגות תמונה של כל מפה (המנוע מצלם את המפות ומדביק לתוכן) */
+  boards: { mapId: string; mesh: THREE.Mesh }[];
+  /** מצלמת תצוגה מקדימה של המפה (לתמונות בלובי) */
+  preview?: { pos: [number, number, number]; look: [number, number, number]; fov?: number };
   lighting: Lighting;
   groundAt(x: number, z: number, y: number, r: number): number;
   surfaceColor(hit: THREE.Intersection, out: THREE.Color): THREE.Color;
@@ -42,12 +53,21 @@ export interface World {
 export type Mat = { m: THREE.MeshStandardMaterial; ptex: PaintTex | null; repeat: [number, number] };
 type AddOpts = { solid?: boolean; standable?: boolean; rotY?: number; rotX?: number; rotZ?: number; noShadow?: boolean; gate?: boolean; scale?: [number, number, number] };
 
+/** קופסה עם קצוות מעוגלים קלות (כמו רהיט אמיתי) — קירות ורצפות נשארים חדים */
+export function boxGeo(w: number, h: number, d: number) {
+  const min = Math.min(w, h, d);
+  const max = Math.max(w, h, d);
+  if (min < 0.05 || max > 4.5) return new THREE.BoxGeometry(w, h, d);
+  return new RoundedBoxGeometry(w, h, d, 2, Math.min(0.035, min * 0.18));
+}
+
 export class Kit {
   group = new THREE.Group();
   surfaces: THREE.Mesh[] = [];
   obstacles: Obstacle[] = [];
   gateMeshes: THREE.Mesh[] = [];
   rooms: { name: string; x1: number; x2: number; z1: number; z2: number }[] = [];
+  boards: { mapId: string; mesh: THREE.Mesh }[] = [];
   wallH: number;
   doorH: number;
   private texCache = new Map<string, PaintTex>();
@@ -64,18 +84,26 @@ export class Kit {
     return t;
   }
 
-  mat(ptex: PaintTex | null, color = "#ffffff", repeat: [number, number] = [1, 1], extra: { metalness?: number; roughness?: number; transparent?: boolean; emissive?: string; emissiveIntensity?: number } = {}): Mat {
+  mat(ptex: PaintTex | null, color = "#ffffff", repeat: [number, number] = [1, 1], extra: { metalness?: number; roughness?: number; transparent?: boolean; emissive?: string; emissiveIntensity?: number; bump?: number } = {}): Mat {
     let map: THREE.Texture | null = null;
+    let normalMap: THREE.Texture | null = null;
+    const bump = extra.bump ?? (extra.transparent ? 0 : 0.55);
     if (ptex) {
       map = ptex.texture.clone();
       map.repeat.set(repeat[0], repeat[1]);
       map.needsUpdate = true;
+      if (bump > 0) {
+        normalMap = T.normalMapFrom(ptex).clone();
+        normalMap.repeat.set(repeat[0], repeat[1]);
+        normalMap.needsUpdate = true;
+      }
     }
     const m = new THREE.MeshStandardMaterial({
-      color, map, roughness: extra.roughness ?? 0.82, metalness: extra.metalness ?? 0,
-      transparent: extra.transparent, alphaTest: extra.transparent ? 0.5 : 0,
+      color, map, normalMap, normalScale: new THREE.Vector2(bump, bump), roughness: extra.roughness ?? 0.82, metalness: extra.metalness ?? 0,
+      transparent: !!extra.transparent, alphaTest: extra.transparent ? 0.5 : 0,
       side: extra.transparent ? THREE.DoubleSide : THREE.FrontSide,
     });
+    m.userData.bump = bump;
     if (extra.emissive) {
       m.emissive = new THREE.Color(extra.emissive);
       m.emissiveIntensity = extra.emissiveIntensity ?? 1;
@@ -87,7 +115,7 @@ export class Kit {
   /** אותו חומר עם חזרתיות לפי גודל המשטח */
   fit(m: Mat, w: number, h: number, unit = 2.5): Mat {
     if (!m.ptex) return m;
-    return this.mat(m.ptex, `#${m.m.color.getHexString()}`, [Math.max(0.3, w / unit), Math.max(0.3, h / unit)], { metalness: m.m.metalness, roughness: m.m.roughness });
+    return this.mat(m.ptex, `#${m.m.color.getHexString()}`, [Math.max(0.3, w / unit), Math.max(0.3, h / unit)], { metalness: m.m.metalness, roughness: m.m.roughness, bump: m.m.userData.bump });
   }
 
   add(geo: THREE.BufferGeometry, material: Mat, pos: [number, number, number], opts: AddOpts = {}) {
@@ -114,11 +142,11 @@ export class Kit {
 
   /** קופסה; y = תחתית */
   box(w: number, h: number, d: number, x: number, y: number, z: number, m: Mat, o: AddOpts = { solid: true }) {
-    return this.add(new THREE.BoxGeometry(w, h, d), m, [x, y + h / 2, z], o);
+    return this.add(boxGeo(w, h, d), m, [x, y + h / 2, z], o);
   }
   /** קופסה שעומדים עליה (רהיט נמוך) */
   seat(w: number, h: number, d: number, x: number, y: number, z: number, m: Mat, rotY = 0) {
-    return this.add(new THREE.BoxGeometry(w, h, d), m, [x, y + h / 2, z], { solid: true, standable: true, rotY });
+    return this.add(boxGeo(w, h, d), m, [x, y + h / 2, z], { solid: true, standable: true, rotY });
   }
   cyl(rt: number, rb: number, h: number, x: number, y: number, z: number, m: Mat, solid = true, seg = 16) {
     return this.add(new THREE.CylinderGeometry(rt, rb, h, seg), m, [x, y + h / 2, z], { solid });
@@ -181,6 +209,84 @@ export class Kit {
     this.add(geo, barMat, [x, this.doorH / 2, z], { solid: true, gate: true });
   }
 
+  // ---------- כלים למידול מדויק ----------
+
+  /** גוף סיבוב (אגרטל, מנורה, עמוד, בקבוק): points = [רדיוס, גובה] מלמטה למעלה; y = תחתית */
+  lathe(points: [number, number][], x: number, y: number, z: number, m: Mat, o: AddOpts & { seg?: number } = {}) {
+    const geo = new THREE.LatheGeometry(points.map(([r, h]) => new THREE.Vector2(r, h)), o.seg ?? 32);
+    return this.add(geo, m, [x, y, z], o);
+  }
+  /** צינור לאורך מסלול נקודות (צינורות, מעקות, כבלים) */
+  tube(points: [number, number, number][], r: number, m: Mat, o: AddOpts & { seg?: number; closed?: boolean } = {}) {
+    const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)), o.closed, "centripetal", 0.1);
+    const geo = new THREE.TubeGeometry(curve, o.seg ?? Math.max(8, points.length * 12), r, 12, o.closed);
+    return this.add(geo, m, [0, 0, 0], o);
+  }
+  /** צורה דו־ממדית שמולטת לעומק (קשתות, מסגרות, שלטים בצורה, קרטונים) — הצורה במישור XY, עומק לאורך Z */
+  extrude(shape: THREE.Shape, depth: number, x: number, y: number, z: number, m: Mat, o: AddOpts & { bevel?: number } = {}) {
+    const b = o.bevel ?? 0.02;
+    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: b > 0, bevelSize: b, bevelThickness: b, bevelSegments: 2, curveSegments: 16 });
+    geo.translate(0, 0, -depth / 2);
+    return this.add(geo, m, [x, y, z], o);
+  }
+  /** הרבה עותקים של אותו גוף (ספרים, אריחים, בקבוקים) בקריאת ציור אחת. solid = כל עותק מתנגש */
+  instances(geo: THREE.BufferGeometry, m: Mat, list: { pos: [number, number, number]; rotY?: number; rotX?: number; rotZ?: number; scale?: [number, number, number]; color?: string }[], o: { solid?: boolean; standable?: boolean; noShadow?: boolean } = {}) {
+    const mesh = new THREE.InstancedMesh(geo, m.m, list.length);
+    const mat4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const box = new THREE.Box3();
+    geo.computeBoundingBox();
+    list.forEach((it, i) => {
+      e.set(it.rotX ?? 0, it.rotY ?? 0, it.rotZ ?? 0);
+      q.setFromEuler(e);
+      mat4.compose(new THREE.Vector3(...it.pos), q, new THREE.Vector3(...(it.scale ?? [1, 1, 1])));
+      mesh.setMatrixAt(i, mat4);
+      if (it.color) mesh.setColorAt(i, new THREE.Color(it.color));
+      if (o.solid) {
+        box.copy(geo.boundingBox!).applyMatrix4(mat4);
+        this.obstacles.push({ minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z, bottom: box.min.y, top: box.max.y, standable: !!o.standable, enabled: true });
+      }
+    });
+    mesh.castShadow = !o.noShadow;
+    mesh.receiveShadow = true;
+    mesh.userData.ptex = m.ptex;
+    mesh.userData.repeat = m.repeat;
+    mesh.computeBoundingSphere();
+    this.group.add(mesh);
+    this.surfaces.push(mesh as unknown as THREE.Mesh);
+    return mesh;
+  }
+  /** איחוד כמה גיאומטריות (כבר ממוקמות) לרשת אחת עם חומר אחד — חוסך קריאות ציור */
+  merged(geos: THREE.BufferGeometry[], m: Mat, o: AddOpts = {}) {
+    const clean = geos.map((g) => (g.index ? g.toNonIndexed() : g));
+    for (const g of clean) { for (const k of Object.keys(g.attributes)) if (!["position", "normal", "uv"].includes(k)) g.deleteAttribute(k); }
+    const geo = mergeGeometries(clean, false)!;
+    return this.add(geo, m, [0, 0, 0], o);
+  }
+  /** מתנגש בלתי נראה (לגופים מסובבים/מעוגלים שה־AABB שלהם לא מדויק): standable = אפשר לעמוד עליו */
+  collider(minX: number, maxX: number, minZ: number, maxZ: number, bottom: number, top: number, standable = true) {
+    this.obstacles.push({ minX, maxX, minZ, maxZ, bottom, top, standable, enabled: true });
+  }
+
+  /** מסגרת בלובי שתציג תמונה של מפה */
+  mapBoard(mapId: string, x: number, y: number, z: number, rotY: number, w = 2.4, h = 1.5, frame?: Mat) {
+    const fm = frame ?? this.mat(null, "#3b2a1a", [1, 1], { roughness: 0.5 });
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    g.rotation.y = rotY;
+    const border = 0.1;
+    const fr = new THREE.Mesh(boxGeo(w + border * 2, h + border * 2, 0.08), fm.m);
+    fr.castShadow = true;
+    const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: "#222", roughness: 0.6 }));
+    pic.position.z = 0.045;
+    g.add(fr, pic);
+    this.group.add(g);
+    this.surfaces.push(fr);
+    this.boards.push({ mapId, mesh: pic });
+    return pic;
+  }
+
   room(name: string, x1: number, x2: number, z1: number, z2: number) {
     this.rooms.push({ name, x1, x2, z1, z2 });
   }
@@ -192,7 +298,7 @@ export class Kit {
 
   finish(o: {
     id: string; name: string; bounds: World["bounds"]; hunterSpawns: THREE.Vector3[]; hiderSpawns: THREE.Vector3[];
-    lighting: Lighting; lobby?: World["lobby"];
+    lighting: Lighting; lobby?: World["lobby"]; preview?: World["preview"];
   }): World {
     const obstacles = this.obstacles;
     const tmp = new THREE.Color();
@@ -201,12 +307,11 @@ export class Kit {
     const group = this.group;
     return {
       ...o,
-      group, surfaces: this.surfaces, obstacles,
+      group, surfaces: this.surfaces, obstacles, boards: this.boards,
       groundAt(x, z, y, r) {
         let g = 0;
         for (const ob of obstacles) {
           if (!ob.enabled) continue;
-          if (!ob.standable && ob.top > 0.5) continue;
           if (x > ob.minX - r * 0.3 && x < ob.maxX + r * 0.3 && z > ob.minZ - r * 0.3 && z < ob.maxZ + r * 0.3)
             if (ob.top <= y + 0.45 && ob.top > g) g = ob.top;
         }
@@ -240,7 +345,9 @@ export class Kit {
           const m = ob as THREE.Mesh;
           m.geometry?.dispose();
           const mm = m.material as THREE.MeshStandardMaterial | undefined;
+          if (Array.isArray(mm)) return;
           mm?.map?.dispose();
+          mm?.normalMap?.dispose();
           mm?.dispose();
         });
       },

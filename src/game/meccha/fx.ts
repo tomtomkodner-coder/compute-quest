@@ -1,7 +1,12 @@
 // אפקטים: שובלי צבע של הרובה, כתמי צבע על משטחים, פיצוצי צבע, תווים של שריקה, וצלילים.
 import * as THREE from "three";
 import { splat, labelTexture } from "./textures";
-import { playTone } from "@/lib/sound";
+import { playTone, playNoise } from "@/lib/sound";
+
+/** צבע קשת אקראי (כמו ההתזה הצבעונית של רובה הצבע) */
+export function rainbow() {
+  return `#${new THREE.Color().setHSL(Math.random(), 0.9, 0.55).getHexString()}`;
+}
 
 interface Timed {
   obj: THREE.Object3D;
@@ -34,26 +39,72 @@ export class Fx {
     return 1 / (1 + at.distanceTo(this.listener) / 7);
   }
 
-  /** שובל צבע מהקנה לנקודת הפגיעה */
+  /** שובל צבע מהקנה לנקודת הפגיעה: פס צבע שמתפוגג + "כדור צבע" שטס לאורכו */
   tracer(from: THREE.Vector3, to: THREE.Vector3, color: string) {
-    const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
-    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
-    const line = new THREE.Line(geo, mat);
-    this.scene.add(line);
-    // "קליע" קטן שנוסע לאורך השובל
-    const blob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color }));
+    const len = from.distanceTo(to);
+    if (len < 0.05) return;
+    const geo = new THREE.CylinderGeometry(0.012, 0.03, len, 6, 1, true);
+    geo.translate(0, len / 2, 0);
+    geo.rotateX(Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false });
+    const trail = new THREE.Mesh(geo, mat);
+    trail.position.copy(from);
+    trail.lookAt(to);
+    trail.scale.z = 0.001;
+    this.scene.add(trail);
+    const blob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color }));
+    blob.scale.set(1, 1, 2.2);
+    blob.lookAt(to.clone().sub(from));
     this.scene.add(blob);
+    const speed = 55; // מ'/ש
+    const travel = Math.min(0.25, len / speed);
     this.timed.push({
-      obj: line, t: 0, life: 0.45,
-      update: (k) => {
-        mat.opacity = 0.9 * (1 - k);
-        blob.position.lerpVectors(from, to, Math.min(1, k * 3));
-        blob.visible = k < 0.34;
+      obj: trail, t: 0, life: travel + 0.55,
+      update: (k, dt) => {
+        const t = k * (travel + 0.55);
+        const f = Math.min(1, t / travel);
+        trail.scale.z = Math.max(0.001, f);
+        blob.position.lerpVectors(from, to, f);
+        blob.lookAt(to);
+        blob.visible = f < 1;
+        mat.opacity = 0.85 * (t < travel ? 1 : Math.max(0, 1 - (t - travel) / 0.55));
         if (k >= 1) {
           this.scene.remove(blob);
           blob.geometry.dispose();
           (blob.material as THREE.Material).dispose();
         }
+        void dt;
+      },
+    });
+  }
+
+  /** הבזק לוע: אור נקודתי שמאיר את הסביבה לרגע + כוכב אור */
+  muzzleFlash(at: THREE.Vector3, dir: THREE.Vector3) {
+    const light = new THREE.PointLight("#ffd9a0", 60, 9, 1.8);
+    light.position.copy(at).addScaledVector(dir, 0.15);
+    this.scene.add(light);
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d")!;
+    const grd = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+    grd.addColorStop(0, "rgba(255,255,230,1)");
+    grd.addColorStop(0.35, "rgba(255,200,90,0.9)");
+    grd.addColorStop(1, "rgba(255,120,0,0)");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(c);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
+    sp.renderOrder = 20;
+    sp.position.copy(at).addScaledVector(dir, 0.08);
+    sp.scale.setScalar(0.22);
+    this.scene.add(sp);
+    this.timed.push({
+      obj: light, t: 0, life: 0.09,
+      update: (k) => {
+        light.intensity = 60 * (1 - k);
+        sp.scale.setScalar(0.22 * (1 + k));
+        (sp.material as THREE.SpriteMaterial).opacity = 1 - k;
+        if (k >= 1) { this.scene.remove(sp); tex.dispose(); sp.material.dispose(); light.dispose(); }
       },
     });
   }
@@ -92,8 +143,8 @@ export class Fx {
   burst(at: THREE.Vector3, color: string, n = 26) {
     const g = new THREE.Group();
     g.position.copy(at);
-    const mat = new THREE.MeshBasicMaterial({ color });
-    const mat2 = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+    const mat = new THREE.MeshBasicMaterial({ color: color === "rainbow" ? rainbow() : color });
+    const mat2 = new THREE.MeshBasicMaterial({ color: color === "rainbow" ? rainbow() : "#ffffff" });
     const bits: { m: THREE.Mesh; v: THREE.Vector3 }[] = [];
     for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(new THREE.SphereGeometry(0.06 + Math.random() * 0.08, 6, 5), i % 5 ? mat : mat2);
@@ -151,17 +202,21 @@ export class Fx {
   }
 
   // ---------- צלילים ----------
+  /** יריית שוטגאן: פיצוץ רעש עמוק + "פלאפ" של צבע */
   shotSound(at?: THREE.Vector3) {
     if (this.muted) return;
     const v = this.vol(at);
-    playTone(140, 0.12, "sawtooth", 0.22 * v);
-    playTone(900, 0.05, "square", 0.08 * v);
-    setTimeout(() => playTone(320, 0.08, "triangle", 0.1 * v), 60);
+    playNoise(0.32, 0.55 * v, 1800, "lowpass");
+    playNoise(0.08, 0.35 * v, 5000, "highpass");
+    playTone(62, 0.22, "sine", 0.35 * v);
+    playNoise(0.12, 0.12 * v, 700, "bandpass", 0.09);
   }
-  pumpSound() {
+  /** טעינה: "קלאק־קלאק" של המשאבה */
+  pumpSound(at?: THREE.Vector3) {
     if (this.muted) return;
-    setTimeout(() => playTone(500, 0.04, "square", 0.06), 350);
-    setTimeout(() => playTone(380, 0.05, "square", 0.06), 450);
+    const v = this.vol(at);
+    playNoise(0.05, 0.3 * v, 3200, "bandpass", 0.42);
+    playNoise(0.06, 0.34 * v, 2400, "bandpass", 0.6);
   }
   splashSound(at?: THREE.Vector3) {
     if (this.muted) return;
@@ -180,6 +235,69 @@ export class Fx {
     if (this.muted) return;
     playTone(200, 0.12, "sawtooth", 0.15);
     setTimeout(() => playTone(150, 0.16, "sawtooth", 0.12), 90);
+  }
+  /** צעד (מקומי או של שחקן אחר — חלש יותר לפי המרחק) */
+  stepSound(at?: THREE.Vector3, soft = false) {
+    if (this.muted) return;
+    const v = this.vol(at) * (soft ? 0.5 : 1);
+    if (v < 0.08) return;
+    playNoise(0.07, 0.16 * v, 520 + Math.random() * 180, "lowpass");
+    playTone(90 + Math.random() * 20, 0.05, "sine", 0.08 * v);
+  }
+  jumpSound() {
+    if (this.muted) return;
+    playNoise(0.16, 0.08, 1400, "bandpass");
+  }
+  landSound(at?: THREE.Vector3) {
+    if (this.muted) return;
+    const v = this.vol(at);
+    playNoise(0.1, 0.22 * v, 380, "lowpass");
+    playTone(70, 0.08, "sine", 0.14 * v);
+  }
+  /** מכחול: "ששש" קצר של צבע */
+  brushSound() {
+    if (this.muted) return;
+    playNoise(0.06, 0.035, 3200 + Math.random() * 1200, "bandpass");
+  }
+  /** טפטפת: בלופ */
+  pickSound() {
+    if (this.muted) return;
+    playTone(660, 0.05, "sine", 0.12);
+    setTimeout(() => playTone(990, 0.07, "sine", 0.1), 45);
+  }
+  /** שכפול: פוף */
+  cloneSound(at?: THREE.Vector3) {
+    if (this.muted) return;
+    const v = this.vol(at);
+    playNoise(0.22, 0.16 * v, 900, "bandpass");
+    playTone(520, 0.12, "triangle", 0.08 * v);
+    setTimeout(() => playTone(780, 0.1, "triangle", 0.07 * v), 70);
+  }
+  /** ええやん */
+  likeSound() {
+    if (this.muted) return;
+    [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => playTone(f, 0.16, "triangle", 0.14), i * 70));
+  }
+  chatSound() {
+    if (this.muted) return;
+    playTone(1320, 0.05, "sine", 0.07);
+  }
+  uiSound() {
+    if (this.muted) return;
+    playTone(880, 0.04, "sine", 0.08);
+  }
+  /** תחילת החיפוש: שריקת שופט */
+  startWhistle() {
+    if (this.muted) return;
+    playTone(2600, 0.5, "square", 0.05);
+    playTone(2650, 0.5, "sine", 0.12);
+    playNoise(0.5, 0.05, 2600, "bandpass");
+  }
+  /** חשיפת התשובות: תופים קצרים ואז "טה־דה" */
+  revealSound() {
+    if (this.muted) return;
+    for (let i = 0; i < 10; i++) playNoise(0.05, 0.12, 250, "lowpass", i * 0.06);
+    setTimeout(() => { playTone(523, 0.3, "triangle", 0.15); playTone(659, 0.3, "triangle", 0.12); playTone(784, 0.45, "triangle", 0.12); }, 650);
   }
   gateSound() {
     if (this.muted) return;

@@ -8,6 +8,40 @@ export interface PaintTex {
   texture: THREE.CanvasTexture;
   data: ImageData | null; // null = דינמי (קורא ישר מה־canvas)
   repeat: [number, number];
+  normal?: THREE.CanvasTexture;
+}
+
+/** מפת נורמלים מתוך הבהירות של הטקסטורה (Sobel) — נותנת לעץ, לבנים ואריחים עומק אמיתי באור */
+export function normalMapFrom(t: PaintTex): THREE.CanvasTexture {
+  if (t.normal) return t.normal;
+  const w = t.canvas.width, h = t.canvas.height;
+  const src = t.data ?? t.ctx.getImageData(0, 0, w, h);
+  const lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) lum[i] = (src.data[i * 4] * 0.3 + src.data[i * 4 + 1] * 0.59 + src.data[i * 4 + 2] * 0.11) / 255;
+  const cv = document.createElement("canvas");
+  cv.width = w;
+  cv.height = h;
+  const g = cv.getContext("2d")!;
+  const out = g.createImageData(w, h);
+  const at = (x: number, y: number) => lum[((y + h) % h) * w + ((x + w) % w)];
+  const k = 2.2;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) * k;
+      const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) * k;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * w + x) * 4;
+      out.data[i] = ((-dx / len) * 0.5 + 0.5) * 255;
+      out.data[i + 1] = ((dy / len) * 0.5 + 0.5) * 255;
+      out.data[i + 2] = ((1 / len) * 0.5 + 0.5) * 255;
+      out.data[i + 3] = 255;
+    }
+  g.putImageData(out, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  t.normal = tex;
+  return tex;
 }
 
 type Draw = (g: CanvasRenderingContext2D, w: number, h: number) => void;

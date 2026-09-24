@@ -2,14 +2,22 @@
 // זרימת סיבוב כמו במקור: לובי תלת־ממדי ← ספירה לאחור ← הכנה (הציידים נעולים) ← ציד ← בדיקת תשובות ← לובי.
 // המארח (מי שנכנס ראשון) מנהל את הסיבוב והבוטים; כל שחקן אחראי על הדמות, הצבע והיריות שלו.
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { buildMap, MAPS, type World } from "./maps";
 import { buildNav, type Nav } from "./nav";
+import { loadHdri } from "./hdri";
 import {
-  buildCharacter, applyPose, setSize, sizeScale, paintDot, paintLine, fillPart, resetPaint, copyPaint, samplePart,
+  buildCharacter, applyPose, poseBox, setSize, sizeScale, paintSphere, paintSegment, restPoint, vertexWorld, invalidatePaint, fillPart, resetPaint, copyPaint, samplePart,
   setLabel, setGlow, disposeCharacter, POSES, SIZES, BODY_TYPES,
   type Character, type PoseId, type SizeId, type BodyType, type Brush, type Part,
 } from "./character";
-import { Fx } from "./fx";
+import { Fx, rainbow } from "./fx";
+import { buildShotgun } from "./gun";
 import type { Net, Presence } from "./net";
 import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic } from "@/lib/sound";
 
@@ -17,21 +25,24 @@ import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic 
 
 export type Role = "hider" | "hunter" | "spectator";
 export type Phase = "lobby" | "countdown" | "hide" | "hunt" | "check";
-export type ModeId = "normal" | "infection" | "double";
+export type ModeId = "normal" | "infection" | "double" | "rcr";
 
 export interface Settings {
   map: string; // מזהה מפה או "random"
+  pool: string[]; // המפות שמשתתפות בהגרלה של Random
   mode: ModeId;
-  hideTime: number;
-  huntTime: number;
-  checkTime: number;
+  filters: { mono: boolean; horror: boolean; mosaic: boolean };
+  hideTime: number; // Hunter Wait Time
+  huntTime: number; // Search Time
+  checkTime: number; // Answer Check Time
   hunters: number;
   ammoLimit: boolean;
   ammo: number;
-  whistle: number; // 0 = כבוי
-  missed: boolean;
+  whistle: number; // Forced Taunt interval (0 = off)
+  missed: boolean; // Show missed-points ranking to hunters
   allowPetit: boolean;
-  bots: number;
+  hunterTps: boolean;
+  bots: number; // רק באימון לבד
   difficulty: 0 | 1 | 2;
 }
 
@@ -98,6 +109,12 @@ export interface HudState {
   locked: boolean;
   spectating: string | null;
   freeCam: boolean;
+  freeLook: boolean;
+  finds: number;
+  cloneSlots: number[]; // 1 = מוכן, אחרת התקדמות הטעינה
+  ranking: { id: string; name: string; color: string; pts: number; me: boolean }[];
+  portraits: { id: string; name: string; url: string; found: boolean }[];
+  filters: boolean;
   tps: boolean;
   attached: boolean;
   crouch: boolean;
@@ -165,7 +182,7 @@ interface Player {
   likes: number;
   vote: string;
   moveT: number;
-  samples: { mesh: THREE.Mesh; local: THREE.Vector3 }[];
+  samples: { mesh: THREE.Mesh; index: number }[];
   dying: number;
   seed: number;
   paintedKey: string;
@@ -175,6 +192,7 @@ interface Player {
   clones: Clone[];
   cloneKey: string;
   display: boolean; // בשלב בדיקת התשובות: מוצג מקובע במקום שבו הסתתר
+  stepT?: number;
 }
 
 interface ShotMsg { o: number[]; h: number[][]; c: string }
@@ -182,19 +200,51 @@ interface SnapMsg { s: number; pi: number; L: number; k: number; n: number; d: s
 type Shot = { hitId: string | null; pts: number[][]; muzzle: THREE.Vector3; fleeing: boolean };
 
 export const DEFAULT_SETTINGS: Settings = {
-  map: "mansion", mode: "normal", hideTime: 75, huntTime: 240, checkTime: 30, hunters: 1,
-  ammoLimit: false, ammo: 5, whistle: 45, missed: true, allowPetit: false, bots: 3, difficulty: 1,
+  map: "mansion", pool: MAPS.map((m) => m.id), mode: "normal", filters: { mono: false, horror: false, mosaic: false },
+  hideTime: 90, huntTime: 240, checkTime: 45, hunters: 1,
+  ammoLimit: false, ammo: 5, whistle: 45, missed: true, allowPetit: false, hunterTps: false, bots: 3, difficulty: 1,
 };
 const GRAVITY = 20;
-const SPEED = { hider: 5, hunter: 5.2, crouch: 2.4, spec: 10 };
+const SPEED = { hider: 4.3, hunter: 4.6, sprint: 7.2, crouch: 2.2, climb: 2.4, spec: 8, specFast: 16 };
 const SHOT_CD = 1500;
-const PELLETS = 7;
-const SPREAD = 0.04;
-const COUNTDOWN = 5;
+const PELLETS = 10;
+const SPREAD = 0.06;
+const COUNTDOWN = 15;
+const CLONE_CD = 8; // שניות עד שאפשר שוב לשכפל (היהלומים הירוקים)
+const RCR_FIND = 50;
+
+/** פילטרים של ההגדרות: Monochrome / Horror / Mosaic (אפשר לשלב) — אחרי ה־tone mapping */
+const FILTER_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    res: { value: new THREE.Vector2(1, 1) },
+    mono: { value: 0 },
+    horror: { value: 0 },
+    mosaic: { value: 0 },
+    time: { value: 0 },
+  },
+  vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse; uniform vec2 res; uniform float mono, horror, mosaic, time; varying vec2 vUv;
+    void main() {
+      vec2 uv = vUv;
+      if (mosaic > 0.5) { vec2 px = vec2(max(8.0, res.y / 90.0)) / res; uv = (floor(uv / px) + 0.5) * px; }
+      vec4 c = texture2D(tDiffuse, uv);
+      if (horror > 0.5) {
+        float l = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+        c.rgb = mix(c.rgb, vec3(l) * vec3(1.0, 0.42, 0.36), 0.7) * 0.82;
+        float v = smoothstep(0.9, 0.2, length(vUv - 0.5));
+        c.rgb *= mix(0.18, 1.0, v);
+        c.rgb += (fract(sin(dot(vUv * res + time * 61.0, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.07;
+      }
+      if (mono > 0.5) { float l = dot(c.rgb, vec3(0.3, 0.59, 0.11)); c.rgb = vec3(l); }
+      gl_FragColor = c;
+    }`,
+};
 const BOT_NAMES = ["Bot Noa", "Bot Itay", "Bot Maya", "Bot Omer", "Bot Shira", "Bot Yoni", "Bot Tamar", "Bot Ariel"];
 const BOT_COLORS = ["#ff595e", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93", "#ff924c", "#52b69a", "#f15bb5"];
 const POSE_SIL: Partial<Record<PoseId, number>> = { stand: 0.26, lump: 0.08, lie: 0.06, side: 0.07, sit: 0.13, crosslegged: 0.12, crouch: 0.15, bend: 0.15, bridge: 0.12, handstand: 0.2 };
-const SIZE_SIL: Record<SizeId, number> = { petit: 0.4, small: 0.65, normal: 1, large: 1.45, huge: 1.8 };
+const SIZE_SIL: Record<SizeId, number> = { petit: 0.4, normal: 1 };
 
 function mulberry(seed: number) {
   let a = seed >>> 0;
@@ -250,6 +300,27 @@ export class Engine {
   private sun: THREE.DirectionalLight;
   private points: THREE.PointLight[] = [];
   private viewGun: THREE.Group;
+  private composer: EffectComposer | null = null;
+  private gtao: GTAOPass | null = null;
+  private filterPass: ShaderPass | null = null;
+  private perfMode = false;
+  private slowT = 0;
+  private gunBob = 0;
+  private stepT = 0;
+  private wasAir = false;
+  private brushT = 0;
+  private cloneReady = [0, 0];
+  private portraits: { id: string; name: string; url: string }[] = [];
+  private sens = 1;
+  private myFindCount = 0;
+  private thumbs = new Map<string, THREE.Texture>();
+  private thumbQueue: string[] = [];
+  private thumbJob: { scene: THREE.Scene; cam: THREE.PerspectiveCamera; world: World; id: string } | null = null;
+  private thumbWait = false;
+  private thumbT = 0;
+  private pmrem: THREE.PMREMGenerator;
+  private roomEnv: THREE.Texture;
+  private envCache = new Map<string, THREE.Texture>();
 
   private players = new Map<string, Player>();
   private me: Player;
@@ -281,10 +352,11 @@ export class Engine {
   private lmb = false;
   private rmb = false;
   private mouse = { x: 0, y: 0 };
-  private drag: { id: number; x: number; y: number; sx: number; sy: number; t: number; mode: "cam" | "paint" | "size"; uv: THREE.Vector2 | null; part: Part | null } | null = null;
+  private drag: { id: number; x: number; y: number; sx: number; sy: number; t: number; mode: "cam" | "paint" | "size"; uv: THREE.Vector3 | null; part: Part | null } | null = null;
   private specPos = new THREE.Vector3(0, 6, 6);
   private specTarget: string | null = null;
   private freeCam = false;
+  private freeLook = false; // 5: מצלמה חופשית — הדמות קופאת במקום והמצלמה מסתובבת סביבה
   private tps = false;
   private attached: { nx: number; nz: number } | null = null;
   private crouch = false;
@@ -294,10 +366,11 @@ export class Engine {
   onPoseMenu: ((open: boolean) => void) | null = null;
   onInteract: (() => void) | null = null;
   onChatKey: (() => void) | null = null;
+  onOptions: (() => void) | null = null;
 
   // צביעה וסנכרון
   private brush: Brush = { color: "#e63946", alpha: 1, metal: 0, rough: 0.8, emis: 0 };
-  private brushSize = 0.06;
+  private brushSize = 0.12; // קוטר המכחול במטרים (על הגוף)
   private history: string[] = [];
   private histIdx = 0;
   private picking = false;
@@ -353,6 +426,32 @@ export class Engine {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.hemi, this.sun, this.camera);
+    // החזרי סביבה (PBR) + הצללה סביבתית (AO) — מה שנותן למפות מראה מציאותי
+    this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.roomEnv = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = this.roomEnv;
+    const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+    try {
+      const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: coarse ? 0 : 4 });
+      this.composer = new EffectComposer(this.renderer, rt);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      if (!coarse) {
+        this.gtao = new GTAOPass(this.scene, this.camera, 1, 1);
+        this.gtao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.5, thickness: 1.2, scale: 1.1, samples: 12 });
+        this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+        this.gtao.blendIntensity = 0.85;
+        this.composer.addPass(this.gtao);
+      }
+      this.composer.addPass(new OutputPass());
+      this.filterPass = new ShaderPass(FILTER_SHADER);
+      this.filterPass.enabled = false;
+      this.composer.addPass(this.filterPass);
+    } catch (e) {
+      console.warn("post-processing disabled", e);
+      this.composer = null;
+      this.gtao = null;
+      this.filterPass = null;
+    }
     this.fx = new Fx(this.scene);
     this.fx.muted = opts.muted;
 
@@ -372,7 +471,7 @@ export class Engine {
       settings: this.rs.s, mapName: "Lobby", myRole: "hider", alive: true, ammo: 0, pts: 0,
       paintMode: false, picking: false, pickPreview: null, color: this.brush.color, alpha: 1, metal: 0, rough: 0.8, emis: 0, brush: this.brushSize, history: [],
       pose: "stand", size: "normal", bodyType: "normal", room: "", players: [], hiderIcons: [],
-      toast: null, locked: false, spectating: null, freeCam: false, tps: false, attached: false, crouch: false, clones: 0,
+      toast: null, locked: false, spectating: null, freeCam: false, freeLook: false, finds: 0, cloneSlots: [1, 1], ranking: [], portraits: [], filters: false, tps: false, attached: false, crouch: false, clones: 0,
       nameplates: true, xray: false, shadow: true, chat: [], votes: { have: 0, need: 0, mine: false }, nearPlay: false, onPad: false,
       likeTarget: null, likedThisRound: false, likes: this.likes, frozen: false,
     };
@@ -431,17 +530,132 @@ export class Engine {
       return l;
     });
     this.renderer.toneMappingExposure = L.exposure ?? 1;
+    this.scene.environmentIntensity = L.env ?? 0.45;
+    this.scene.environmentRotation.set(0, L.envRotation ?? 0, 0);
+    this.scene.backgroundRotation.set(0, L.envRotation ?? 0, 0);
+    this.scene.environment = this.envCache.get(L.hdri ?? "") ?? this.roomEnv;
+    if (L.hdri) {
+      const name = L.hdri;
+      const wid = id;
+      loadHdri(name).then((tex) => {
+        if (this.disposed) return;
+        let env = this.envCache.get(name);
+        if (!env) { env = this.pmrem.fromEquirectangular(tex).texture; this.envCache.set(name, env); }
+        if (this.worldId !== wid) return;
+        this.scene.environment = env;
+        if (L.hdriBackground) { this.scene.background = tex; this.scene.backgroundBlurriness = L.hdriBackground; }
+      }).catch((e) => console.warn("hdri", e));
+    }
     this.world.setGate(true);
+    this.applyBoards();
     this.nav = buildNav(this.world);
     this.world.setGate(this.rs?.ph !== "hide");
     this.attached = null;
   }
 
-  /** הכיוון (yaw של דמות) משער חדר הציידים — כדי שהציידים יתחילו כשהם מסתכלים על השער */
+  /** הכיוון (yaw של דמות) ממיקום אל מרכז המפה — הציידים נכנסים כשהם מסתכלים פנימה */
   private gateYaw(from: THREE.Vector3) {
-    const g = this.world.obstacles.find((o) => o.gate);
-    if (!g) return Math.PI;
-    return Math.atan2((g.minX + g.maxX) / 2 - from.x, (g.minZ + g.maxZ) / 2 - from.z);
+    const b = this.world.bounds;
+    const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
+    if (Math.hypot(cx - from.x, cz - from.z) < 0.5) return Math.PI;
+    return Math.atan2(cx - from.x, cz - from.z);
+  }
+
+  /** האם הציידים מחכים בלובי (שלב ההסתתרות, לא במצב כפול) */
+  private huntersInLobby() {
+    return this.rs.ph === "hide" && this.rs.s.mode !== "double";
+  }
+
+  /** מציב צייד בכניסה למפה כשמתחיל החיפוש */
+  private placeHunterOnMap(p: Player, idx: number) {
+    const sp = this.world.hunterSpawns[idx % this.world.hunterSpawns.length];
+    p.pos.copy(sp);
+    p.tpos.copy(sp);
+    p.vy = 0;
+    p.yaw = p.tyaw = this.gateYaw(sp);
+    if (p.local) { this.camYaw = p.yaw + Math.PI; this.camPitch = 0; this.attached = null; }
+  }
+
+  // ---------- תמונות המפות בלובי ----------
+
+  private applyBoards() {
+    for (const b of this.world.boards ?? []) {
+      const tex = this.thumbs.get(b.mapId);
+      const m = b.mesh.material as THREE.MeshStandardMaterial;
+      if (tex) { m.map = tex; m.color.set("#ffffff"); m.roughness = 0.35; m.needsUpdate = true; }
+      else if (!this.thumbQueue.includes(b.mapId)) this.thumbQueue.push(b.mapId);
+    }
+  }
+
+  /** מכין צילום של מפה (בונה אותה בסצנה נפרדת עם התאורה שלה) */
+  private prepareThumb(id: string) {
+    const world = buildMap(id);
+    const scene = new THREE.Scene();
+    scene.add(world.group);
+    const L = world.lighting;
+    scene.background = new THREE.Color(L.sky);
+    if (L.fog) scene.fog = new THREE.Fog(L.fog[0], L.fog[1], L.fog[2]);
+    scene.add(new THREE.HemisphereLight(L.hemi[0], L.hemi[1], L.hemi[2]));
+    if (L.sun) { const d = new THREE.DirectionalLight(L.sun.color, L.sun.int); d.position.set(...L.sun.pos); scene.add(d); }
+    for (const pt of L.points) { const l = new THREE.PointLight(pt.color, pt.int, pt.dist, 1.6); l.position.set(...pt.pos); scene.add(l); }
+    scene.environment = this.roomEnv;
+    scene.environmentIntensity = L.env ?? 0.45;
+    scene.environmentRotation.set(0, L.envRotation ?? 0, 0);
+    const pv = world.preview;
+    const b = world.bounds;
+    const cam = new THREE.PerspectiveCamera(pv?.fov ?? 55, 1.6, 0.05, 200);
+    if (pv) { cam.position.set(...pv.pos); cam.lookAt(...pv.look); }
+    else { cam.position.set(b.maxX * 0.7, 5, b.maxZ * 0.7); cam.lookAt((b.minX + b.maxX) / 2, 1.2, (b.minZ + b.maxZ) / 2); }
+    const job = { scene, cam, world, id };
+    if (L.hdri) {
+      this.thumbWait = true;
+      const name = L.hdri;
+      loadHdri(name).then((tex) => {
+        let env = this.envCache.get(name);
+        if (!env) { env = this.pmrem.fromEquirectangular(tex).texture; this.envCache.set(name, env); }
+        scene.environment = env;
+        if (L.hdriBackground) { scene.background = tex; scene.backgroundBlurriness = L.hdriBackground; }
+      }).catch(() => {}).finally(() => { this.thumbWait = false; });
+    }
+    this.thumbJob = job;
+  }
+
+  /** מצלם לתוך פינת הקנבס ומעתיק — כך מקבלים את אותו tone mapping כמו במשחק. מיד אחר כך הפריים הרגיל מצויר מעליו */
+  private shootThumb() {
+    const job = this.thumbJob!;
+    this.thumbJob = null;
+    const cv = this.renderer.domElement;
+    const W = Math.min(480, cv.width), H = Math.min(300, cv.height);
+    job.cam.aspect = W / H;
+    job.cam.updateProjectionMatrix();
+    const pr = this.renderer.getPixelRatio();
+    this.renderer.setViewport(0, 0, W / pr, H / pr);
+    this.renderer.setScissor(0, 0, W / pr, H / pr);
+    this.renderer.setScissorTest(true);
+    this.renderer.render(job.scene, job.cam);
+    const out = document.createElement("canvas");
+    out.width = W;
+    out.height = H;
+    out.getContext("2d")!.drawImage(cv, 0, cv.height - H, W, H, 0, 0, W, H);
+    this.renderer.setScissorTest(false);
+    this.renderer.setViewport(0, 0, cv.width / pr, cv.height / pr);
+    const tex = new THREE.CanvasTexture(out);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    this.thumbs.set(job.id, tex);
+    job.world.dispose();
+    if (this.worldId === "lobby") this.applyBoards();
+  }
+
+  private updateThumbs(dt: number) {
+    if (this.worldId !== "lobby") return;
+    this.thumbT -= dt;
+    if (this.thumbJob) { if (!this.thumbWait) this.shootThumb(); return; }
+    if (this.thumbT > 0 || !this.thumbQueue.length) return;
+    this.thumbT = 0.6;
+    const id = this.thumbQueue.shift()!;
+    if (!this.thumbs.has(id)) {
+      try { this.prepareThumb(id); } catch (e) { console.warn("thumb", id, e); }
+    }
   }
 
   private spawnInLobby(p: Player) {
@@ -454,24 +668,36 @@ export class Engine {
   }
 
   private makeViewGun(color: string) {
+    const sg = buildShotgun(color, true);
     const g = new THREE.Group();
-    const dark = new THREE.MeshStandardMaterial({ color: "#2b2d42", roughness: 0.45, metalness: 0.5 });
-    const tank = new THREE.MeshStandardMaterial({ color, roughness: 0.3 });
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.6, 10), dark);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0, -0.35);
-    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.12, 0.34), dark);
-    stock.position.set(0, -0.02, 0.05);
-    const can = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), tank);
-    can.position.set(0, 0.1, 0);
-    const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 10), tank);
-    pump.rotation.x = Math.PI / 2;
-    pump.position.set(0, -0.055, -0.3);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshStandardMaterial({ color: "#f4f4f4", roughness: 0.8 }));
-    hand.position.set(0, -0.08, 0.1);
-    g.add(barrel, stock, can, pump, hand);
-    g.position.set(0.22, -0.2, -0.38);
+    sg.group.rotation.y = Math.PI; // הקנה קדימה (-Z של המצלמה)
+    g.add(sg.group);
+    g.position.set(0.2, -0.2, -0.36);
+    g.userData.pump = sg.pump;
+    g.userData.muzzle = sg.muzzle;
+    g.userData.pump0 = sg.pump.position.z;
     return g;
+  }
+
+  /** אנימציית הרובה בגוף ראשון: רתע ביריה, ואז משיכת המשאבה אחורה וקדימה (טעינה), ונדנוד בהליכה */
+  private animateViewGun(dt: number) {
+    const g = this.viewGun;
+    const t = (performance.now() - this.lastShot) / 1000;
+    let kick = 0, pump = 0, roll = 0;
+    if (t < 1.2) {
+      kick = t < 0.06 ? t / 0.06 : Math.max(0, 1 - (t - 0.06) / 0.28);
+      if (t > 0.34 && t < 0.78) {
+        const k = (t - 0.34) / 0.44;
+        pump = Math.sin(k * Math.PI);
+        roll = Math.sin(k * Math.PI) * 0.18;
+      }
+    }
+    this.gunBob += dt * (this.me.moving ? 9 : 0);
+    const bob = this.me.moving ? 1 : 0;
+    g.position.set(0.2 + Math.sin(this.gunBob) * 0.012 * bob, -0.2 - Math.abs(Math.cos(this.gunBob)) * 0.012 * bob - kick * 0.02, -0.36 + kick * 0.09);
+    g.rotation.set(kick * 0.22 + pump * 0.08, 0, -roll);
+    const p = g.userData.pump as THREE.Object3D;
+    p.position.z = (g.userData.pump0 as number) - pump * 0.11;
   }
 
   // ================= שחקנים =================
@@ -496,10 +722,10 @@ export class Engine {
     const samples: Player["samples"] = [];
     for (const m of ch.meshes) {
       const pos = m.geometry.getAttribute("position");
-      const n = Math.max(2, Math.round(pos.count / 40));
+      const n = Math.max(40, Math.round(pos.count / 60));
       for (let k = 0; k < n; k++) {
         const i = Math.floor(Math.random() * pos.count);
-        samples.push({ mesh: m, local: new THREE.Vector3().fromBufferAttribute(pos, i).multiplyScalar(0.96) });
+        samples.push({ mesh: m, index: i });
       }
     }
     return samples;
@@ -583,9 +809,13 @@ export class Engine {
     if (m.armed || !m.alive) return;
     const ph = this.rs.ph;
     if (ph !== "hide" && ph !== "hunt" && ph !== "lobby") return;
+    const now = performance.now();
+    const slot = this.cloneReady.findIndex((t) => t <= now);
+    if (slot < 0) return;
+    this.cloneReady[slot] = now + CLONE_CD * 1000;
     this.addClone(m, m.pos, m.yaw, m.pose, m.size);
     this.publishSelf(true);
-    if (!this.opts.muted) sfxClick();
+    this.fx.cloneSound();
     this.emit();
   }
   /** X — מוחקים את כל השכפולים */
@@ -740,10 +970,17 @@ export class Engine {
     this.rsSeenId = rs.id;
     this.rsPhaseSeen = rs.ph;
 
-    const wantWorld = rs.ph === "lobby" || rs.ph === "countdown" ? "lobby" : rs.map;
+    const myRole = rs.roles[this.me.id];
+    const wantWorld = rs.ph === "lobby" || rs.ph === "countdown" || (this.huntersInLobby() && myRole === "hunter") ? "lobby" : rs.map;
     if (wantWorld !== this.worldId) {
+      const fromLobby = this.worldId === "lobby";
       this.loadWorld(wantWorld);
-      if (wantWorld === "lobby") for (const p of this.players.values()) if (p.local || p.bot) this.spawnInLobby(p);
+      if (wantWorld === "lobby") { for (const p of this.players.values()) if (p.local || (p.bot && this.isHost() && rs.ph !== "hide")) this.spawnInLobby(p); }
+      else if (fromLobby && rs.ph === "hunt" && myRole === "hunter") {
+        const ids = Object.keys(rs.roles).filter((id) => rs.roles[id] === "hunter").sort();
+        this.placeHunterOnMap(this.me, Math.max(0, ids.indexOf(this.me.id)));
+        this.publishSelf(true);
+      }
     }
     if (newRound && rs.ph !== "lobby" && rs.ph !== "countdown") this.pendingDead.clear();
 
@@ -771,7 +1008,10 @@ export class Engine {
     const ph = this.rs.ph;
     let v = true;
     if (ph === "check") v = p.display;
-    else if (ph === "hide" || ph === "hunt") {
+    else if (ph === "hide" && this.huntersInLobby() && !p.local) {
+      // בזמן ההסתתרות הציידים בלובי והזיקיות במפה — כל אחד רואה רק את מי שבאותו מקום
+      v = p.role !== "spectator" && (p.role === "hunter") === (this.worldId === "lobby");
+    } else if (ph === "hide" || ph === "hunt") {
       if (p.role === "spectator") v = false;
       else if (!p.alive && p.dying <= 0) v = p.role === "hunter";
     }
@@ -783,15 +1023,22 @@ export class Engine {
   private onPhase(ph: Phase, prev: Phase) {
     const rs = this.rs;
     if (ph === "hunt") {
+      this.fx.startWhistle();
+      if (this.isHost() && rs.s.mode !== "double") {
+        let i = 0;
+        for (const p of this.players.values()) if (p.bot && rs.roles[p.id] === "hunter") this.placeHunterOnMap(p, 4 + i++);
+      }
       this.fx.gateSound();
       this.whistleT = 0;
       this.finalWhistleDone = false;
       if (this.me.role === "hider" || rs.s.mode === "double") this.sendFullSnapshot();
       if (rs.s.mode === "double") this.setupStatues();
+      if (rs.s.mode === "rcr") { this.renderPortraits(); window.setTimeout(() => { if (this.rs.ph === "hunt") this.renderPortraits(); }, 2500); }
       if (!this.opts.muted) startMusic();
     } else if (ph === "check") {
       stopMusic();
       this.enterCheck();
+      this.fx.revealSound();
       const iWon = (rs.win === "hiders" && rs.roles[this.me.id] === "hider") || (rs.win === "hunters" && rs.roles[this.me.id] === "hunter") || rs.win === this.me.id;
       if (!this.opts.muted) (iWon ? sfxWin : sfxCorrect)();
     } else if (ph === "lobby") {
@@ -810,6 +1057,7 @@ export class Engine {
         this.updateLabel(p);
       }
       this.freeCam = false;
+      this.freeLook = false;
       this.tps = false;
       this.hud.paintMode = false;
       if (prev !== "lobby") this.spawnInLobby(this.me);
@@ -821,7 +1069,11 @@ export class Engine {
     this.fx.clearDecals();
     this.pendingDead.clear();
     this.myFinds.clear();
+    this.myFindCount = 0;
+    this.cloneReady = [0, 0];
+    this.portraits = [];
     this.freeCam = false;
+    this.freeLook = false;
     this.attached = null;
     this.hud.paintMode = false;
     for (const p of this.players.values()) {
@@ -843,9 +1095,8 @@ export class Engine {
     const ids = Object.keys(rs.roles).sort();
     const idx = Math.max(0, ids.indexOf(m.id));
     if (m.role === "hunter") {
-      m.pos.copy(this.world.hunterSpawns[idx % this.world.hunterSpawns.length]);
-      this.camYaw = this.gateYaw(m.pos) + Math.PI;
-      this.camPitch = 0;
+      if (this.worldId === "lobby") this.spawnInLobby(m); // מחכים בלובי עד שמתחיל החיפוש
+      else this.placeHunterOnMap(m, idx);
     } else if (m.role === "hider") {
       m.pos.copy(this.world.hiderSpawns[idx % this.world.hiderSpawns.length]);
     } else {
@@ -967,6 +1218,9 @@ export class Engine {
         const n = ids.length;
         const winner = Object.entries(rs.finds ?? {}).find(([, f]) => f.length >= n - 1);
         if (winner || t <= 0) { this.endRound(winner ? winner[0] : this.bestFinder(), winner ? "found everyone" : "time up"); changed = true; }
+      } else if (rs.s.mode === "rcr") {
+        const hiders = ids.filter((id) => rs.roles[id] === "hider" && !rs.dead.includes(id) && this.players.has(id));
+        if (!hiders.length || t <= 0) { this.endRound(this.bestScorer(), !hiders.length ? "all hiders found" : "time up"); changed = true; }
       } else {
         const hiders = ids.filter((id) => rs.roles[id] === "hider" && !rs.dead.includes(id) && this.players.has(id));
         const armed = ids.filter((id) => rs.roles[id] === "hunter" && this.players.has(id) && (!rs.s.ammoLimit || (this.players.get(id)?.ammo ?? 0) > 0));
@@ -994,6 +1248,12 @@ export class Engine {
   private snap(p: Player) {
     const pos = p.local ? p.pos : p.tpos;
     return [r2(pos.x), r2(pos.y), r2(pos.z), r2(p.local || (p.bot && this.isHost()) ? p.yaw : p.tyaw), poseIdx(p.pose), sizeIdx(p.size)];
+  }
+
+  private bestScorer() {
+    let best = "none", n = -1;
+    for (const id of Object.keys(this.rs.roles)) { const p = this.players.get(id); if (p && p.pts > n) { n = p.pts; best = id; } }
+    return best;
   }
 
   private bestFinder() {
@@ -1067,7 +1327,9 @@ export class Engine {
       }
       for (const id of ids) rs.roles[id] = hunters.includes(id) ? "hunter" : "hider";
     }
-    rs.map = s.map === "random" ? MAPS[Math.floor(Math.random() * MAPS.length)].id : s.map;
+    const pool = MAPS.filter((m) => s.pool.includes(m.id));
+    const list = pool.length ? pool : MAPS;
+    rs.map = s.map === "random" ? list[Math.floor(Math.random() * list.length)].id : s.map;
     rs.dead = [];
     rs.conv = [];
     rs.deadAt = {};
@@ -1090,9 +1352,10 @@ export class Engine {
       p.seed = Math.floor(Math.random() * 1e9);
       p.ai = this.newAI();
       if (rs.roles[p.id] === "hunter") {
-        p.pos.copy(this.world.hunterSpawns[(hi++ + 4) % this.world.hunterSpawns.length]);
+        if (s.mode === "double") this.placeHunterOnMap(p, hi + 4);
+        else { const a = (hi / 6) * Math.PI * 2; p.pos.set(Math.cos(a) * 3, 0, Math.sin(a) * 3); p.yaw = a + Math.PI; } // בלובי
+        hi++;
         p.pose = "stand";
-        p.yaw = this.gateYaw(p.pos);
       } else this.botHide(p, taken);
       p.tpos.copy(p.pos);
       p.tyaw = p.yaw;
@@ -1147,7 +1410,30 @@ export class Engine {
     } catch (e) {
       console.error(e);
     }
-    this.renderer.render(this.scene, this.camera);
+    if (this.thumbJob && !this.thumbWait) this.shootThumb();
+    else this.updateThumbs(real);
+    const fp = this.filterPass;
+    const f = this.rs.s.filters;
+    const filt = !!fp && (this.rs.ph === "hide" || this.rs.ph === "hunt") && this.worldId !== "lobby" && (f.mono || f.horror || f.mosaic);
+    if (fp) {
+      fp.enabled = filt;
+      if (filt) {
+        const u = fp.uniforms;
+        u.mono.value = f.mono ? 1 : 0;
+        u.horror.value = f.horror ? 1 : 0;
+        u.mosaic.value = f.mosaic ? 1 : 0;
+        u.time.value = now / 1000;
+        u.res.value.set(this.renderer.domElement.width, this.renderer.domElement.height);
+      }
+    }
+    const ao = !!this.gtao && this.gtao.enabled && !this.perfMode;
+    if (this.composer && (ao || filt)) this.composer.render(real);
+    else this.renderer.render(this.scene, this.camera);
+    // מכשיר איטי: מכבים את ה־AO כדי לשמור על קצב פריימים
+    if (this.gtao?.enabled) {
+      this.slowT = real > 0.045 ? this.slowT + real : Math.max(0, this.slowT - real * 0.5);
+      if (this.slowT > 3 && !(window as unknown as { __mecchaHQ?: boolean }).__mecchaHQ) this.gtao.enabled = false;
+    }
   };
 
   private update(dt: number, real: number) {
@@ -1178,6 +1464,10 @@ export class Engine {
 
   private updateRemote(p: Player, dt: number) {
     if (p.display) return;
+    if (p.moving && p.ch.root.visible && Math.abs(p.tpos.y - p.pos.y) < 0.2) {
+      p.stepT = (p.stepT ?? 0) - dt;
+      if (p.stepT <= 0) { p.stepT = 0.38; this.fx.stepSound(p.pos); }
+    }
     const k = Math.min(1, dt * 12);
     if (p.pos.distanceTo(p.tpos) > 6) p.pos.copy(p.tpos);
     else p.pos.lerp(p.tpos, k);
@@ -1233,21 +1523,23 @@ export class Engine {
     const fz = -Math.cos(this.camYaw);
 
     if (this.spectating()) {
-      const sp = SPEED.spec * dt;
+      const fast = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+      const sp = (fast ? SPEED.specFast : SPEED.spec) * dt;
       const fwd = new THREE.Vector3(fx * Math.cos(this.camPitch), -Math.sin(this.camPitch), fz * Math.cos(this.camPitch));
       if (Math.abs(iy) + Math.abs(ix) > 0.1) this.specTarget = null;
       this.specPos.addScaledVector(fwd, iy * sp);
       this.specPos.x += -fz * ix * sp;
       this.specPos.z += fx * ix * sp;
-      if (this.keys.has("KeyE") || this.keys.has("Space")) this.specPos.y += sp;
-      if (this.keys.has("KeyQ") || this.keys.has("ControlLeft")) this.specPos.y -= sp;
+      if (this.keys.has("Space")) this.specPos.y += sp;
+      if (this.keys.has("ControlLeft") || this.keys.has("ControlRight")) this.specPos.y -= sp;
       this.specPos.y = Math.max(0.4, Math.min(14, this.specPos.y));
       this.wantJump = false;
       m.moving = false;
       return;
     }
 
-    const can = !this.hud.paintMode && (m.alive || rs.ph === "lobby" || rs.ph === "countdown");
+    const pre = rs.ph === "lobby" || rs.ph === "countdown";
+    const can = !this.hud.paintMode && !this.freeLook && (m.alive || pre);
     // לחיצה שמאלית + A/D = סיבוב במקום
     if (can && this.lmb && !m.armed && !this.attached) {
       m.yaw -= ix * dt * 2.2;
@@ -1256,34 +1548,42 @@ export class Engine {
       iy = 0;
     }
     if (this.attached) {
-      this.updateAttached(dt, ix, iy);
+      if (can) this.updateAttached(dt, ix, iy);
       m.tpos.copy(m.pos);
       return;
     }
     if (!can) { ix = 0; iy = 0; }
     const ctrl = this.keys.has("ControlLeft") || this.keys.has("ControlRight");
-    this.crouch = can && ctrl && this.onGround(m);
-    const speed = this.crouch ? SPEED.crouch : m.armed ? SPEED.hunter : SPEED.hider;
+    const shift = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+    this.crouch = can && ctrl && this.onGround(m) && !(m.armed && rs.ph === "hide");
+    const sprint = can && shift && !this.crouch;
+    const speed = this.crouch ? SPEED.crouch : sprint ? SPEED.sprint : m.armed ? SPEED.hunter : SPEED.hider;
     const sc = m.armed ? 1 : Math.max(0.6, sizeScale(m.size));
     const dx = (fx * iy - fz * ix) * speed * sc * dt;
     const dz = (fz * iy + fx * ix) * speed * sc * dt;
     const moving = can && Math.hypot(ix, iy) > 0.1;
-    if (this.wantJump && can) {
-      if (this.onGround(m)) { m.vy = 7.2; m.moveT = 0; }
-      else if (!m.armed && m.role === "hider") this.tryAttach();
-    }
+    if (this.wantJump && can && this.onGround(m)) { m.vy = 6.6; m.moveT = 0; this.fx.jumpSound(); }
     this.wantJump = false;
     const before = m.pos.clone();
     this.moveAgent(m, dx, dz, dt);
+    // טיפוס: קופצים אל קיר/חפץ ומחזיקים רווח
+    if (can && this.keys.has("Space") && !this.onGround(m) && m.vy < 4 && (rs.ph === "hide" || rs.ph === "hunt" || pre)) this.tryAttach(moving ? Math.atan2(dx, dz) : null);
     const moved = before.distanceTo(m.pos) > 0.003;
+    const grounded = this.onGround(m);
+    if (grounded && this.wasAir) this.fx.landSound();
+    this.wasAir = !grounded && !this.attached;
+    if (grounded && moving && moved) {
+      this.stepT -= dt;
+      if (this.stepT <= 0) { this.stepT = sprint ? 0.26 : this.crouch ? 0.55 : 0.38; this.fx.stepSound(undefined, this.crouch); }
+    } else this.stepT = 0.05;
     if (m.armed) m.yaw = this.camYaw + Math.PI;
-    else if (moving) {
+    else if (moving && !this.attached) {
       let d = Math.atan2(dx, dz) - m.yaw;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       m.yaw += d * Math.min(1, dt * 12);
     }
-    m.moving = moved && (moving || Math.abs(m.vy) > 0.1);
-    if (m.moving) m.moveT = 0;
+    m.moving = !this.attached && moved && (moving || Math.abs(m.vy) > 0.1);
+    if (m.moving || this.attached) m.moveT = 0;
     else m.moveT += dt;
     if (!m.armed) {
       if (moving && m.pose !== "stand" && m.pose !== "crouch") m.pose = "stand";
@@ -1293,57 +1593,99 @@ export class Engine {
     m.tpos.copy(m.pos);
   }
 
-  /** נצמדים לקיר: רווח באוויר ליד משטח אנכי */
-  private tryAttach() {
+  /** נצמדים לקיר: באוויר, עם רווח לחוץ, מול משטח אנכי */
+  private tryAttach(moveYaw: number | null) {
     const m = this.me;
-    const origin = m.pos.clone().add(new THREE.Vector3(0, 0.9 * sizeScale(m.size), 0));
-    const dirs = [new THREE.Vector3(Math.sin(m.yaw), 0, Math.cos(m.yaw)), new THREE.Vector3(-Math.sin(this.camYaw), 0, -Math.cos(this.camYaw))];
-    for (const d of dirs) {
+    const h = 1.7 * (m.armed ? 1 : sizeScale(m.size));
+    const origin = m.pos.clone().add(new THREE.Vector3(0, h * 0.55, 0));
+    const yaws = [moveYaw ?? m.yaw, m.yaw, this.camYaw + Math.PI];
+    for (const yw of yaws) {
+      const d = new THREE.Vector3(Math.sin(yw), 0, Math.cos(yw));
       this.ray.set(origin, d);
-      this.ray.far = 0.9;
+      this.ray.far = m.radius + 0.45;
       const hit = this.ray.intersectObjects(this.world.surfaces, false)[0];
       if (!hit || !hit.face) continue;
       const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-      if (Math.abs(n.y) > 0.35) continue;
+      if (Math.abs(n.y) > 0.4) continue;
       n.y = 0;
       n.normalize();
       this.attached = { nx: n.x, nz: n.z };
-      m.pos.x = hit.point.x + n.x * (m.radius + 0.05);
-      m.pos.z = hit.point.z + n.z * (m.radius + 0.05);
-      m.yaw = Math.atan2(n.x, n.z);
+      m.pos.x = hit.point.x + n.x * (m.radius + 0.04);
+      m.pos.z = hit.point.z + n.z * (m.radius + 0.04);
+      if (!m.armed) m.yaw = Math.atan2(n.x, n.z);
       m.vy = 0;
       m.moveT = 0;
+      m.pose = m.armed ? m.pose : "stand";
       this.publishSelf(true);
       this.emit();
       return;
     }
   }
 
+  /** על הקיר: רווח/W = למעלה, Ctrl = למטה, A/D = לצדדים, S = לרדת מהקיר. בראש הקיר מטפסים מעליו */
   private updateAttached(dt: number, ix: number, iy: number) {
     const m = this.me;
     const a = this.attached!;
-    let moved = false;
-    const v = 2.2 * dt;
-    if (this.keys.has("Space")) { m.pos.y += v; moved = true; }
-    if (this.keys.has("ControlLeft") || this.keys.has("ControlRight")) { m.pos.y = Math.max(0, m.pos.y - v); moved = true; }
-    if (this.rmb) {
-      // ימני + WASD = החלקה לאורך הקיר
-      m.pos.x += -a.nz * ix * v;
-      m.pos.z += a.nx * ix * v;
-      m.pos.y = Math.max(0, m.pos.y + iy * v);
-      if (Math.abs(ix) + Math.abs(iy) > 0.1) moved = true;
-    } else if (Math.abs(ix) > 0.1) {
-      m.yaw -= ix * dt * 2;
-      moved = true;
+    const n = new THREE.Vector3(a.nx, 0, a.nz);
+    const h = 1.7 * (m.armed ? 1 : sizeScale(m.size));
+    const v = SPEED.climb * dt;
+    const ctrl = this.keys.has("ControlLeft") || this.keys.has("ControlRight");
+    if (iy < -0.5) { // מתרחקים מהקיר
+      this.detach();
+      m.pos.addScaledVector(n, 0.25);
+      return;
     }
-    m.pos.y = Math.min(12, m.pos.y);
-    if (m.pos.y <= 0.001) { this.detach(); return; }
+    const up = this.keys.has("Space") || iy > 0.5;
+    const prev = m.pos.clone();
+    let vert = 0;
+    if (up) vert += v;
+    if (ctrl) vert -= v;
+    m.pos.y = Math.max(0, m.pos.y + vert);
+    // הקיר "סובב" למצלמה: A/D לאורך הקיר ביחס לכיוון שהמצלמה מסתכלת
+    const tangent = new THREE.Vector3(-n.z, 0, n.x);
+    const camRight = new THREE.Vector3(Math.cos(this.camYaw), 0, -Math.sin(this.camYaw));
+    const side = tangent.dot(camRight) >= 0 ? 1 : -1;
+    m.pos.addScaledVector(tangent, ix * v * side);
+    const probe = (y: number) => {
+      this.ray.set(new THREE.Vector3(m.pos.x + n.x * 0.1, m.pos.y + y, m.pos.z + n.z * 0.1), n.clone().negate());
+      this.ray.far = m.radius + 0.5;
+      return this.ray.intersectObjects(this.world.surfaces, false)[0];
+    };
+    const mid = probe(h * 0.55);
+    if (!mid) {
+      const low = probe(0.15);
+      if (low && vert > 0) {
+        // הגענו לראש הקיר/החפץ: עולים עליו
+        const tx = m.pos.x - n.x * (m.radius + 0.35), tz = m.pos.z - n.z * (m.radius + 0.35);
+        const top = this.world.groundAt(tx, tz, m.pos.y + h * 0.6, m.radius * 0.5);
+        this.detach();
+        m.pos.set(tx, Math.max(top, m.pos.y), tz);
+        m.vy = 0;
+        return;
+      }
+      m.pos.copy(prev); // אין קיר בכיוון הזה
+    } else {
+      const hn = mid.face ? mid.face.normal.clone().transformDirection(mid.object.matrixWorld) : n;
+      if (Math.abs(hn.y) < 0.4) {
+        hn.y = 0;
+        hn.normalize();
+        a.nx = hn.x;
+        a.nz = hn.z;
+        if (!m.armed) m.yaw = Math.atan2(hn.x, hn.z);
+      }
+      m.pos.x = mid.point.x + a.nx * (m.radius + 0.04);
+      m.pos.z = mid.point.z + a.nz * (m.radius + 0.04);
+    }
+    const w = this.world.bounds;
+    m.pos.x = Math.max(w.minX + m.radius, Math.min(w.maxX - m.radius, m.pos.x));
+    m.pos.z = Math.max(w.minZ + m.radius, Math.min(w.maxZ - m.radius, m.pos.z));
+    m.pos.y = Math.min(14, m.pos.y);
+    if (m.pos.y <= 0.001 && ctrl) { this.detach(); return; }
     m.moving = false;
-    if (moved) m.moveT = 0;
-    else m.moveT += dt;
+    m.moveT = prev.distanceTo(m.pos) > 0.001 ? 0 : m.moveT + dt;
   }
 
-  /** Shift — נפרדים מהקיר */
+  /** יורדים מהקיר */
   detach() {
     if (!this.attached) return;
     this.attached = null;
@@ -1416,6 +1758,7 @@ export class Engine {
       const look = new THREE.Vector3(-Math.sin(this.camYaw) * Math.cos(this.camPitch), -Math.sin(this.camPitch), -Math.cos(this.camYaw) * Math.cos(this.camPitch));
       this.camera.lookAt(eye.clone().add(look));
       this.viewGun.visible = true;
+      this.animateViewGun(dt);
       m.ch.root.visible = false;
       return;
     }
@@ -1442,6 +1785,7 @@ export class Engine {
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
     this.renderer.setSize(w, h, false);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -1462,7 +1806,7 @@ export class Engine {
     const origin = this.ray.ray.origin.clone();
     const muzzle = this.tps
       ? m.pos.clone().add(new THREE.Vector3(0, 1.25, 0)).addScaledVector(new THREE.Vector3(-Math.sin(this.camYaw), 0, -Math.cos(this.camYaw)), 0.8)
-      : this.viewGun.localToWorld(new THREE.Vector3(0, 0, -0.66));
+      : (this.viewGun.userData.muzzle as THREE.Object3D).getWorldPosition(new THREE.Vector3());
     this.afterShot(m, this.shoot(origin, dir, m, muzzle));
   }
 
@@ -1507,7 +1851,6 @@ export class Engine {
 
   private afterShot(s: Player, res: Shot) {
     this.drawShot(res.muzzle, res.pts, s.color, s.local);
-    if (s.local) this.fx.pumpSound();
     this.net.emit("shot", { o: [r2(res.muzzle.x), r2(res.muzzle.y), r2(res.muzzle.z)], h: res.pts, c: s.color } satisfies ShotMsg);
     const ammo = this.rs.s.ammoLimit;
     if (res.hitId) {
@@ -1535,12 +1878,17 @@ export class Engine {
     this.emit();
   }
 
-  private drawShot(o: THREE.Vector3, pts: number[][], color: string, local: boolean) {
+  /** יריה: הבזק לוע, שובלי צבע בכל צבעי הקשת, כתמים צבעוניים בכל מקום שהכדוריות פגעו, ו"קלאק־קלאק" של המשאבה */
+  private drawShot(o: THREE.Vector3, pts: number[][], _color: string, local: boolean) {
     this.fx.shotSound(local ? undefined : o);
+    this.fx.pumpSound(local ? undefined : o);
+    const first = pts[0] ? new THREE.Vector3(pts[0][0], pts[0][1], pts[0][2]).sub(o).normalize() : new THREE.Vector3(0, 0, -1);
+    this.fx.muzzleFlash(o, first);
     for (const p of pts) {
       const at = new THREE.Vector3(p[0], p[1], p[2]);
-      this.fx.tracer(o, at, color);
-      if (!p[6]) this.fx.decal(at, new THREE.Vector3(p[3], p[4], p[5]), color, 0.25 + Math.random() * 0.25);
+      const c = rainbow();
+      this.fx.tracer(o, at, c);
+      if (!p[6]) this.fx.decal(at, new THREE.Vector3(p[3], p[4], p[5]), c, 0.22 + Math.random() * 0.3);
     }
   }
 
@@ -1569,7 +1917,7 @@ export class Engine {
     const t = this.players.get(targetId);
     if (!t || rs.ph !== "hunt" || rs.roles[targetId] !== "hider" || rs.dead.includes(targetId) || this.pendingDead.has(targetId)) return;
     const shooter = this.players.get(by);
-    this.fx.burst(t.pos.clone().setY(t.pos.y + 0.9 * sizeScale(t.size)), shooter?.color ?? "#ff006e");
+    this.fx.burst(t.pos.clone().setY(t.pos.y + 0.9 * sizeScale(t.size)), "rainbow", 40);
     this.fx.splashSound(t.local ? undefined : t.pos);
     if (t.local) {
       this.attached = null;
@@ -1577,6 +1925,10 @@ export class Engine {
       if (!this.opts.muted) sfxWrong();
       this.specPos.copy(this.camera.position);
     } else if (shooter?.local && !this.opts.muted) sfxCorrect();
+    if (shooter && (shooter.local || (shooter.bot && this.isHost()))) {
+      if (rs.s.mode === "rcr") shooter.pts += RCR_FIND;
+      if (shooter.local) this.myFindCount++;
+    }
     if (this.isHost()) {
       rs.deadAt[targetId] = this.snap(t);
       if (rs.s.mode === "infection") {
@@ -1643,7 +1995,7 @@ export class Engine {
     else pose = r < 0.35 ? "lump" : r < 0.6 ? "sit" : r < 0.8 ? "crosslegged" : "lie";
     if (pose === "lie" || pose === "side") p.yaw = rand() * Math.PI * 2;
     p.pose = pose;
-    const sizes: SizeId[] = this.rs.s.allowPetit ? ["petit", "small", "normal", "normal", "large"] : ["small", "normal", "normal", "large"];
+    const sizes: SizeId[] = this.rs.s.allowPetit ? ["petit", "normal", "normal"] : ["normal"];
     p.size = sizes[Math.floor(rand() * sizes.length)];
     this.setModel(p, false, BODY_TYPES[Math.floor(rand() * 3)]);
     setSize(p.ch, p.size);
@@ -1651,7 +2003,7 @@ export class Engine {
 
   private paintBotsIfNeeded() {
     const rs = this.rs;
-    if (rs.ph !== "hide" && rs.ph !== "hunt") return;
+    if ((rs.ph !== "hide" && rs.ph !== "hunt") || this.worldId !== rs.map) return;
     for (const p of this.players.values()) {
       if (!p.bot || p.armed || !p.alive || p.dying > 0 || p.role !== "hider") continue;
       const key = `${rs.id}:${p.seed}:${p.tpos.x.toFixed(1)}:${p.tpos.z.toFixed(1)}:${p.pose}:${p.size}:${p.bodyType}`;
@@ -1676,18 +2028,17 @@ export class Engine {
     const fwd = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
     const vantage = p.pos.clone().addScaledVector(fwd, 6);
     vantage.y = p.pose === "lie" || p.pose === "side" || p.pos.y > 0.3 ? 3.2 : 1.6;
-    const jobs: { part: Part; uv: THREE.Vector2; b: Brush }[] = [];
+    const jobs: { part: Part; rest: THREE.Vector3; b: Brush }[] = [];
     const avg = new Map<Part, { c: THREE.Color; n: number; m: number; r: number }>();
     const sum = new THREE.Color(0, 0, 0);
     let count = 0;
     for (const part of p.ch.parts) {
       const pos = part.mesh.geometry.getAttribute("position");
-      const uv = part.mesh.geometry.getAttribute("uv") as THREE.BufferAttribute;
-      const step = Math.max(1, Math.floor(pos.count / 110));
+      const step = Math.max(1, Math.floor(pos.count / 260));
       const acc = { c: new THREE.Color(0, 0, 0), n: 0, m: 0, r: 0 };
       avg.set(part, acc);
       for (let i = 0; i < pos.count; i += step) {
-        const wp = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(part.mesh.matrixWorld);
+        const wp = vertexWorld(part.mesh, i, new THREE.Vector3());
         const dir = wp.clone().sub(vantage).normalize();
         this.ray.set(wp.clone().addScaledVector(dir, 0.02), dir);
         this.ray.far = 50;
@@ -1704,7 +2055,7 @@ export class Engine {
         acc.c.add(c); acc.n++; acc.m += metal; acc.r += rough;
         sum.add(c);
         count++;
-        jobs.push({ part, uv: new THREE.Vector2().fromBufferAttribute(uv, i), b: { color: `#${c.getHexString()}`, alpha: 1, metal, rough, emis: 0 } });
+        jobs.push({ part, rest: new THREE.Vector3().fromBufferAttribute(pos, i), b: { color: `#${c.getHexString()}`, alpha: 1, metal, rough, emis: 0 } });
       }
     }
     if (lazy && count) {
@@ -1716,7 +2067,7 @@ export class Engine {
       if (!a.n) continue;
       fillPart(part, { color: `#${a.c.multiplyScalar(1 / a.n).getHexString()}`, alpha: 1, metal: a.m / a.n, rough: a.r / a.n, emis: 0 });
     }
-    for (const j of jobs) paintDot(j.part, j.uv, j.b, 0.09);
+    for (const j of jobs) paintSphere(j.part, j.rest, j.b, 0.065);
   }
 
   private updateBot(p: Player, dt: number) {
@@ -1915,7 +2266,9 @@ export class Engine {
     const c1 = new THREE.Color(), c2 = new THREE.Color();
     for (let k = 0; k < K; k++) {
       const smp = h.samples[Math.floor(Math.random() * h.samples.length)];
-      const wp = smp.local.clone().applyMatrix4(smp.mesh.matrixWorld);
+      const wp = vertexWorld(smp.mesh, smp.index, new THREE.Vector3());
+      const nrm = smp.mesh.geometry.getAttribute("normal");
+      if (nrm) wp.addScaledVector(new THREE.Vector3().fromBufferAttribute(nrm, smp.index).transformDirection(smp.mesh.matrixWorld), -0.02);
       const dir = wp.clone().sub(eye);
       const dd = dir.length();
       dir.normalize();
@@ -1951,7 +2304,7 @@ export class Engine {
   // ================= נקודות החמצה (見逃しポイント) + שריקה =================
 
   private updatePoints(dt: number) {
-    if (this.rs.ph !== "hunt" || !this.rs.s.missed || this.rs.s.mode === "double") return;
+    if (this.rs.ph !== "hunt" || this.rs.s.mode === "double") return;
     this.ptsT -= dt;
     if (this.ptsT > 0) return;
     this.ptsT = 0.5;
@@ -2048,7 +2401,7 @@ export class Engine {
     this.net.emit("like", { to: this.likeTarget.id });
     const p = this.players.get(this.likeTarget.id);
     if (p) { p.likes += 1; this.updateLabel(p); }
-    if (!this.opts.muted) sfxCorrect();
+    this.fx.likeSound();
     this.emit();
   }
 
@@ -2076,6 +2429,7 @@ export class Engine {
     if (!d || typeof d.m !== "string") return;
     const p = this.players.get(from);
     this.addChat(p?.name ?? "?", p?.color ?? "#ffffff", d.m.slice(0, 120));
+    this.fx.chatSound();
   }
   private addChat(name: string, color: string, m: string) {
     this.chat = [...this.chat, { id: ++this.chatId, name, color, m, t: Date.now() }].slice(-8);
@@ -2116,12 +2470,13 @@ export class Engine {
     const p = this.players.get(from);
     if (!p || !d || !Array.isArray(d.ops)) return;
     for (const op of d.ops.slice(0, 200)) {
-      if (!Array.isArray(op) || op[0] !== "d") continue;
-      const part = Number.isInteger(op[1]) ? p.ch.parts[op[1] as number] : undefined;
-      const nums = [op[2], op[3], op[4], op[6], op[7], op[8], op[9]];
+      // ["p", x, y, z, רדיוס, צבע, שקיפות, מתכת, חספוס, זוהר] — נקודה על הגוף בתנוחת המנוחה
+      if (!Array.isArray(op) || op[0] !== "p") continue;
+      const part = p.ch.parts[0];
+      const nums = [op[1], op[2], op[3], op[4], op[6], op[7], op[8], op[9]];
       if (!part || !HEX.test(String(op[5])) || !nums.every(Number.isFinite)) continue;
       const b: Brush = { color: String(op[5]), alpha: Math.min(1, Math.max(0, op[6])), metal: op[7], rough: op[8], emis: op[9] };
-      paintDot(part, new THREE.Vector2(op[2], op[3]), b, Math.min(0.5, op[4]));
+      paintSphere(part, new THREE.Vector3(op[1], op[2], op[3]), b, Math.min(0.3, op[4]));
     }
   }
 
@@ -2170,6 +2525,7 @@ export class Engine {
       layer.ctx.globalAlpha = 1;
       layer.ctx.drawImage(img, 0, 0, layer.canvas.width, layer.canvas.height);
       layer.texture.needsUpdate = true;
+      invalidatePaint(part);
     };
     img.src = url;
   }
@@ -2185,19 +2541,20 @@ export class Engine {
     return m.role === "hunter" && ph === "hide"; // גם ציידים יכולים להיצבע בזמן ההמתנה
   }
 
-  private paintAt(part: Part, uv: THREE.Vector2, prev: THREE.Vector2 | null, prevPart: Part | null) {
-    const pi = this.me.ch.parts.indexOf(part);
-    if (pi < 0) return;
+  /** צובעים סביב נקודה על הגוף (בתנוחת המנוחה); prev = הנקודה הקודמת בקו */
+  private paintAt(part: Part, at: THREE.Vector3, prev: THREE.Vector3 | null) {
     const r = this.brushSize / 2;
     const b = this.brush;
-    const send = (q: THREE.Vector2) => this.queuePaintOp(["d", pi, r3(q.x), r3(q.y), r3(r), b.color, r2(b.alpha), r2(b.metal), r2(b.rough), r2(b.emis)]);
-    if (prev && prevPart === part && prev.distanceTo(uv) <= 0.35) {
-      paintLine(part, prev, uv, b, r);
-      const steps = Math.max(1, Math.ceil(prev.distanceTo(uv) / Math.max(0.004, r * 0.8)));
-      for (let i = 1; i <= steps; i++) send(new THREE.Vector2().lerpVectors(prev, uv, i / steps));
+    const nowB = performance.now();
+    if (nowB - this.brushT > 90) { this.brushT = nowB; this.fx.brushSound(); }
+    const send = (q: THREE.Vector3) => this.queuePaintOp(["p", r3(q.x), r3(q.y), r3(q.z), r3(r), b.color, r2(b.alpha), r2(b.metal), r2(b.rough), r2(b.emis)]);
+    if (prev && prev.distanceTo(at) <= 0.5) {
+      paintSegment(part, prev, at, b, r);
+      const steps = Math.max(1, Math.ceil(prev.distanceTo(at) / Math.max(0.004, r * 0.8)));
+      for (let i = 1; i <= steps; i++) send(new THREE.Vector3().lerpVectors(prev, at, i / steps));
     } else {
-      paintDot(part, uv, b, r);
-      send(uv);
+      paintSphere(part, at, b, r);
+      send(at);
     }
   }
 
@@ -2224,7 +2581,7 @@ export class Engine {
     const pp = this.pickPreview;
     this.brush = { ...this.brush, color: pp.color, metal: pp.metal, rough: pp.rough, emis: pp.emis };
     this.addHistory(pp.color);
-    if (!this.opts.muted) sfxClick();
+    this.fx.pickSound();
     this.emit();
   }
   private addHistory(c: string) {
@@ -2260,14 +2617,14 @@ export class Engine {
         case "Digit1": this.whistle(); break;
         case "Digit2": this.toggleNameplates(); break;
         case "Digit3": this.setXray(!this.xray); break;
-        case "Digit4": if (this.spectating()) this.cycleSpectate(); break;
-        case "Digit5": this.toggleFreeCam(); break;
+        case "Digit4": this.toggleFreeCam(); break;
+        case "Digit5": this.toggleFreeLook(); break;
         case "KeyG": this.giveLike(); break;
         case "KeyY": this.voteSkip(); break;
         case "KeyT": e.preventDefault(); this.unlockPointerIfNeeded(); this.onChatKey?.(); break;
         case "KeyE": if (this.nearPlay()) { this.unlockPointerIfNeeded(); this.onInteract?.(); } break;
         case "KeyV": if (this.hud.paintMode) this.setShadow(!this.shadow); break;
-        case "ShiftLeft": case "ShiftRight": this.detach(); break;
+        case "Escape": if (!this.pointerLocked) this.onOptions?.(); break;
       }
     });
     this.listen(window, "keyup", (e: KeyboardEvent) => {
@@ -2301,7 +2658,7 @@ export class Engine {
       if (e.button === 0) this.lmb = true;
       if (e.button === 2) {
         this.rmb = true;
-        if (this.me.armed && !this.hud.paintMode && (this.rs.ph === "hide" || this.rs.ph === "hunt")) { this.tps = !this.tps; this.updateVisibility(this.me); this.emit(); }
+        if (this.me.armed && !this.hud.paintMode && (this.rs.ph === "hide" || (this.rs.ph === "hunt" && this.rs.s.hunterTps))) { this.tps = !this.tps; this.updateVisibility(this.me); this.emit(); }
       }
       if (this.pointerLocked) {
         if (e.button === 0) this.fire();
@@ -2309,7 +2666,7 @@ export class Engine {
       }
       try { cv.setPointerCapture(e.pointerId); } catch { /* ignore */ }
       let mode: "cam" | "paint" | "size" = "cam";
-      let uv: THREE.Vector2 | null = null;
+      let uv: THREE.Vector3 | null = null;
       let part: Part | null = null;
       if (this.hud.paintMode && !(e.altKey && e.button === 0) && e.button !== 1) {
         if (e.button === 2) mode = "size";
@@ -2319,8 +2676,8 @@ export class Engine {
             part = this.me.ch.parts.find((pp) => pp.mesh === hit.object) ?? null;
             if (part) {
               mode = "paint";
-              uv = hit.uv!.clone();
-              this.paintAt(part, uv, null, null);
+              uv = restPoint(hit);
+              if (uv) this.paintAt(part, uv, null);
             }
           }
         }
@@ -2338,9 +2695,10 @@ export class Engine {
       if (p.mode === "paint") {
         const hit = this.pickOwnBody(e.clientX, e.clientY);
         const part = hit ? this.me.ch.parts.find((pp) => pp.mesh === hit.object) ?? null : null;
-        if (hit && hit.uv && part) {
-          this.paintAt(part, hit.uv, p.uv, p.part);
-          p.uv = hit.uv.clone();
+        const at = hit ? restPoint(hit) : null;
+        if (at && part) {
+          this.paintAt(part, at, p.part === part ? p.uv : null);
+          p.uv = at;
           p.part = part;
         } else { p.uv = null; p.part = null; }
         return;
@@ -2389,13 +2747,22 @@ export class Engine {
     if (pointerType === "mouse" && button === 0 && !this.pointerLocked) this.requestLock();
   }
 
-  private canFreeCam() {
+  private deadOrSpec() {
     const ph = this.rs.ph;
     return ph === "check" || ((ph === "hide" || ph === "hunt") && (!this.me.alive || this.me.role === "spectator"));
   }
-
+  /** 5 — מצלמה חופשית: הדמות נשארת במקום והמצלמה חופשית להסתכל (לבדוק את ההסוואה) */
+  toggleFreeLook() {
+    if (this.me.armed && (this.rs.ph === "hunt" || this.rs.ph === "hide") && this.me.alive) return;
+    if (this.deadOrSpec()) { this.toggleFreeCam(); return; }
+    this.freeLook = !this.freeLook;
+    if (!this.freeLook) this.freeCam = false;
+    this.hud.paintMode = false;
+    this.emit();
+  }
+  /** 4 — תנועה חופשית של המצלמה (WASD, Shift מהר, רווח למעלה, Ctrl למטה) */
   toggleFreeCam() {
-    if (!this.canFreeCam()) return;
+    if (!this.deadOrSpec() && !this.freeLook) return;
     this.freeCam = !this.freeCam || this.rs.ph === "check";
     this.specTarget = null;
     this.specPos.copy(this.camera.position);
@@ -2436,8 +2803,21 @@ export class Engine {
   setJoystick(x: number, y: number) { this.joy.x = x; this.joy.y = y; }
   jump() { if (!this.attached) this.wantJump = true; }
   lookDelta(dx: number, dy: number) {
-    this.camYaw -= dx * 0.006;
-    this.camPitch = Math.max(-1.2, Math.min(1.35, this.camPitch + dy * 0.005));
+    this.camYaw -= dx * 0.006 * this.sens;
+    this.camPitch = Math.max(-1.2, Math.min(1.35, this.camPitch + dy * 0.005 * this.sens));
+  }
+  // ----- Options (Esc) -----
+  setSensitivity(v: number) { this.sens = Math.max(0.1, Math.min(3, v)); }
+  setShadowQuality(q: 0 | 1 | 2) {
+    this.renderer.shadowMap.enabled = q > 0;
+    const size = q === 2 ? 2048 : 1024;
+    if (this.sun.shadow.mapSize.x !== size) { this.sun.shadow.mapSize.set(size, size); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
+    this.scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.needsUpdate = true; });
+  }
+  setPerformance(v: boolean) {
+    this.perfMode = v;
+    this.renderer.setPixelRatio(v ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+    this.resize();
   }
   togglePaint() {
     if (!this.canPaint() && !this.hud.paintMode) return;
@@ -2515,6 +2895,50 @@ export class Engine {
     try { (this.renderer.domElement.requestPointerLock() as unknown as Promise<void> | undefined)?.catch?.(() => {}); } catch { /* לא נתמך */ }
   }
 
+  /** מצב 逆算チキンレース: הציידים רואים איך כל זיקית נראית (הצבע והתנוחה שלה) */
+  private renderPortraits() {
+    const size = 128;
+    const rt = new THREE.WebGLRenderTarget(size, size);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#2b2f3a");
+    scene.add(new THREE.HemisphereLight("#ffffff", "#555555", 1.6));
+    const dl = new THREE.DirectionalLight("#ffffff", 1.4);
+    dl.position.set(2, 4, 3);
+    scene.add(dl);
+    const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 30);
+    const buf = new Uint8Array(size * size * 4);
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = size;
+    const g = cv.getContext("2d")!;
+    const out: { id: string; name: string; url: string }[] = [];
+    for (const p of this.players.values()) {
+      if (this.rs.roles[p.id] !== "hider") continue;
+      const ch = buildCharacter({ bodyType: p.bodyType });
+      copyPaint(p.ch, ch);
+      applyPose(ch, p.pose);
+      scene.add(ch.root);
+      ch.root.updateMatrixWorld(true);
+      const box = poseBox(ch);
+      const c = box.getCenter(new THREE.Vector3());
+      const r = Math.max(...box.getSize(new THREE.Vector3()).toArray()) * 0.62;
+      cam.position.set(c.x + r * 1.1, c.y + r * 0.6, c.z + r * 2.6);
+      cam.lookAt(c);
+      this.renderer.setRenderTarget(rt);
+      this.renderer.render(scene, cam);
+      this.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
+      const img = g.createImageData(size, size);
+      for (let y = 0; y < size; y++) img.data.set(buf.subarray((size - 1 - y) * size * 4, (size - y) * size * 4), y * size * 4);
+      g.putImageData(img, 0, 0);
+      out.push({ id: p.id, name: p.name, url: cv.toDataURL("image/png") });
+      scene.remove(ch.root);
+      disposeCharacter(ch);
+    }
+    this.renderer.setRenderTarget(null);
+    rt.dispose();
+    this.portraits = out;
+    this.emit();
+  }
+
   /** אייקוני התנוחות — מצולמים מהבובה עצמה */
   poseIcons(): Record<string, string> {
     if (this.poseIconCache) return this.poseIconCache;
@@ -2537,7 +2961,7 @@ export class Engine {
     for (const pose of POSES) {
       applyPose(ch, pose);
       ch.root.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(ch.root);
+      const box = poseBox(ch);
       const c = box.getCenter(new THREE.Vector3());
       const s = box.getSize(new THREE.Vector3());
       const r = Math.max(s.x, s.y, s.z) * 0.62;
@@ -2594,6 +3018,16 @@ export class Engine {
     h.room = this.world.roomAt(m.pos.x, m.pos.z);
     h.locked = this.pointerLocked;
     h.freeCam = this.freeCam;
+    h.freeLook = this.freeLook;
+    h.finds = rs.s.mode === "double" ? this.myFinds.size : this.myFindCount;
+    const nowT = performance.now();
+    h.cloneSlots = this.cloneReady.map((t) => (t <= nowT ? 1 : Math.max(0, 1 - (t - nowT) / (CLONE_CD * 1000))));
+    const showRank = (rs.ph === "hunt" || rs.ph === "hide") && rs.s.mode !== "double" && (m.role !== "hunter" || rs.s.missed);
+    h.ranking = showRank ? [...this.players.values()].filter((p) => rs.roles[p.id] === "hider" && !rs.conv.includes(p.id))
+      .map((p) => ({ id: p.id, name: p.name, color: p.color, pts: Math.floor(p.pts), me: p.local })).sort((a, b) => b.pts - a.pts).slice(0, 10) : [];
+    h.portraits = rs.s.mode === "rcr" && rs.ph === "hunt" ? this.portraits.map((q) => ({ ...q, found: rs.dead.includes(q.id) })) : [];
+    const f = rs.s.filters;
+    h.filters = (rs.ph === "hide" || rs.ph === "hunt") && this.worldId !== "lobby" && (f.mono || f.horror || f.mosaic);
     h.spectating = this.spectating() ? (this.specTarget ? this.players.get(this.specTarget)?.name ?? "" : "") : null;
     h.tps = this.tps;
     h.attached = !!this.attached;

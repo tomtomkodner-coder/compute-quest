@@ -10,6 +10,32 @@ function getCtx() {
   return ctx;
 }
 
+let masterVolume = 1;
+/** עוצמה כללית 0..1 (מתפריט ההגדרות) */
+export function setVolume(v: number) {
+  masterVolume = Math.max(0, Math.min(1, v));
+}
+
+/** פרץ רעש מסונן (יריות, קליקים, התזות) */
+export function playNoise(duration = 0.2, volume = 0.2, freq = 2000, type: BiquadFilterType = "lowpass", delay = 0) {
+  if (masterMuted) return;
+  const ac = getCtx();
+  if (!ac) return;
+  const len = Math.max(1, Math.floor(ac.sampleRate * duration));
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = freq;
+  const g = ac.createGain();
+  g.gain.value = volume * masterVolume;
+  src.connect(f).connect(g).connect(ac.destination);
+  src.start(ac.currentTime + delay);
+}
+
 export function setMuted(v: boolean) {
   masterMuted = v;
   if (v) stopMusic();
@@ -23,7 +49,7 @@ export function playTone(freq: number, duration = 0.15, type: OscillatorType = "
   const gain = ac.createGain();
   osc.type = type;
   osc.frequency.value = freq;
-  gain.gain.setValueAtTime(volume, ac.currentTime);
+  gain.gain.setValueAtTime(Math.max(0.0001, volume * masterVolume), ac.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + duration);
   osc.connect(gain).connect(ac.destination);
   osc.start();
