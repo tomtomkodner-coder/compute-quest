@@ -323,7 +323,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
 
           {/* שמאל למעלה: בלובי בלבד — יציאה, קוד, שחקנים */}
           <div className="absolute top-2 left-2 z-20 flex flex-col gap-1.5 items-start">
-            {(hud.phase === "lobby" || touch) && (
+            {touch && (
               <div className="flex gap-1.5">
                 <button onClick={onExit} className="hud-btn rounded-xl bg-black/50 px-2.5 py-1.5 text-xs font-bold"><X className="w-4 h-4 inline" /> {t("Leave")}</button>
                 <button onClick={() => setOptionsOpen(true)} className="hud-btn rounded-xl bg-black/50 p-1.5" aria-label="Settings"><Gear className="w-4 h-4" /></button>
@@ -402,14 +402,10 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           {hud.phase === "lobby" && !overlayOpen && (
             <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-none">
               {hud.nearPlay ? (
-                <div className="rounded-2xl bg-black/60 px-4 py-2 text-lg font-black pointer-events-auto cursor-pointer" onClick={() => setSettingsOpen(true)}>
-                  <Key k="E" /> {hud.isHost ? t("Game Settings / Start") : t("Game Settings")}
+                <div className="flex items-center gap-2 rounded bg-black/55 border border-white/15 px-3 py-1.5 text-[15px] font-bold pointer-events-auto cursor-pointer" onClick={() => setSettingsOpen(true)}>
+                  <KeyBox k="E" /> {t("Configure Map")}
                 </div>
-              ) : (
-                <div className="text-sm font-bold text-center" style={{ textShadow: OUTLINE }}>
-                  {t("Walk to")} <b className="text-[#ffd23f]">PLAY</b> {t("and press")} <Key k="E" /> · {t("Stand on the red")} <b className="text-[#ff4d4d]">HUNTER</b> {t("pad to be a hunter")}
-                </div>
-              )}
+              ) : null}
               {hud.onPad && <div className="text-xl font-black text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>{t("You will be a HUNTER")}</div>}
               {touch && <div className="flex gap-2 pointer-events-auto">
                 <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-black border-2 border-black">{t("Settings")}</button>
@@ -449,10 +445,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           {/* בדיקת תשובות */}
           {hud.phase === "check" && <CheckPanel hud={hud} onLike={() => e?.giveLike()} />}
 
-          {/* מגע: ביטול נעילה */}
-          {hud.locked && !hud.paintMode && hud.phase !== "check" && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-[11px] font-bold opacity-80" style={{ textShadow: OUTLINE }}>{t("Esc to release the mouse")}</div>
-          )}
+
 
           {/* בלובי: כפתור השתקה בפינה הימנית התחתונה (כמו במשחק) */}
           {hud.phase === "lobby" && !overlayOpen && (
