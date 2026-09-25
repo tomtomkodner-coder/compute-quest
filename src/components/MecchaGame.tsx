@@ -211,7 +211,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         else if (conn.kind === "p2p") net = await netMod.createP2PNet(conn.code, conn.host);
         else net = netMod.createLocalNet();
         const { Engine } = await import("@/game/meccha/engine");
-        await (await import("@/game/meccha/character")).loadCharacterModels();
+        await Promise.all([(await import("@/game/meccha/character")).loadCharacterModels(), (await import("@/game/meccha/paintings")).loadPaintings()]);
         if (!alive || !mountRef.current) { if (net.kind === "p2p") net.close(); return; }
         eng = new Engine(mountRef.current, net, { name, color, muted, defaultBots: net.kind === "local" ? 3 : 0, onHud: setHud });
         eng.onPoseMenu = (open) => {

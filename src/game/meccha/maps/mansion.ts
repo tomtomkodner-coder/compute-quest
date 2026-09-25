@@ -5,6 +5,7 @@
 // room with taped boxes; a blue-damask room; an arched wooden library; a restaurant kitchen with blue hex tile;
 // cold storage with meat shelves; a laundry basement with clothes lines and towel piles; a green-tiled bathroom;
 // and a brick basement with a bronze rearing horse.
+import { PAINTINGS, pickPainting, realPaintingTex } from "../paintings";
 import * as THREE from "three";
 import * as X from "./tex/mansion";
 import { Kit, type Mat, type World } from "./kit";
@@ -308,7 +309,8 @@ export function buildMansion(): World {
   const mGreenShade = M(null, "#12a032", 1, { roughness: 0.2, emissive: "#20c040", emissiveIntensity: 0.45 });
   const mLampWhite = M(null, "#ffffff", 1, { roughness: 0.5, emissive: "#fff8ea", emissiveIntensity: 1.6, shadow: false });
   const mWindow = M(tx("night", () => X.nightWindow()), "#fff", 1, { emissive: "#ffffff", emissiveIntensity: 0.6, roughness: 0.1 });
-  const mPaint = M(tx("paint", () => X.paintingAtlas()), "#fff", 1, { roughness: 0.55, bump: 0.2 });
+  const usedPaintings = new Set<number>();
+  const paintMats = new Map<number, ReturnType<typeof M>>();
   const mPoster = M(tx("poster2", () => X.posterAtlas2()), "#fff", 1, { roughness: 0.7, bump: 0.15 });
   const mClock = M(tx("clock", () => X.clockFace()), "#fff", 1, { roughness: 0.4 });
   const mMirror = M(null, "#c9d2d6", 1, { metalness: 1, roughness: 0.04 });
@@ -444,10 +446,13 @@ export function buildMansion(): World {
       box(mGold, f, h, 0.07, w / 2 + f / 2, -h / 2, 0.035, { r: 0.025 });
       box(mGoldDark, w + 0.02, 0.03, 0.04, 0, h / 2 - 0.025, 0.02);
       box(mGoldDark, w + 0.02, 0.03, 0.04, 0, -h / 2 - 0.005, 0.02);
-      const cx = cell % 4, cy = Math.floor(cell / 4);
-      const asp = w / h;
-      const cw = asp >= 1 ? 1 : asp, ch = asp >= 1 ? 1 / asp : 1;
-      plane(mPaint, w, h, 0, 0, 0.012, 0, [(cx + (1 - cw) / 2) / 4, (3 - cy + (1 - ch) / 2) / 4, cw / 4, ch / 4]);
+      // ציור אמיתי מפורסם (ואן גוך / דה וינצ'י / ורמר / מונה) בקירוב היחס של המסגרת
+      const pi = pickPainting(w / h, usedPaintings, cell);
+      let pm = paintMats.get(pi);
+      if (!pm) { pm = M(realPaintingTex(pi), "#fff", 1, { roughness: 0.6, bump: 0 }); paintMats.set(pi, pm); }
+      const pa = PAINTINGS[pi].w / PAINTINGS[pi].h, fa = w / h;
+      const uw = pa > fa ? fa / pa : 1, vh = pa > fa ? 1 : pa / fa;
+      plane(pm, w, h, 0, 0, 0.012, 0, [(1 - uw) / 2, (1 - vh) / 2, uw, vh]);
     });
   }
   /** framed poster (cell of posterAtlas2: 0 BOOKMAN, 1 bread, 2 clown, 3 portrait); y = centre */
