@@ -311,3 +311,49 @@ export const palette = () =>
       g.fill();
     });
   });
+
+/** קיר לבנים אדום (כמו בתמונת המפתח של המשחק): 32 שורות × 12 לבנים לאריח של 2.5 מ' */
+export const brickWall = (seed = 21) =>
+  makeTex(512, 512, (g, w, h) => {
+    let s = seed;
+    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    g.fillStyle = "#cdbfae";
+    g.fillRect(0, 0, w, h);
+    const pal = ["#9a4430", "#a9523a", "#8a3a28", "#b35f45", "#93432f", "#7d3325", "#a24c36", "#b86a4d"];
+    const rows = 32, cols = 12, bw = w / cols, bh = h / rows;
+    for (let y = 0; y < rows; y++)
+      for (let x = -1; x <= cols; x++) {
+        const px = x * bw + (y % 2) * (bw / 2) + 1.5, py = y * bh + 1.5;
+        g.fillStyle = pal[Math.floor(r() * pal.length)];
+        g.fillRect(px, py, bw - 3, bh - 3);
+        g.fillStyle = `rgba(0,0,0,${r() * 0.12})`;
+        g.fillRect(px, py + bh * 0.55, bw - 3, bh * 0.45 - 3);
+        g.fillStyle = `rgba(255,235,210,${r() * 0.08})`;
+        g.fillRect(px, py, bw - 3, 2);
+      }
+    for (let i = 0; i < 1800; i++) { // נקבוביות ושחיקה
+      g.fillStyle = `rgba(${r() < 0.5 ? "0,0,0" : "255,240,220"},${0.05 + r() * 0.1})`;
+      g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
+    }
+  });
+
+/** כתם צבע שפוך (שקוף מסביב) — צבע אחד לכל טקסטורה */
+export const splat = (color: string, seed = 1) =>
+  makeTex(256, 256, (g, w, h) => {
+    let s = seed * 7919 + 13;
+    const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = color;
+    const cx = w / 2, cy = h / 2;
+    g.beginPath();
+    for (let k = 0; k <= 28; k++) {
+      const a = (k / 28) * Math.PI * 2, rr = 52 + r() * 34;
+      const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+      if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.fill();
+    for (let k = 0; k < 16; k++) { // טיפות מסביב
+      const a = r() * Math.PI * 2, d = 80 + r() * 40, rr = 3 + r() * 9;
+      g.beginPath(); g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, rr, 0, 7); g.fill();
+    }
+  });

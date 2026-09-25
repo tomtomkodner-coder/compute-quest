@@ -84,7 +84,9 @@ export function buildLobby(): World {
 
   // ---------- חומרים ----------
   const plasterT = k.tex("lb-plaster", () => L.plaster("#ebe5da", 2));
-  const plasterM = k.mat(plasterT, "#fff", [1, 1], { bump: 0.2, roughness: 0.93 });
+  void plasterT;
+  // קירות לבנים אדומות כמו בתמונת המפתח של המשחק (דמות צבועה על קיר לבנים)
+  const plasterM = k.mat(k.tex("lb-brick", () => L.brickWall()), "#fff", [1, 1], { bump: 0.9, roughness: 0.9 });
   const accentM = k.mat(k.tex("lb-accent", () => L.plaster("#2c5360", 6)), "#fff", [1, 1], { bump: 0.2, roughness: 0.9 });
   const ceilM = k.mat(k.tex("lb-ceil", () => L.plaster("#f7f6f3", 8)), "#fff", [1, 1], { bump: 0.15, roughness: 0.95 });
   const wainT = k.tex("lb-wain", () => L.wainscot("#34505b"));
@@ -534,6 +536,39 @@ export function buildLobby(): World {
 
   // ---------- נקודות הופעה ----------
   const hiders = [...ring(0, 0, 4.2, 12), ...ring(0, 0, 5.4, 12).map((v) => v.applyAxisAngle(new V3(0, 1, 0), Math.PI / 12))];
+  // ---------- כתמי צבע שפוכים על הקירות והרצפה + פחי צבע (סטודיו ציור, כמו האווירה של המשחק) ----------
+  {
+    const COLS = ["#ff3d7f", "#ffb700", "#3ec7ff", "#7cf23a", "#ff6a00", "#b04dff", "#ffffff", "#1d6bff"];
+    const sm = COLS.map((c, i) => k.mat(k.tex("lb-splat" + i, () => L.splat(c, i + 1)), "#fff", [1, 1], { transparent: true, bump: 0, roughness: 0.3 }));
+    let q = 3;
+    const rnd = () => ((q = (q * 16807) % 2147483647) / 2147483647);
+    // על הקירות (צפון/דרום/מערב), מעל הלוחות
+    const wallSpots: [number, number, number, number][] = [
+      [-8.5, 1.2, IN.n + 0.02, 0], [-3.2, 3.9, IN.n + 0.02, 0], [4.8, 1.0, IN.n + 0.02, 0], [8.9, 3.6, IN.n + 0.02, 0],
+      [-7.4, 3.8, IN.s - 0.02, Math.PI], [-1.8, 0.9, IN.s - 0.02, Math.PI], [3.6, 4.0, IN.s - 0.02, Math.PI], [9.2, 1.3, IN.s - 0.02, Math.PI],
+      [IN.w + 0.02, 3.9, -5.5, Math.PI / 2], [IN.w + 0.02, 1.1, 1.8, Math.PI / 2], [IN.w + 0.02, 4.1, 6.4, Math.PI / 2],
+    ];
+    wallSpots.forEach(([x, y, z, ry], i) => { const sz = 0.9 + rnd() * 1.1; k.panel(sz, sz, x, y, z, sm[i % sm.length], ry); });
+    // על הרצפה (לא על המשטח האדום ולא מול הכן)
+    for (let i = 0; i < 16; i++) {
+      const x = (rnd() - 0.5) * 20, z = (rnd() - 0.5) * 16;
+      if (Math.hypot(x, z) < padR + 0.6 || (Math.abs(x) < 1.6 && z < -4.6)) continue;
+      const sz = 0.5 + rnd() * 1.0;
+      k.add(new THREE.PlaneGeometry(sz, sz), sm[i % sm.length], [x, 0.006 + i * 0.0004, z], { rotX: -Math.PI / 2, noShadow: true });
+    }
+    // פחי צבע פתוחים, עם שפיכה מתחתיהם
+    const tinM = k.mat(null, "#c9ccd0", [1, 1], { metalness: 0.85, roughness: 0.35 });
+    const cans: [number, number, number][] = [[-9.6, -7.6, 0], [-9.0, -7.9, 2], [-9.9, -7.0, 3], [9.4, 7.6, 1], [8.8, 7.9, 5], [-9.7, 7.5, 7], [-9.1, 7.8, 4], [2.2, -7.9, 6]];
+    for (const [x, z, c] of cans) {
+      k.add(new THREE.CylinderGeometry(0.16, 0.16, 0.24, 24), tinM, [x, 0.12, z], { solid: false });
+      k.add(new THREE.CircleGeometry(0.15, 24), k.mat(null, COLS[c], [1, 1], { roughness: 0.25 }), [x, 0.241, z], { rotX: -Math.PI / 2, noShadow: true });
+      k.add(new THREE.TorusGeometry(0.155, 0.012, 6, 24), tinM, [x, 0.24, z], { rotX: Math.PI / 2, noShadow: true });
+    }
+    k.collider(-10.2, -8.6, -8.3, -6.6, 0, 0.26, true);
+    k.collider(8.4, 9.8, 7.2, 8.3, 0, 0.26, true);
+    k.collider(-10.2, -8.6, 7.1, 8.3, 0, 0.26, true);
+  }
+
   return k.finish({
     id: "lobby", name: "Lobby",
     bounds: { minX: -10.8, maxX: 10.8, minZ: -8.8, maxZ: 8.8 },
