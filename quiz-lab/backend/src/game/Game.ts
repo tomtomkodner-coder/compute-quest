@@ -7,6 +7,7 @@ import {
   USERNAME_MAX,
   USERNAME_MIN,
   type AnswerId,
+  type AnswerKey,
   type AnswerResult,
   type AnyServerEvent,
   type GamePhase,
@@ -494,6 +495,21 @@ export class Game extends TypedEmitter<GameEvents> {
     return [...this.players.values()]
       .sort((a, b) => b.score - a.score || b.correctCount - a.correctCount || a.joinedAt - b.joinedAt)
       .map((p, i) => ({ rank: i + 1, playerId: p.id, username: p.username, score: p.score, correctCount: p.correctCount }));
+  }
+
+  /** Full answer key (host only). */
+  answerKey(): AnswerKey {
+    return {
+      pin: this.pin,
+      currentIndex: this.currentIndex,
+      questions: this.questions.map((q, index) => ({
+        index,
+        id: q.id,
+        text: q.text,
+        answers: q.answers.map((a) => ({ ...a })),
+        correctAnswerId: q.correctAnswerId,
+      })),
+    };
   }
 
   getResults(): GameResults {

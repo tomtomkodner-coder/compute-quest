@@ -1,6 +1,7 @@
 import { TypedEmitter } from "../emitter";
 import type {
   AnswerId,
+  AnswerKey,
   CreateGameRequest,
   CreateGameResponse,
   GameResults,
@@ -98,5 +99,9 @@ export class MockHostAPI extends TypedEmitter<{ network: NetworkEntry }> {
   }
   reset(): Promise<GameState> {
     return this.host("/dev/reset");
+  }
+  /** All questions with their correct answers (requires the host token). */
+  answerKey(): Promise<AnswerKey> {
+    return this.http.request("GET", "/dev/answer-key", { query: { pin: this.pin }, headers: this.headers() });
   }
 }

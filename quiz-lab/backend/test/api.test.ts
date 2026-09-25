@@ -141,3 +141,15 @@ describe("MockGameAPI + WebSocket events", () => {
     await waitFor(() => changes.some((c) => c.fatal === true));
   });
 });
+
+describe("answer key", () => {
+  it("returns all correct answers to the host only", async () => {
+    const host = new MockHostAPI(ctx.url);
+    await host.createGame({ questionCount: 5 });
+    const key = await host.answerKey();
+    expect(key.questions).toHaveLength(5);
+    expect(key.questions.every((q) => q.answers.some((a) => a.id === q.correctAnswerId))).toBe(true);
+    const denied = await fetch(`${ctx.url}/dev/answer-key?pin=${host.pin}`, { headers: { "X-Host-Token": "nope" } });
+    expect(denied.status).toBe(403);
+  });
+});

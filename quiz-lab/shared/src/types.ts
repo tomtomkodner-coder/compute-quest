@@ -134,6 +134,19 @@ export interface AnswerResult {
   rank?: number;
 }
 
+/** Full answer key of a game (host only — Developer Mode / solo games). */
+export interface AnswerKey {
+  pin: string;
+  currentIndex: number;
+  questions: Array<{
+    index: number;
+    id: string;
+    text: string;
+    answers: AnswerOption[];
+    correctAnswerId: AnswerId;
+  }>;
+}
+
 export interface GameResults {
   pin: string;
   phase: GamePhase;

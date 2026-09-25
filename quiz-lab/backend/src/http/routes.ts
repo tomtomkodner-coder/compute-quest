@@ -142,5 +142,14 @@ export function createRouter(store: GameStore): Router {
   host("/dev/end-game", (g) => g.endGame());
   host("/dev/reset", (g) => g.reset());
 
+  r.get("/dev/answer-key", (req, res) => {
+    const game = store.require(pinFrom(req));
+    const token = str(req.header("x-host-token")) || str(req.query.hostToken);
+    if (!token || token !== game.hostToken) {
+      throw new GameError("invalid_host_token", "A valid host token is required for this action", 403);
+    }
+    res.json(game.answerKey());
+  });
+
   return r;
 }

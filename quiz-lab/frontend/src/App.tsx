@@ -4,14 +4,15 @@ import { Dashboard } from "./pages/Dashboard";
 import { Developer } from "./pages/Developer";
 import { Plugins } from "./pages/Plugins";
 import { Settings } from "./pages/Settings";
+import { Simple } from "./pages/Simple";
 import { useSettings } from "./state/lab";
 import { useToasts } from "./state/toasts";
 
-const PAGES: Page[] = ["dashboard", "plugins", "developer", "settings"];
+const PAGES: Page[] = ["simple", "dashboard", "plugins", "developer", "settings"];
 
 function pageFromHash(): Page {
   const h = window.location.hash.replace("#/", "") as Page;
-  return PAGES.includes(h) ? h : "dashboard";
+  return PAGES.includes(h) ? h : "simple";
 }
 
 export function App() {
@@ -43,6 +44,7 @@ export function App() {
     <div className="app">
       <Sidebar page={current} onNavigate={navigate} />
       <main className="main">
+        {current === "simple" && <Simple />}
         {current === "dashboard" && <Dashboard />}
         {current === "plugins" && <Plugins />}
         {current === "developer" && <Developer />}

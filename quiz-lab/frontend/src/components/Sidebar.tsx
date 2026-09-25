@@ -2,10 +2,10 @@ import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { lab, useLab, useSettings } from "../state/lab";
 import { toast } from "../state/toasts";
-import { IconCode, IconDashboard, IconPlug, IconSettings, IconShield } from "./Icons";
+import { IconBolt, IconCode, IconDashboard, IconPlug, IconSettings, IconShield } from "./Icons";
 import { CONNECTION_META } from "./status";
 
-export type Page = "dashboard" | "plugins" | "developer" | "settings";
+export type Page = "simple" | "dashboard" | "plugins" | "developer" | "settings";
 
 export function Sidebar({ page, onNavigate }: { page: Page; onNavigate: (p: Page) => void }) {
   const t = useT();
@@ -28,6 +28,7 @@ export function Sidebar({ page, onNavigate }: { page: Page; onNavigate: (p: Page
   };
 
   const nav: Array<{ id: Page; label: string; icon: ReactNode; extra?: string }> = [
+    { id: "simple", label: t("navSimple"), icon: <IconBolt /> },
     { id: "dashboard", label: t("navDashboard"), icon: <IconDashboard /> },
     { id: "plugins", label: t("navPlugins"), icon: <IconPlug />, extra: `${enabledPlugins}/${lab.listPlugins().length}` },
     ...(settings.debugMode ? [{ id: "developer" as Page, label: t("navDeveloper"), icon: <IconCode /> }] : []),
