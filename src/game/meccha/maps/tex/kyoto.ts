@@ -349,8 +349,8 @@ export const kyShamisen = () =>
     // kimono sleeve
     g.fillStyle = "#6a0c14"; g.beginPath(); g.moveTo(w, h * 0.35); g.lineTo(w * 0.78, h * 0.5); g.lineTo(w * 0.86, h); g.lineTo(w, h); g.fill();
     g.fillStyle = "#f2e4c0"; g.font = `bold 44px ${JP}`; g.textAlign = "left"; g.textBaseline = "top";
-    g.fillText("三味線", 24, h - 70);
-    g.font = `22px ${JP}`; g.fillText("京の音色 — 秋の夜祭", 26, h - 110);
+    g.fillText("Tom Kodner", 24, h - 70, w - 40);
+    g.font = `22px ${JP}`; g.fillText("Tom Kodner", 26, h - 110);
   });
 
 /** star field seen through the roof */

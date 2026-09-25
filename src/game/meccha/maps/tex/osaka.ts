@@ -296,9 +296,9 @@ export const osUniBand = () =>
     g.font = `bold 66px ${SERIF}`;
     g.save(); g.translate(16, h / 2 + 4); g.scale(1, 1.05);
     let x = 0;
-    for (const c of ["う", "に", "道", "楽"]) { g.fillText(c, x, (r() - 0.5) * 4); x += 76; }
-    g.font = `bold 40px ${SERIF}`;
-    g.fillText("本", x + 10, 10); g.fillText("店", x + 52, 10);
+    void x;
+    g.font = `bold 62px ${SERIF}`;
+    g.fillText("TOM KODNER", 4, (r() - 0.5) * 4, w - 40);
     g.restore();
     streaks(g, w, h, r, 16, 0.2);
     grime(g, w, h, r, 6, 0.15);
@@ -312,7 +312,8 @@ export const osNekoCafe = () =>
     g.strokeStyle = "#1c1c1c"; g.lineWidth = 5; g.strokeRect(3, 3, w - 6, h - 6);
     g.fillStyle = "#1c1c1c"; g.textAlign = "center"; g.textBaseline = "middle";
     g.font = `bold 58px ${JP}`;
-    ["猫", "カ", "フ", "ェ"].forEach((c, i) => g.fillText(c, w * 0.42, 44 + i * 60));
+    g.font = `bold 30px ${JP}`;
+    "TOMKODNER".split("").forEach((c, i) => g.fillText(c, w * 0.42, 22 + i * 30));
     g.save(); g.translate(w * 0.86, 150); g.rotate(Math.PI / 2); g.font = `bold 13px sans-serif`; g.fillText("CAT CAFE", 0, 0); g.restore();
     // cat face
     const cx = w / 2, cy = 318;
@@ -331,15 +332,15 @@ export const osMenzeiYakiniku = () =>
     g.fillStyle = "#f4f2ee"; g.fillRect(0, 0, w, 150);
     g.fillStyle = "#d4141c"; g.textAlign = "center"; g.textBaseline = "middle";
     g.font = `bold 44px ${JP}`;
-    g.fillText("免", w / 2, 40); g.fillText("税", w / 2, 88);
+    g.font = `bold 34px ${JP}`; ["T", "O", "M"].forEach((c, i) => g.fillText(c, w / 2, 28 + i * 34));
     g.font = `bold 11px ${JP}`; g.fillStyle = "#333"; g.fillText("TAX FREE", w / 2, 128);
     g.fillStyle = "#121212"; g.fillRect(0, 150, w, h - 150);
     g.shadowColor = "#ff2a2a"; g.shadowBlur = 12; g.fillStyle = "#ff3030";
     g.font = `bold 58px ${JP}`;
-    g.fillText("焼", w * 0.45, 200); g.fillText("肉", w * 0.45, 268);
+    g.font = `bold 32px ${JP}`; "KODNER".split("").forEach((c, i) => g.fillText(c, w * 0.45, 172 + i * 33));
     g.shadowBlur = 0;
     g.fillStyle = "#ffd23a"; g.font = `bold 12px ${JP}`;
-    g.save(); g.translate(w * 0.86, 240); g.rotate(Math.PI / 2); g.fillText("ロケット・カルビ", 0, 0); g.restore();
+    g.save(); g.translate(w * 0.86, 240); g.rotate(Math.PI / 2); g.fillText("TOM KODNER", 0, 0); g.restore();
     g.fillStyle = "#e8e8e8"; for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(14 + i * 13, 350, 3.5, 0, 6.3); g.fill(); }
     streaks(g, w, h, r, 6, 0.15);
   });
@@ -353,9 +354,10 @@ export const osNikuIzakaya = () =>
     g.lineWidth = 7; g.strokeRect(20, 18, w - 40, w - 40);
     g.fillStyle = "#111"; g.textAlign = "center"; g.textBaseline = "middle";
     g.font = `bold 74px ${SERIF}`;
-    g.fillText("肉", w / 2, 18 + (w - 40) / 2 + 3);
-    g.font = `bold 62px ${SERIF}`;
-    ["居", "酒", "屋"].forEach((c, i) => g.fillText(c, w / 2, 160 + i * 72));
+    g.font = `bold 44px ${SERIF}`;
+    g.fillText("TOM", w / 2, 18 + (w - 40) / 2 + 3);
+    g.font = `bold 38px ${SERIF}`;
+    "KODNER".split("").forEach((c, i) => g.fillText(c, w / 2, 142 + i * 40));
     streaks(g, w, h, r, 10, 0.22);
     grime(g, w, h, r, 6, 0.15);
   });
@@ -367,8 +369,8 @@ export const osKusuri = () =>
     g.fillStyle = "#f2d21a"; g.fillRect(0, 0, w, h);
     g.fillStyle = "#1a1a1a"; g.fillRect(0, 0, w, 8); g.fillRect(0, h - 8, w, 8);
     g.textAlign = "center"; g.textBaseline = "middle";
-    g.font = `bold 96px ${JP}`;
-    g.fillText("薬", w / 2, h / 2 + 4);
+    g.font = `bold 40px ${JP}`;
+    g.fillText("TOM", w / 2, h / 2 - 26); g.font = `bold 26px ${JP}`; g.fillText("KODNER", w / 2, h / 2 + 26, w - 10);
     streaks(g, w, h, r, 6, 0.15);
   });
 
@@ -378,7 +380,8 @@ export const osUsagiDrug = () =>
     g.fillStyle = "#d6121c"; g.fillRect(0, 0, w, h);
     g.fillStyle = "#ffffff"; g.textAlign = "center"; g.textBaseline = "middle";
     g.font = `bold 52px ${JP}`;
-    ["う", "さ", "ぎ", "ド", "ラ", "ッ", "グ"].forEach((c, i) => g.fillText(c, w / 2, 36 + i * 58));
+    g.font = `bold 40px ${JP}`;
+    "TOMKODNER".split("").forEach((c, i) => g.fillText(c, w / 2, 32 + i * 46));
     g.strokeStyle = "#ffffff"; g.lineWidth = 3; g.strokeRect(6, 6, w - 12, h - 12);
   });
 

@@ -503,7 +503,7 @@ export function buildKyoto(): World {
     }
     bx(darkWoodM, 4.6, 0.18, 0.24, 0, 3.4, -2.4, { round: true });
     bx(kawaraM, 4.9, 0.08, 0.7, 0, 3.62, -2.4, { unit: 1.2 });
-    put(signM("秋の夜祭"), xf(new THREE.BoxGeometry(2.4, 0.55, 0.06), 0, 3.0, -2.4, Math.PI));
+    put(signM("Tom Kodner"), xf(new THREE.BoxGeometry(2.4, 0.55, 0.06), 0, 3.0, -2.4, Math.PI));
     for (const s of [-1, 1]) chochin.push({ pos: [s * 1.25, 2.95, -2.35], scale: [1.1, 1.1, 1.1] });
 
     // second torii row in the east lane

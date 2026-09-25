@@ -5,7 +5,7 @@
 // 4. Settings — לשוניות User Management / Friends List / Sound / Graphics / General Game Settings / FAQ
 import { useEffect, useRef, useState } from "react";
 import type { Engine } from "@/game/meccha/engine";
-import { KEY_ART, MENU_BG, MENU_BG_PLAIN } from "@/game/meccha/menuart";
+import { KEY_ART, MENU_BG } from "@/game/meccha/menuart";
 import { THUMBS } from "@/game/meccha/thumbs";
 import { t, getLang, setLang, onLang } from "@/game/meccha/i18n";
 import { setVolume, setBgmVolume, setSeVolume, setMuted as setSoundMuted } from "@/lib/sound";
@@ -90,12 +90,11 @@ const LANGS: [string, number, number, number, string | null][] = [
 ];
 
 // ---------- 2. תפריט ראשי ----------
-export function MainMenu({ onCreate, onFind, onSettings, onQuit, onMaps }: { onCreate: () => void; onFind: () => void; onSettings: () => void; onQuit: () => void; onMaps: () => void }) {
+export function MainMenu({ onCreate, onFind, onSettings, onQuit, onMaps, onCredits }: { onCreate: () => void; onFind: () => void; onSettings: () => void; onQuit: () => void; onMaps: () => void; onCredits: () => void }) {
   useLangTick();
   const lang = getLang();
   return (
     <Stage bg={MENU_BG}>
-      <div className="absolute text-white" style={{ right: U(22), top: U(10), fontSize: U(30), textShadow: "0 2px 4px #000" }}>version - web</div>
       <GBtn x={147} y={554} w={293} h={62} onClick={onCreate}>{t("Create Server")}</GBtn>
       <GBtn x={147} y={649} w={293} h={62} onClick={onFind}>{t("Find Server")}</GBtn>
       <GBtn x={147} y={743} w={293} h={62} onClick={onSettings}>{t("Settings")}</GBtn>
@@ -112,17 +111,11 @@ export function MainMenu({ onCreate, onFind, onSettings, onQuit, onMaps }: { onC
         </svg>
         <span className="font-black leading-none" style={{ color: GREEN, fontSize: U(30), marginTop: U(-8) }}>MAPS</span>
       </button>
-      {/* Discord / Twitter (X) */}
-      <div className="absolute grid place-items-center" style={{ left: U(1478), top: U(940), width: U(203), height: U(121), background: "linear-gradient(135deg,#1c2b4a,#3a2b6a)", borderRadius: U(4) }}>
-        <span className="font-bold text-white" style={{ fontSize: U(26) }}>Discord</span>
-      </div>
-      <div className="absolute flex flex-col items-center justify-center" style={{ left: U(1716), top: U(940), width: U(160), height: U(121), background: "#141414", borderRadius: U(4) }}>
-        <span className="text-white" style={{ fontSize: U(20) }}>Twitter (X)</span>
-        <div className="flex" style={{ gap: U(10), marginTop: U(8) }}>
-          <span className="rounded-full" style={{ width: U(56), height: U(56), background: "radial-gradient(circle,#46a8ff,#123 70%)" }} />
-          <span className="rounded-full" style={{ width: U(56), height: U(56), background: "radial-gradient(circle,#dff,#6cf 70%)" }} />
-        </div>
-      </div>
+      {/* קרדיטים */}
+      <button onClick={onCredits} className="absolute grid place-items-center font-bold text-white hover:text-[#5dff5d]"
+        style={{ left: U(1478), top: U(940), width: U(398), height: U(121), fontSize: U(38), background: "linear-gradient(#2c2c2c,#121212)", border: `${U(3)} solid ${GREEN}` }}>
+        {t("Credits")}
+      </button>
     </Stage>
   );
 }
@@ -162,7 +155,7 @@ export function ServerScreen({ mode, form, setForm, results, onPrimary, onPublic
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onBack(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onBack]);
   const tog = (tag: string) => setForm({ ...form, tags: form.tags.includes(tag) ? form.tags.filter((x) => x !== tag) : [...form.tags, tag] });
   return (
-    <Stage bg={MENU_BG_PLAIN} dim={0.25}>
+    <Stage bg={MENU_BG} dim={0.25}>
       {/* שמאל: שדות */}
       <div className="absolute" style={{ left: U(90), top: U(90), width: U(560) }}>
         <Field label="Enter the name to display in-game" value={form.name} max={30} onChange={(v) => setForm({ ...form, name: v })} />
@@ -228,7 +221,7 @@ export function ServerScreen({ mode, form, setForm, results, onPrimary, onPublic
 export function MapsScreen({ maps, onBack }: { maps: { id: string; name: string }[]; onBack: () => void }) {
   useLangTick();
   return (
-    <Stage bg={MENU_BG_PLAIN} dim={0.55}>
+    <Stage bg={MENU_BG} dim={0.55}>
       <div className="absolute overflow-auto grid grid-cols-4" style={{ left: U(90), top: U(70), right: U(90), bottom: U(80), gap: U(18) }}>
         {maps.map((m) => (
           <div key={m.id} className="bg-black/60" style={{ border: `${U(3)} solid ${GREEN}` }}>
@@ -396,5 +389,23 @@ export function SettingsScreen({ engine, inGame, muted, onToggleMute, onClose, o
     </>
   );
   if (inGame) return <div className="fixed inset-0 z-50 overflow-hidden" style={{ background: "rgba(0,0,0,.35)" }}><div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: "min(100vw, 177.78vh)", height: "min(56.25vw, 100vh)", ["--u" as string]: "calc(min(56.25vw, 100vh) / 1080)" }}>{body}</div></div>;
-  return <Stage bg={MENU_BG_PLAIN} dim={0.35}>{body}</Stage>;
+  return <Stage bg={MENU_BG} dim={0.35}>{body}</Stage>;
+}
+
+// ---------- קרדיטים ----------
+export function CreditsScreen({ onBack }: { onBack: () => void }) {
+  useLangTick();
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onBack(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onBack]);
+  return (
+    <Stage bg={MENU_BG} dim={0.6}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center" style={{ gap: U(18) }}>
+        <div className="font-bold" style={{ fontSize: U(40), color: "#5dff5d" }}>{t("Credits")}</div>
+        <div style={{ fontSize: U(30), opacity: 0.8 }}>{t("Created by")}</div>
+        <div className="font-black" style={{ fontSize: U(96), textShadow: "0 4px 14px rgba(0,0,0,.7)", background: "linear-gradient(90deg,#ff3d7f,#ffb700,#7cf23a,#3ec7ff,#b04dff)", WebkitBackgroundClip: "text", color: "transparent" }}>Tom Kodner</div>
+      </div>
+      <button onClick={onBack} className="absolute flex items-center text-white" style={{ left: U(40), bottom: U(20), gap: U(8), fontSize: U(24) }}>
+        <span className="bg-white text-black font-bold rounded" style={{ fontSize: U(16), padding: `${U(1)} ${U(6)}` }}>Esc</span>{t("Back")}
+      </button>
+    </Stage>
+  );
 }

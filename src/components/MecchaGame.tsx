@@ -7,7 +7,7 @@ import type { Net } from "@/game/meccha/net";
 import { setMuted as setSoundMuted, setVolume as setSoundVolume, sfxClick } from "@/lib/sound";
 import { t, getLang, setLang, onLang, isRtl, type Lang } from "@/game/meccha/i18n";
 import { THUMBS } from "@/game/meccha/thumbs";
-import { Splash, MainMenu, ServerScreen, SettingsScreen, MapsScreen, applySavedSettings, serverKey, type ServerForm } from "./MecchaMenu";
+import { Splash, MainMenu, ServerScreen, SettingsScreen, MapsScreen, CreditsScreen, applySavedSettings, serverKey, type ServerForm } from "./MecchaMenu";
 
 /** מרנדר מחדש כשמחליפים שפה */
 function useLang() {
@@ -83,7 +83,7 @@ type Conn = { kind: "local" } | { kind: "room" } | { kind: "p2p"; code: string; 
 
 export function MecchaGame() {
   useLang();
-  const [screen, setScreen] = useState<"splash" | "menu" | "create" | "find" | "settings" | "maps" | "game">("splash");
+  const [screen, setScreen] = useState<"splash" | "menu" | "create" | "find" | "settings" | "maps" | "credits" | "game">("splash");
   // בזמן מסך הטעינה טוענים מראש את כל מה שהמשחק צריך
   const [ready] = useState(() => typeof window === "undefined" ? Promise.resolve() : Promise.all([
     import("@/game/meccha/engine"), import("@/game/meccha/net"), import("@/game/meccha/poseicons"),
@@ -141,6 +141,7 @@ export function MecchaGame() {
   if (screen === "splash") return wrap(<Splash ready={ready} onDone={() => setScreen("menu")} />);
   if (screen === "settings") return wrap(<SettingsScreen engine={null} inGame={false} muted={muted} onToggleMute={toggleMute} onClose={back} />);
   if (screen === "maps") return wrap(<MapsScreen maps={MAP_LIST} onBack={back} />);
+  if (screen === "credits") return wrap(<CreditsScreen onBack={back} />);
   if (screen === "create" || screen === "find") {
     const pub = roomNet && (screen === "create" || showPublic) ? [{ id: "room", name: t("This page's server"), players: `${Math.max(1, roomNet.peers().length)}/24`, tags: ["Everyone Welcome", "Basic Mode Main"], join: () => { setName(myName); go({ kind: "room" }); } }] : [];
     const mine = screen === "create" ? [{ id: "mine", name: form.server || `${myName}'s server`, players: "1/24", tags: [form.region, ...form.tags].filter((x) => x !== "Not Specified"), join: () => create() }] : [];
@@ -164,7 +165,7 @@ export function MecchaGame() {
   return wrap(
     <>
       <MainMenu onCreate={() => setScreen("create")} onFind={() => { setShowPublic(false); setScreen("find"); }} onSettings={() => setScreen("settings")}
-        onQuit={() => { try { window.location.assign("/"); } catch { /* ignore */ } }} onMaps={() => setScreen("maps")} />
+        onQuit={() => { try { window.location.assign("/"); } catch { /* ignore */ } }} onMaps={() => setScreen("maps")} onCredits={() => setScreen("credits")} />
     </>,
   );
 }

@@ -678,9 +678,9 @@ export function buildOsaka(): World {
       B.box(shutters[i], 0.35, 0.35, 3.3, rx + 0.17, 2.85, zc, { flat: true });
     }
     B.box(redPaint, 0.3, 3.2, 0.5, rx + 0.15, 0.14, 0.65, { flat: true });
-    B.geo(sText("kusuri2", "くすり", "#f2d21a", "#1a1a1a", { worn: 0.3 }), new THREE.PlaneGeometry(2.8, 0.5), rx + 0.02, 3.05, 0.65, { ry: PI / 2 });
+    B.geo(sText("kusuri2", "TOM KODNER", "#f2d21a", "#1a1a1a", { worn: 0.3 }), new THREE.PlaneGeometry(2.8, 0.5), rx + 0.02, 3.05, 0.65, { ry: PI / 2 });
     // red fascia band + hanging 薬 banners
-    B.geo(sText("drug", "ドラッグ ナニワ", "#c8161d", "#ffffff", { worn: 0.3, border: "#ffffff" }), new THREE.PlaneGeometry(6.5, 0.95), -5.99, 3.85, 0.2, { ry: PI / 2 });
+    B.geo(sText("drug", "TOM KODNER", "#c8161d", "#ffffff", { worn: 0.3, border: "#ffffff" }), new THREE.PlaneGeometry(6.5, 0.95), -5.99, 3.85, 0.2, { ry: PI / 2 });
     for (const z of [-2.6, 0.7, 4.0]) {
       B.geo(sKusuri, new THREE.PlaneGeometry(0.75, 1.1), -5.94, 2.7, z, { ry: PI / 2 });
       B.geo(sKusuri, new THREE.PlaneGeometry(0.75, 1.1), -5.96, 2.7, z, { ry: -PI / 2 });
@@ -716,11 +716,11 @@ export function buildOsaka(): World {
     vsign(-6, 1, -5.0, 7.0, 0.95, 3.8, sMenzei);
     vsign(-6, 1, -5.0, 11.0, 0.95, 3.8, sNeko);
     vsign(-6, 1, -13.2, 3.7, 0.9, 3.6, sNeko);
-    vsign(-6, 1, -13.2, 7.5, 0.9, 3.4, sText("ramen", "ラーメン", "#f4e04d", "#c0141b", { vertical: true, worn: 0.3 }, 0.1));
-    vsign(-6, 1, -21, 3.7, 0.9, 3.6, sText("karaoke", "カラオケ", "#1a1030", "#ff4fa0", { vertical: true, neon: true, worn: 0.1 }, 0.5));
-    vsign(-6, 1, -21, 7.5, 0.9, 3.4, sText("izaka", "居酒屋", "#f3f2ee", "#111", { vertical: true, worn: 0.3, serif: true }));
+    vsign(-6, 1, -13.2, 7.5, 0.9, 3.4, sText("ramen", "TOM KODNER", "#f4e04d", "#c0141b", { vertical: true, worn: 0.3 }, 0.1));
+    vsign(-6, 1, -21, 3.7, 0.9, 3.6, sText("karaoke", "TOM KODNER", "#1a1030", "#ff4fa0", { vertical: true, neon: true, worn: 0.1 }, 0.5));
+    vsign(-6, 1, -21, 7.5, 0.9, 3.4, sText("izaka", "TOM KODNER", "#f3f2ee", "#111", { vertical: true, worn: 0.3, serif: true }));
     // izakaya noren + lanterns at street level
-    B.geo(sText("noren", "居酒屋", "#1f2f5a", "#ffffff", { worn: 0.1 }), new THREE.PlaneGeometry(2.2, 0.7), -5.9, 2.4, -9.0, { ry: PI / 2 });
+    B.geo(sText("noren", "TOM KODNER", "#1f2f5a", "#ffffff", { worn: 0.1 }), new THREE.PlaneGeometry(2.2, 0.7), -5.9, 2.4, -9.0, { ry: PI / 2 });
     const lanM = sText("lan", "酒", "#d8262b", "#111", { worn: 0 }, 0.4);
     for (const z of [-7.6, -10.4]) {
       B.lathe(lanM, [[0.02, 0], [0.16, 0.02], [0.25, 0.14], [0.27, 0.32], [0.25, 0.5], [0.16, 0.62], [0.02, 0.64]], -5.7, 1.9, z, { seg: 14 });
