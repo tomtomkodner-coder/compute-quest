@@ -24,7 +24,8 @@ export function t(s: string, vars?: Record<string, string | number>) {
 
 const HE: Record<string, string> = {
   // תפריט ראשי
-  "Home": "בית", "Name": "שם", "Join This Page's Server": "הצטרפות לשרת של הדף", "Create Server": "יצירת שרת",
+  "Home": "בית", "Quit": "יציאה", "Find Server": "מציאת שרת", "Offline (with Bots)": "לא מקוון (עם בוטים)",
+  "Search Public Servers": "חיפוש שרתים ציבוריים", "This page's server": "השרת של הדף הזה", "No public servers found": "לא נמצאו שרתים ציבוריים", "Name": "שם", "Join This Page's Server": "הצטרפות לשרת של הדף", "Create Server": "יצירת שרת",
   "Search Server": "חיפוש שרת", "CODE": "קוד", "Join": "הצטרפות", "Practice (Solo + Bots)": "אימון (לבד + בוטים)",
   "Checking for a shared server…": "בודק אם יש שרת משותף…", "Controls": "מקשים", "Language": "שפה",
   "Move": "תזוזה", "Camera (click to lock)": "מצלמה (לחיצה לנעילה)", "Sprint": "ריצה", "Jump / Climb (jump into a wall, hold Space)": "קפיצה / טיפוס (קופצים אל קיר ומחזיקים רווח)",

@@ -85,6 +85,8 @@ export function MecchaGame() {
   const [roomNet, setRoomNet] = useState<Net | null | undefined>(undefined);
   const [joinCode, setJoinCode] = useState("");
   const [search, setSearch] = useState(false);
+  const [tab, setTab] = useState<"create" | "find">("create");
+  const [optsOpen, setOptsOpen] = useState(false);
   const [runId, setRunId] = useState(0);
 
   useEffect(() => {
@@ -114,72 +116,82 @@ export function MecchaGame() {
         muted={muted} onToggleMute={toggleMute} onExit={() => setScreen("menu")} />
     );
 
-  const btn = "w-full rounded-2xl py-3.5 text-lg font-extrabold transition hover:scale-[1.02] active:scale-95 border-[3px] border-black shadow-[0_4px_0_#000]";
+  // מסך הפתיחה בסגנון המשחק במחשב: קיר לבנים (כמו בתמונת המפתח של המשחק), לוגו צבעוני, תפריט טקסט בצד שמאל
+  const item = "group relative w-fit text-left text-[30px] leading-none font-black text-white tracking-tight py-1 transition hover:translate-x-2";
+  const under = (c: string) => <span className="absolute left-0 -bottom-0.5 h-[6px] w-0 group-hover:w-full transition-all rounded-full" style={{ background: c }} />;
+  const LOGO = ["#ff3d7f", "#ffb700", "#3ec7ff", "#7cf23a", "#ff6a00", "#b04dff"];
+  const logo = (w: string, o: number) => w.split("").map((ch, i) => (
+    <span key={i} style={{ background: `linear-gradient(135deg, ${LOGO[(i + o) % 6]}, ${LOGO[(i + o + 2) % 6]} 55%, ${LOGO[(i + o + 4) % 6]})`, WebkitBackgroundClip: "text", color: "transparent", display: "inline-block", transform: `rotate(${((i * 7) % 5) - 2}deg)` }}>{ch}</span>
+  ));
+  const panel = "rounded-md bg-[#101010]/85 border border-white/15 backdrop-blur-sm text-white p-5 w-[420px] max-w-[92vw]";
+  const pbtn = "w-full rounded-md py-2.5 text-[15px] font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition disabled:opacity-40";
   return (
-    <div onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }} className="relative min-h-screen overflow-hidden" dir="ltr" style={{ fontFamily: FONT, background: "radial-gradient(circle at 30% 20%, #ffe36e 0, #ff9f1c 35%, #ff4d6d 70%, #7b2cbf 100%)" }}>
-      <div className="absolute inset-0 opacity-25 pointer-events-none" style={{ backgroundImage: "radial-gradient(#fff 2px, transparent 2px)", backgroundSize: "26px 26px" }} />
-      <div className="relative z-10 mx-auto max-w-md px-4 py-6 text-black" dir={isRtl() ? "rtl" : "ltr"}>
-        <div className="flex items-center justify-between mb-6">
-          <Link to="/" className="rounded-xl bg-black/30 text-white px-3 py-2 text-sm font-bold inline-flex items-center gap-2"><Home className="w-4 h-4" /> {t("Home")}</Link>
-          <div className="flex items-center gap-2">
-            <LangToggle dark />
-            <button onClick={toggleMute} className="rounded-xl bg-black/30 text-white p-2.5" aria-label="Mute">
-              {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-        <div className="text-center mb-7 select-none">
-          <div className="text-[44px] sm:text-[56px] leading-[0.95] font-black text-white tracking-tight" style={{ textShadow: "0 5px 0 #000, 3px 0 0 #000, -3px 0 0 #000, 0 -3px 0 #000" }}>
-            MECCHA<br /><span style={{ color: "#8ef56b" }}>CHAMELEON</span>
-          </div>
+    <div onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }} className="relative h-screen overflow-hidden select-none text-white" dir="ltr"
+      style={{ fontFamily: FONT, backgroundColor: "#8f4431", backgroundImage: `linear-gradient(rgba(25,12,8,.25), rgba(25,12,8,.45)), url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cg fill='%23a0513a' stroke='%23d9c6b0' stroke-width='3'%3E%3Crect x='1.5' y='1.5' width='57' height='27' rx='2'/%3E%3Crect x='61.5' y='1.5' width='57' height='27' rx='2' fill='%23944a34'/%3E%3Crect x='-28.5' y='31.5' width='57' height='27' rx='2' fill='%23a95b41'/%3E%3Crect x='31.5' y='31.5' width='57' height='27' rx='2' fill='%238f4431'/%3E%3Crect x='91.5' y='31.5' width='57' height='27' rx='2' fill='%23a95b41'/%3E%3C/g%3E%3C/svg%3E\")`, backgroundSize: "auto, 150px 75px" }}>
+      <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0,0,0,.65) 100%)" }} />
+      {/* דמות לבנה חצי צבועה כמו בתמונת המפתח */}
+      <div className="absolute right-[6%] bottom-0 h-[78%] aspect-[3/5] pointer-events-none opacity-95" aria-hidden>
+        <svg viewBox="0 0 300 500" className="w-full h-full" style={{ filter: "drop-shadow(0 12px 18px rgba(0,0,0,.5))" }}>
+          <defs><linearGradient id="bodyPaint" x1="0" x2="1"><stop offset="0.55" stopColor="#f4f2ee" /><stop offset="0.56" stopColor="#b5563d" /></linearGradient></defs>
+          <g fill="url(#bodyPaint)">
+            <circle cx="150" cy="70" r="58" /><rect x="88" y="120" width="124" height="200" rx="60" />
+            <rect x="30" y="140" width="46" height="170" rx="23" transform="rotate(18 53 140)" /><rect x="224" y="140" width="46" height="170" rx="23" transform="rotate(-24 247 140)" />
+            <rect x="96" y="290" width="52" height="210" rx="26" /><rect x="152" y="290" width="52" height="210" rx="26" />
+          </g>
+          <path d="M125 62 q6 -8 12 0 M163 62 q6 -8 12 0 M128 92 q22 20 44 0" stroke="#222" strokeWidth="6" fill="none" strokeLinecap="round" />
+        </svg>
+      </div>
+
+      <div className="relative z-10 h-full flex flex-col justify-between px-[6vw] py-[6vh]" dir={isRtl() ? "rtl" : "ltr"}>
+        <div className="leading-[0.9] font-black text-[clamp(48px,8vw,110px)]" style={{ filter: "drop-shadow(0 6px 0 rgba(0,0,0,.45))" }}>
+          <div>{logo("MECCHA", 0)}</div><div>{logo("CHAMELEON", 3)}</div>
         </div>
 
-        <div className="rounded-3xl bg-white/90 border-[3px] border-black p-4 mb-4 grid gap-3 shadow-[0_6px_0_#000]">
-          <label className="grid gap-1">
-            <span className="font-extrabold text-sm">{t("Name")}</span>
-            <input id="meccha-name" value={name} maxLength={14} onChange={(e) => setName(e.target.value)}
-              className="bg-white border-2 border-black rounded-xl px-3 py-2 text-base font-bold outline-none" />
-          </label>
-          <div className="flex gap-1.5 justify-center">
-            {PLAYER_COLORS.map((c) => (
-              <button key={c} onClick={() => setColor(c)} aria-label={c}
-                className={`w-8 h-8 rounded-full border-[3px] ${color === c ? "border-black scale-110" : "border-white"}`} style={{ background: c }} />
-            ))}
-          </div>
-        </div>
+        <div className="flex items-end gap-10">
+          <nav className="flex flex-col gap-2.5 pb-1 shrink-0" style={{ textShadow: "0 3px 10px rgba(0,0,0,.6)" }}>
+            <button className={item} onClick={() => setSearch((v) => !v)}>{t("Start")}{under("#ffb700")}</button>
+            <button className={item} onClick={() => setOptsOpen(true)}>{t("Settings")}{under("#3ec7ff")}</button>
+            <Link to="/" className={item}>{t("Quit")}{under("#ff3d7f")}</Link>
+          </nav>
 
-        <div className="grid gap-3">
-          {roomNet && <button onClick={() => go({ kind: "room" })} className={`${btn} bg-[#8ef56b]`}>{t("Join This Page's Server")}</button>}
-          <button onClick={async () => { const { randomCode } = await import("@/game/meccha/net"); go({ kind: "p2p", code: randomCode(), host: true }); }}
-            className={`${btn} bg-[#ffd23f]`}>{t("Create Server")}</button>
-          {!search ? (
-            <button onClick={() => setSearch(true)} className={`${btn} bg-[#4cc9f0]`}>{t("Search Server")}</button>
-          ) : (
-            <div className="flex gap-2">
-              <input id="meccha-code" autoFocus value={joinCode} placeholder={t("CODE")} dir="ltr"
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5))}
-                className="flex-1 min-w-0 bg-white border-[3px] border-black rounded-2xl px-3 text-2xl tracking-[0.3em] text-center font-black outline-none" />
-              <button disabled={joinCode.length !== 5} onClick={() => go({ kind: "p2p", code: joinCode, host: false })}
-                className={`${btn} !w-auto px-5 bg-[#4cc9f0] disabled:opacity-40`}>{t("Join")}</button>
+          {search && (
+            <div className={panel}>
+              <div className="flex gap-1 mb-4 border-b border-white/15">
+                {(["create", "find"] as const).map((k) => (
+                  <button key={k} onClick={() => setTab(k)} className={`px-3 pb-2 text-[15px] font-bold border-b-2 -mb-px ${tab === k ? "border-[#ffb700] text-white" : "border-transparent text-white/60"}`}>{t(k === "create" ? "Create Server" : "Find Server")}</button>
+                ))}
+              </div>
+              <label className="grid gap-1 mb-3 text-[13px]">
+                <span className="text-white/70">{t("Name")}</span>
+                <input id="meccha-name" value={name} maxLength={14} onChange={(e) => setName(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[15px] outline-none focus:border-white/50" />
+              </label>
+              {tab === "create" ? (
+                <div className="grid gap-2">
+                  <button className={pbtn} onClick={async () => { const { randomCode } = await import("@/game/meccha/net"); go({ kind: "p2p", code: randomCode(), host: true }); }}>{t("Create Server")}</button>
+                  <button className={pbtn} onClick={() => go({ kind: "local" })}>{t("Offline (with Bots)")}</button>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <div className="text-[12px] text-white/60">{t("Search Public Servers")}</div>
+                  <div className="rounded border border-white/15 bg-black/40 min-h-[48px] p-1.5 text-[14px]">
+                    {roomNet ? (
+                      <button onClick={() => go({ kind: "room" })} className="w-full flex justify-between items-center rounded px-2 py-1.5 hover:bg-white/10"><span>{t("This page's server")}</span><span className="text-[#7cf23a] text-[12px]">{t("Join")}</span></button>
+                    ) : <div className="px-2 py-1.5 text-white/50">{roomNet === undefined ? t("Checking for a shared server…") : t("No public servers found")}</div>}
+                  </div>
+                  <div className="text-[12px] text-white/60 mt-1">{t("Search Server")}</div>
+                  <div className="flex gap-2">
+                    <input id="meccha-code" value={joinCode} placeholder={t("CODE")} dir="ltr" onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5))}
+                      className="flex-1 min-w-0 bg-black/50 border border-white/20 rounded px-2.5 text-[18px] tracking-[0.3em] text-center outline-none" />
+                    <button disabled={joinCode.length !== 5} onClick={() => go({ kind: "p2p", code: joinCode, host: false })} className={`${pbtn} !w-auto px-5`}>{t("Join")}</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          <button onClick={() => go({ kind: "local" })} className={`${btn} bg-white`}>{t("Practice (Solo + Bots)")}</button>
-          {roomNet === undefined && <p className="text-xs text-white/80 text-center">{t("Checking for a shared server…")}</p>}
         </div>
-
-        <details className="mt-5 rounded-2xl bg-black/35 text-white p-4 text-sm leading-relaxed">
-          <summary className="font-extrabold cursor-pointer">{t("Controls")}</summary>
-          <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[13px]">
-            {[
-              ["WASD", "Move"], ["Mouse", "Camera (click to lock)"], ["Shift", "Sprint"], ["Space", "Jump / Climb (jump into a wall, hold Space)"],
-              ["Ctrl", "Crouch / climb down"], ["F", "Paint mode"], ["Hold Space", "Eyedropper (paint mode)"], ["Right drag", "Brush size"],
-              ["V", "Shadow on/off (paint mode)"], ["Hold R", "Pose wheel"], ["Q / X", "Place clone / remove clones"], ["1", "Whistle"],
-              ["2", "Nameplates"], ["3", "See-through"], ["5 / 4", "Free camera / move free camera"], ["LMB / RMB", "Hunter: shoot / FPS-TPS"],
-              ["G", "Like (answer check)"], ["Y", "Vote to skip"], ["T", "Chat"], ["E", "Interact (PLAY)"], ["Esc", "Settings"],
-            ].map(([k, v]) => (<Fragment key={k}><b dir="ltr">{k}</b><span>{t(v)}</span></Fragment>))}
-          </div>
-        </details>
       </div>
+      <button onClick={toggleMute} className="absolute bottom-4 right-4 z-20 rounded-full bg-black/45 border border-white/30 p-2.5" aria-label="Mute">{muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}</button>
+      {optsOpen && <MenuSettings onClose={() => setOptsOpen(false)} />}
     </div>
   );
 }
@@ -293,7 +305,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
 
       {error && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-black/80 p-6">
-          <div className="rounded-2xl bg-white text-black p-5 max-w-sm text-center font-bold">
+          <div className="rounded-md bg-[#121212] border border-white/15 text-white p-5 max-w-sm text-center font-bold">
             <p className="mb-3">{error}</p>
             <button onClick={onExit} className="rounded-xl bg-black text-white px-4 py-2">{t("Back")}</button>
           </div>
@@ -399,10 +411,10 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
                 </div>
               )}
               {hud.onPad && <div className="text-xl font-black text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>{t("You will be a HUNTER")}</div>}
-              <div className="flex gap-2 pointer-events-auto">
+              {touch && <div className="flex gap-2 pointer-events-auto">
                 <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-black border-2 border-black">{t("Settings")}</button>
                 <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-black border-2 border-black">{t("Character")}</button>
-              </div>
+              </div>}
             </div>
           )}
 
@@ -618,10 +630,10 @@ function Banner({ children }: { children: React.ReactNode }) {
 function Panel({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-black/40 p-3" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div dir={isRtl() ? "rtl" : "ltr"} className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} max-h-[92vh] overflow-auto rounded-3xl bg-white text-black border-[3px] border-black shadow-[0_6px_0_#000] p-4`}>
+      <div dir={isRtl() ? "rtl" : "ltr"} className={`w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[92vh] overflow-auto rounded-md bg-[#121212]/92 text-white border border-white/15 shadow-2xl backdrop-blur-sm p-5`}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xl font-black">{title}</h2>
-          <button onClick={onClose} className="rounded-full bg-black text-white p-1" aria-label="Close"><X className="w-4 h-4" /></button>
+          <h2 className="text-lg font-bold tracking-wide">{title}</h2>
+          <button onClick={onClose} className="rounded p-1 hover:bg-white/15" aria-label="Close"><X className="w-4 h-4" /></button>
         </div>
         {children}
       </div>
@@ -635,12 +647,12 @@ function Opt<T extends string | number | boolean>({ label, value, options, onCha
   const i = Math.max(0, options.findIndex((o) => o.v === value));
   const step = (d: number) => onChange(options[(i + d + options.length) % options.length].v);
   return (
-    <div className="flex items-center justify-between gap-2 py-1 border-b border-black/10">
-      <span className="text-sm font-bold">{t(label)}</span>
+    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-white/10">
+      <span className="text-[13px] text-white/85">{t(label)}</span>
       <div className="flex items-center gap-1">
-        <button disabled={disabled} onClick={() => step(isRtl() ? 1 : -1)} className="w-7 h-7 rounded-lg bg-black text-white font-black disabled:opacity-30">‹</button>
-        <span className="min-w-[128px] text-center text-sm font-black truncate" dir="ltr">{t(options[i]?.n ?? "")}</span>
-        <button disabled={disabled} onClick={() => step(isRtl() ? -1 : 1)} className="w-7 h-7 rounded-lg bg-black text-white font-black disabled:opacity-30">›</button>
+        <button disabled={disabled} onClick={() => step(isRtl() ? 1 : -1)} className="w-7 h-7 rounded bg-white/10 hover:bg-white/25 font-bold disabled:opacity-30">‹</button>
+        <span className="min-w-[128px] text-center text-[13px] font-bold truncate" dir="ltr">{t(options[i]?.n ?? "")}</span>
+        <button disabled={disabled} onClick={() => step(isRtl() ? -1 : 1)} className="w-7 h-7 rounded bg-white/10 hover:bg-white/25 font-bold disabled:opacity-30">›</button>
       </div>
     </div>
   );
@@ -655,26 +667,26 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
   const dis = !hud.isHost;
   const set = (p: Partial<Settings>) => engine?.setSettings(p);
   const solo = hud.net === "local";
-  const col = "rounded-2xl border-[3px] border-black bg-white p-3 min-h-0 overflow-auto";
+  const col = "rounded border border-white/15 bg-black/35 p-3 min-h-0 overflow-auto";
   const h = "text-sm font-black mb-2";
   return (
     <div className="absolute inset-0 z-40 bg-black/50 p-2 sm:p-4 grid place-items-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div dir={isRtl() ? "rtl" : "ltr"} className="relative w-full max-w-5xl h-full max-h-[640px] rounded-3xl bg-[#ffe7a3] text-black border-[3px] border-black shadow-[0_6px_0_#000] p-3 flex flex-col gap-2">
+      <div dir={isRtl() ? "rtl" : "ltr"} className="relative w-full max-w-5xl h-full max-h-[640px] rounded-md bg-[#121212]/92 text-white border border-white/15 shadow-2xl backdrop-blur-sm p-3 flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-black">{t("Configure Map")}</h2>
           <button onClick={onClose} className="rounded-full bg-black text-white p-1" aria-label="Close"><X className="w-4 h-4" /></button>
         </div>
-        {dis && <p className="text-xs font-bold text-black/60 -mt-1">{t("Only the host can change the settings.")}</p>}
+        {dis && <p className="text-xs font-bold text-white/60 -mt-1">{t("Only the host can change the settings.")}</p>}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-1 min-h-0 overflow-auto md:overflow-hidden">
           {/* מפה */}
           <div className={col}>
             <div className={h}>{t("Map")}</div>
             <button disabled={dis} onClick={() => set({ map: "random" })}
-              className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-black ${s.map === "random" ? "border-black bg-[#ffd23f]" : "border-black/15"}`}>🎲 {t("Random")}</button>
+              className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-black ${s.map === "random" ? "border-[#ffb700] bg-[#ffb700]/25" : "border-white/10 hover:bg-white/10"}`}>🎲 {t("Random")}</button>
             {MAP_LIST.map((m) => (
-              <div key={m.id} className={`flex items-center gap-1.5 rounded-xl border-2 px-2 py-1 mb-1 ${s.map === m.id ? "border-black bg-[#4cc9f0]" : "border-black/15"}`}>
+              <div key={m.id} className={`flex items-center gap-1.5 rounded-xl border-2 px-2 py-1 mb-1 ${s.map === m.id ? "border-[#3ec7ff] bg-[#3ec7ff]/25" : "border-white/10 hover:bg-white/10"}`}>
                 <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-start text-sm font-bold truncate">{t(m.name)}</button>
-                <label className="flex items-center gap-1 text-[10px] font-bold text-black/60" title={t("Include in Random")}>
+                <label className="flex items-center gap-1 text-[10px] font-bold text-white/60" title={t("Include in Random")}>
                   <input type="checkbox" disabled={dis} checked={s.pool.includes(m.id)}
                     onChange={(ev) => set({ pool: ev.target.checked ? [...s.pool, m.id] : s.pool.filter((x) => x !== m.id) })} /> {t("random")}
                 </label>
@@ -686,14 +698,14 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
             <div className={h}>{t("Game Mode")}</div>
             {MODES.map((m) => (
               <button key={m.id} disabled={dis} onClick={() => set({ mode: m.id })}
-                className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 ${s.mode === m.id ? "border-black bg-[#8ef56b]" : "border-black/15"}`}>
+                className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 ${s.mode === m.id ? "border-[#7cf23a] bg-[#7cf23a]/20" : "border-white/10 hover:bg-white/10"}`}>
                 <div className="text-sm font-black">{t(m.name)}</div>
-                <div className="text-[11px] font-bold text-black/60 leading-tight">{t(m.desc)}</div>
+                <div className="text-[11px] font-bold text-white/60 leading-tight">{t(m.desc)}</div>
               </button>
             ))}
             <div className={`${h} mt-3`}>{t("Filters")}</div>
             {([["mono", "Monochrome"], ["horror", "Horror"], ["mosaic", "Mosaic"]] as const).map(([k, n]) => (
-              <label key={k} className="flex items-center gap-2 rounded-xl border-2 border-black/15 px-2 py-1.5 mb-1 text-sm font-bold">
+              <label key={k} className="flex items-center gap-2 rounded border border-white/10 px-2 py-1.5 mb-1 text-sm">
                 <input type="checkbox" disabled={dis} checked={s.filters[k]} onChange={(ev) => set({ filters: { ...s.filters, [k]: ev.target.checked } })} /> {t(n)}
               </label>
             ))}
@@ -713,7 +725,7 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
             <Opt label="Hunter TPS" value={s.hunterTps} disabled={dis} options={onOff} onChange={(v) => set({ hunterTps: v })} />
             {solo && (
               <>
-                <div className="text-[11px] font-black mt-3 text-black/60">{t("Practice (solo only)")}</div>
+                <div className="text-[11px] font-black mt-3 text-white/60">{t("Practice (solo only)")}</div>
                 <Opt label="Bots" value={s.bots} disabled={dis} options={nums(1, 8)} onChange={(v) => set({ bots: v })} />
                 <Opt label="Bot Level" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />
               </>
@@ -722,11 +734,11 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
         </div>
         <div className="flex items-center gap-3">
           {hud.isHost && (
-            <button onClick={() => { engine?.startCountdown(); onClose(); }} className="rounded-2xl bg-[#8ef56b] border-[3px] border-black shadow-[0_4px_0_#000] px-8 py-2.5 text-xl font-black">
+            <button onClick={() => { engine?.startCountdown(); onClose(); }} className="rounded-md bg-[#2e9e44] hover:bg-[#38b951] border border-white/25 px-10 py-2.5 text-lg font-bold">
               {t("Start")}
             </button>
           )}
-          <span className="text-xs font-bold text-black/60">{t("{n} players", { n: hud.players.length })} · {s.map === "random" ? t("Random map") : t(MAP_LIST.find((m) => m.id === s.map)?.name ?? "")}</span>
+          <span className="text-xs font-bold text-white/60">{t("{n} players", { n: hud.players.length })} · {s.map === "random" ? t("Random map") : t(MAP_LIST.find((m) => m.id === s.map)?.name ?? "")}</span>
         </div>
       </div>
     </div>
@@ -744,7 +756,7 @@ function CharPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | n
           const off = z.id === "petit" && !hud.settings.allowPetit;
           return (
             <button key={z.id} disabled={off} onClick={() => engine?.setMySize(z.id)}
-              className={`rounded-xl border-[3px] py-2 text-sm font-black disabled:opacity-30 ${hud.size === z.id ? "border-black bg-[#4cc9f0]" : "border-black/20"}`}>{t(z.name)}{z.id === "petit" ? " ×0.5" : ""}</button>
+              className={`rounded-xl border-[3px] py-2 text-sm font-black disabled:opacity-30 ${hud.size === z.id ? "border-[#3ec7ff] bg-[#3ec7ff]/25" : "border-white/15 hover:bg-white/10"}`}>{t(z.name)}{z.id === "petit" ? " ×0.5" : ""}</button>
           );
         })}
       </div>
@@ -752,7 +764,7 @@ function CharPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | n
       <div className="grid grid-cols-3 gap-2">
         {BODY_LIST.map((b) => (
           <button key={b.id} onClick={() => engine?.setMyBody(b.id)}
-            className={`rounded-xl border-[3px] py-2 font-black ${hud.bodyType === b.id ? "border-black bg-[#ffd23f]" : "border-black/20"}`}>{t(b.name)}</button>
+            className={`rounded-xl border-[3px] py-2 font-black ${hud.bodyType === b.id ? "border-[#ffb700] bg-[#ffb700]/25" : "border-white/15 hover:bg-white/10"}`}>{t(b.name)}</button>
         ))}
       </div>
       <button onClick={onClose} className="mt-4 w-full rounded-2xl bg-black text-white py-2.5 font-black">{t("OK")}</button>
@@ -760,7 +772,12 @@ function CharPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | n
   );
 }
 
-function OptionsPanel({ engine, muted, onToggleMute, onClose, onLeave }: { engine: Engine | null; muted: boolean; onToggleMute: () => void; onClose: () => void; onLeave: () => void }) {
+function MenuSettings({ onClose }: { onClose: () => void }) {
+  const [m, setM] = useState(false);
+  return <OptionsPanel engine={null} muted={m} onToggleMute={() => setM((v) => { setSoundMuted(!v); return !v; })} onClose={onClose} />;
+}
+
+function OptionsPanel({ engine, muted, onToggleMute, onClose, onLeave }: { engine: Engine | null; muted: boolean; onToggleMute: () => void; onClose: () => void; onLeave?: () => void }) {
   const load = (k: string, d: number) => { try { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && localStorage.getItem(k) !== null ? v : d; } catch { return d; } };
   const [sens, setSens] = useState(() => load("meccha_sens", 1));
   const [vol, setVol] = useState(() => load("meccha_vol", 1));
@@ -769,7 +786,7 @@ function OptionsPanel({ engine, muted, onToggleMute, onClose, onLeave }: { engin
   const save = (k: string, v: number) => { try { localStorage.setItem(k, String(v)); } catch { /* ignore */ } };
   return (
     <Panel title={t("Settings")} onClose={onClose}>
-      <div className="flex items-center justify-between mb-3"><span className="text-sm font-bold">{t("Language")}</span><LangToggle /></div>
+      <div className="flex items-center justify-between mb-3"><span className="text-sm font-bold">{t("Language")}</span><LangToggle dark /></div>
       <Slider id="o-sens" label={t("Mouse Sensitivity")} value={sens} min={0.2} max={3} step={0.05} onChange={(v) => { setSens(v); save("meccha_sens", v); engine?.setSensitivity(v); }} />
       <div className="h-2" />
       <Slider id="o-vol" label={t("Volume")} value={vol} min={0} max={1} step={0.05} onChange={(v) => { setVol(v); save("meccha_vol", v); setSoundVolume(v); }} />
@@ -777,8 +794,8 @@ function OptionsPanel({ engine, muted, onToggleMute, onClose, onLeave }: { engin
       <Opt label="Shadow Quality" value={shadow} options={[{ v: 0 as const, n: "Off" }, { v: 1 as const, n: "Low" }, { v: 2 as const, n: "High" }]} onChange={(v) => { setShadow(v); save("meccha_shadow", v); engine?.setShadowQuality(v); }} />
       <Opt label="Performance Mode" value={perf} options={onOff} onChange={(v) => { setPerf(v); save("meccha_perf", v ? 1 : 0); engine?.setPerformance(v); }} />
       <div className="flex gap-2 mt-4">
-        <button onClick={onClose} className="flex-1 rounded-2xl bg-black text-white py-2.5 font-black">{t("Back to Game")}</button>
-        <button onClick={onLeave} className="rounded-2xl border-[3px] border-black px-4 py-2 font-black">{t("Leave")}</button>
+        <button onClick={onClose} className="flex-1 rounded-md bg-white/15 hover:bg-white/25 border border-white/20 py-2 font-bold">{t(onLeave ? "Back to Game" : "Back")}</button>
+        {onLeave && <button onClick={onLeave} className="rounded-md bg-[#c0392b]/80 hover:bg-[#c0392b] border border-white/20 px-4 py-2 font-bold">{t("Leave")}</button>}
       </div>
     </Panel>
   );
@@ -931,10 +948,10 @@ function ColorWheel({ color, onChange }: { color: string; onChange: (c: string) 
 
 function Slider({ id, label, value, min, max, step, onChange, bg }: { id: string; label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; bg?: string }) {
   return (
-    <label htmlFor={id} className="grid grid-cols-[62px_1fr_34px] items-center gap-1.5 text-[11px] font-bold">
+    <label htmlFor={id} className="grid grid-cols-[120px_1fr_40px] items-center gap-2 text-[13px] text-white/85">
       <span>{label}</span>
       <input id={id} type="range" min={min} max={max} step={step} value={value} onChange={(ev) => onChange(Number(ev.target.value))}
-        className="w-full h-2 rounded-full appearance-none accent-black" style={{ background: bg ?? "#ddd" }} />
+        className="w-full h-1.5 rounded-full appearance-none accent-white" style={{ background: bg ?? "rgba(255,255,255,.25)" }} />
       <span className="tabular-nums text-right">{step < 1 ? value.toFixed(2) : Math.round(value)}</span>
     </label>
   );
