@@ -14,6 +14,12 @@ import { buildDeepSea } from "./deepsea";
 import { buildMall } from "./mall";
 import { buildKyoto } from "./kyoto";
 import { buildMuseum } from "./museum";
+import { buildGallery } from "./gallery";
+import { buildColdStorage } from "./coldstorage";
+import { buildBrickLoft } from "./brickloft";
+import { buildPool } from "./pool";
+import { buildSakura } from "./sakura";
+import { buildMeeting } from "./meeting";
 
 export type { World, Obstacle, Lighting } from "./kit";
 
@@ -33,6 +39,13 @@ export const MAPS: { id: string; name: string; build: () => World }[] = [
   { id: "mall", name: "Shopping Mall", build: buildMall },
   { id: "kyoto", name: "Kyoto", build: buildKyoto },
   { id: "museum", name: "Art Museum", build: buildMuseum },
+  // מפות סדנת Steam (Workshop) פופולריות
+  { id: "gallery", name: "Art Gallery", build: buildGallery },
+  { id: "coldstorage", name: "Cold Storage", build: buildColdStorage },
+  { id: "brickloft", name: "Brick Loft", build: buildBrickLoft },
+  { id: "pool", name: "Swimming Pool", build: buildPool },
+  { id: "sakura", name: "Cherry Blossom Garden", build: buildSakura },
+  { id: "meeting", name: "Meeting Room", build: buildMeeting },
 ];
 
 export function buildMap(id: string): World {

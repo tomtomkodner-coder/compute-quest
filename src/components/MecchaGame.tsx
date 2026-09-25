@@ -42,6 +42,12 @@ const MAP_LIST = [
   { id: "mall", name: "Shopping Mall" },
   { id: "kyoto", name: "Kyoto" },
   { id: "museum", name: "Art Museum" },
+  { id: "gallery", name: "Art Gallery" },
+  { id: "coldstorage", name: "Cold Storage" },
+  { id: "brickloft", name: "Brick Loft" },
+  { id: "pool", name: "Swimming Pool" },
+  { id: "sakura", name: "Cherry Blossom Garden" },
+  { id: "meeting", name: "Meeting Room" },
 ];
 const MODES: { id: Settings["mode"]; name: string; desc: string }[] = [
   { id: "normal", name: "Basic", desc: "Players split into two teams: hunters and runners.\nHide until the end to win" },

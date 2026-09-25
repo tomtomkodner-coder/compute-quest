@@ -75,7 +75,8 @@ const HE: Record<string, string> = {
   // מפות וחדרים
   "Lobby": "לובי", "Hide-and-Seek Mansion": "אחוזת המחבואים", "Indoor Country": "כפר מקורה", "Sewer": "ביוב", "Backrooms": "בקרומס", "Penguin Hotel": "מלון הפינגווינים",
   "Sugarland": "ארץ הממתקים", "Osaka": "אוסקה", "Egypt": "מצרים", "Death Burger": "דת' בורגר", "Greece": "יוון", "Deep Sea": "מעמקי הים", "Shopping Mall": "קניון",
-  "Kyoto": "קיוטו", "Art Museum": "מוזיאון לאמנות",
+  "Kyoto": "קיוטו", "Art Museum": "מוזיאון לאמנות", "Art Gallery": "גלריה לאמנות", "Cold Storage": "חדר קירור", "Brick Loft": "לופט לבנים",
+  "Swimming Pool": "בריכת שחייה", "Cherry Blossom Garden": "גן הדובדבנים", "Meeting Room": "חדר ישיבות",
   "Main Hall": "האולם הראשי", "Library": "ספרייה", "Kitchen": "מטבח", "Laundry": "חדר כביסה", "Laundry Room": "חדר כביסה", "Storage": "מחסן", "Bathroom": "חדר רחצה",
   "Hallway": "מסדרון", "Stage Entrance": "כניסה לבמה", "Barn": "אסם", "Entrance": "כניסה", "Ballroom": "אולם נשפים", "Bedroom": "חדר שינה",
   // הודעות מהמנוע
