@@ -127,9 +127,12 @@ type Wire =
   | { k: "p"; p: Presence }
   | { k: "P"; list: [string, Presence][] }
   | { k: "e"; t: string; d: unknown }
-  | { k: "E"; t: string; d: unknown; f: string };
+  | { k: "E"; t: string; d: unknown; f: string }
+  | { k: "x"; why: string };
 
-export async function createP2PNet(code: string, host: boolean): Promise<Net> {
+export interface ServerOpts { password?: string; max?: number }
+
+export async function createP2PNet(code: string, host: boolean, opts: ServerOpts = {}): Promise<Net> {
   const { Peer } = await import("peerjs");
   const hostId = PREFIX + code.toUpperCase();
   const peer: PeerType = host ? new Peer(hostId) : new Peer();
@@ -138,7 +141,7 @@ export async function createP2PNet(code: string, host: boolean): Promise<Net> {
     peer.on("open", (id) => { window.clearTimeout(t); resolve(id); });
     peer.on("error", (e: { type?: string }) => {
       window.clearTimeout(t);
-      reject(new Error(e.type === "unavailable-id" ? "הקוד תפוס — נסו קוד אחר" : e.type === "peer-unavailable" ? "לא נמצא חדר עם הקוד הזה" : "החיבור נכשל"));
+      reject(new Error(e.type === "unavailable-id" ? "That code is taken — try another" : e.type === "peer-unavailable" ? "No server found with this code" : "Connection failed"));
     });
   });
 
@@ -157,6 +160,10 @@ export async function createP2PNet(code: string, host: boolean): Promise<Net> {
     pres.set(myId, mine);
     peer.on("connection", (c) => {
       c.on("open", () => {
+        // סיסמה ומספר שחקנים מרבי (כמו ב־Create Server במשחק)
+        const pw = (c.metadata as { pw?: string } | undefined)?.pw ?? "";
+        const why = opts.password && pw !== opts.password ? "Wrong password" : conns.size + 1 >= (opts.max ?? 24) ? "Server is full" : "";
+        if (why) { c.send({ k: "x", why } satisfies Wire); window.setTimeout(() => c.close(), 300); return; }
         conns.set(c.peer, c);
         dirty = true;
       });
@@ -182,21 +189,18 @@ export async function createP2PNet(code: string, host: boolean): Promise<Net> {
     });
   } else {
     await new Promise<void>((resolve, reject) => {
-      const c = peer.connect(hostId, { reliable: true });
-      const t = window.setTimeout(() => reject(new Error("לא נמצא חדר עם הקוד הזה")), 12000);
+      const c = peer.connect(hostId, { reliable: true, metadata: { pw: opts.password ?? "" } });
+      const t = window.setTimeout(() => reject(new Error("No server found with this code")), 12000);
       peer.on("error", (e: { type?: string }) => {
         window.clearTimeout(t);
-        reject(new Error(e.type === "peer-unavailable" ? "לא נמצא חדר עם הקוד הזה" : "החיבור נכשל"));
+        reject(new Error(e.type === "peer-unavailable" ? "No server found with this code" : "Connection failed"));
       });
-      c.on("open", () => {
-        window.clearTimeout(t);
-        hostConn = c;
-        ok = true;
-        resolve();
-      });
+      c.on("open", () => { hostConn = c; }); // מחכים לרשימת השחקנים הראשונה (או לדחייה: סיסמה שגויה / מלא)
       c.on("data", (raw) => {
         const m = raw as Wire;
+        if (m.k === "x") { window.clearTimeout(t); reject(new Error(m.why)); return; }
         if (m.k === "P") {
+          if (!ok) { ok = true; window.clearTimeout(t); resolve(); }
           pres.clear();
           for (const [id, p] of m.list) pres.set(id, id === myId ? mine : p);
           firePeers();

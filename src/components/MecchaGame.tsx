@@ -73,7 +73,7 @@ function saveName(n: string) {
 }
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-type Conn = { kind: "local" } | { kind: "room" } | { kind: "p2p"; code: string; host: boolean };
+type Conn = { kind: "local" } | { kind: "room" } | { kind: "p2p"; code: string; host: boolean; password?: string; max?: number };
 
 export function MecchaGame() {
   useLang();
@@ -87,6 +87,10 @@ export function MecchaGame() {
   const [search, setSearch] = useState(false);
   const [tab, setTab] = useState<"create" | "find">("create");
   const [optsOpen, setOptsOpen] = useState(false);
+  const [srvName, setSrvName] = useState("");
+  const [srvPw, setSrvPw] = useState("");
+  const [srvMax, setSrvMax] = useState(13);
+  const [joinPw, setJoinPw] = useState("");
   const [runId, setRunId] = useState(0);
 
   useEffect(() => {
@@ -166,9 +170,21 @@ export function MecchaGame() {
                 <input id="meccha-name" value={name} maxLength={14} onChange={(e) => setName(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[15px] outline-none focus:border-white/50" />
               </label>
               {tab === "create" ? (
-                <div className="grid gap-2">
-                  <button className={pbtn} onClick={async () => { const { randomCode } = await import("@/game/meccha/net"); go({ kind: "p2p", code: randomCode(), host: true }); }}>{t("Create Server")}</button>
-                  <button className={pbtn} onClick={() => go({ kind: "local" })}>{t("Offline (with Bots)")}</button>
+                <div className="grid gap-2 text-[13px]">
+                  <label className="grid gap-1"><span className="text-white/70">{t("Server Name")}</span>
+                    <input value={srvName} maxLength={24} placeholder={`${name || "Player"}'s server`} onChange={(e) => setSrvName(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[15px] outline-none focus:border-white/50" /></label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="grid gap-1"><span className="text-white/70">{t("Password")}</span>
+                      <input value={srvPw} maxLength={16} type="password" placeholder={t("(none)")} onChange={(e) => setSrvPw(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[15px] outline-none focus:border-white/50" /></label>
+                    <label className="grid gap-1"><span className="text-white/70">{t("Max Players")}</span>
+                      <select value={srvMax} onChange={(e) => setSrvMax(Number(e.target.value))} className="bg-black/50 border border-white/20 rounded px-2 py-1.5 text-[15px] outline-none">
+                        {Array.from({ length: 23 }, (_, i) => i + 2).map((n) => <option key={n} value={n} className="bg-black">{n}</option>)}
+                      </select></label>
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    <button className={`${pbtn} !bg-[#2e9e44] hover:!bg-[#38b951]`} onClick={async () => { const { randomCode } = await import("@/game/meccha/net"); go({ kind: "p2p", code: randomCode(), host: true, password: srvPw || undefined, max: srvMax }); }}>{t("Create Server")}</button>
+                    <button className={pbtn} onClick={() => go({ kind: "local" })}>{t("Offline (with Bots)")}</button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid gap-2">
@@ -182,8 +198,9 @@ export function MecchaGame() {
                   <div className="flex gap-2">
                     <input id="meccha-code" value={joinCode} placeholder={t("CODE")} dir="ltr" onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5))}
                       className="flex-1 min-w-0 bg-black/50 border border-white/20 rounded px-2.5 text-[18px] tracking-[0.3em] text-center outline-none" />
-                    <button disabled={joinCode.length !== 5} onClick={() => go({ kind: "p2p", code: joinCode, host: false })} className={`${pbtn} !w-auto px-5`}>{t("Join")}</button>
+                    <button disabled={joinCode.length !== 5} onClick={() => go({ kind: "p2p", code: joinCode, host: false, password: joinPw || undefined })} className={`${pbtn} !w-auto px-5`}>{t("Join")}</button>
                   </div>
+                  <input value={joinPw} type="password" maxLength={16} placeholder={t("Password")} onChange={(e) => setJoinPw(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[14px] outline-none" />
                 </div>
               )}
             </div>
@@ -226,7 +243,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         const netMod = await import("@/game/meccha/net");
         let net: Net;
         if (conn.kind === "room" && roomNet) net = roomNet;
-        else if (conn.kind === "p2p") net = await netMod.createP2PNet(conn.code, conn.host);
+        else if (conn.kind === "p2p") net = await netMod.createP2PNet(conn.code, conn.host, { password: conn.password, max: conn.max });
         else net = netMod.createLocalNet();
         const { Engine } = await import("@/game/meccha/engine");
         await Promise.all([(await import("@/game/meccha/character")).loadCharacterModels(), (await import("@/game/meccha/paintings")).loadPaintings()]);
@@ -253,7 +270,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         if (import.meta.env.DEV) (window as unknown as { __meccha: Engine }).__meccha = eng;
       } catch (e) {
         console.error(e);
-        setError(e instanceof Error ? e.message : "Failed to start (WebGL or connection).");
+        setError(e instanceof Error ? t(e.message) : t("Failed to start (WebGL or connection)."));
       }
     })();
     return () => {

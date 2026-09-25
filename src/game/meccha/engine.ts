@@ -1242,6 +1242,7 @@ export class Engine {
     }
     const t = rs.t;
     if (rs.ph === "countdown" && t <= 0) { this.startMatch(); return; }
+    if (rs.ph === "hide" && t <= 0 && !Object.values(rs.roles).includes("hunter") && rs.s.mode !== "double") { this.endRound("hiders", "solo"); return; }
     if (rs.ph === "hide" && t <= 0) {
       rs.ph = "hunt";
       if (rs.s.mode === "double") {
@@ -1347,7 +1348,7 @@ export class Engine {
   startCountdown() {
     if (!this.isHost() || this.rs.ph !== "lobby") return;
     this.ensureBots();
-    if (this.players.size < 2) { this.toast(t("Need at least 2 players (add Bots in Settings)")); this.emit(); return; }
+    // לבד בחדר (כמו במשחק): אפשר להתחיל כדי לראות את המפה — אחרי זמן ההמתנה עוברים ישר לבדיקת התשובות
     this.rs.ph = "countdown";
     this.setTimer(COUNTDOWN);
     this.pushRS();
@@ -1367,7 +1368,7 @@ export class Engine {
       if (hunters.length >= ids.length) hunters = hunters.slice(0, ids.length - 1);
       if (!hunters.length) {
         const shuffled = [...ids].sort(() => Math.random() - 0.5);
-        hunters = shuffled.slice(0, Math.max(1, Math.min(ids.length - 1, s.hunters)));
+        hunters = ids.length < 2 ? [] : shuffled.slice(0, Math.max(1, Math.min(ids.length - 1, s.hunters)));
       }
       for (const id of ids) rs.roles[id] = hunters.includes(id) ? "hunter" : "hider";
     }
