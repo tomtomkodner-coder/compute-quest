@@ -20,6 +20,9 @@ import { buildBrickLoft } from "./brickloft";
 import { buildPool } from "./pool";
 import { buildSakura } from "./sakura";
 import { buildMeeting } from "./meeting";
+import { buildSchool } from "./school";
+import { buildAmusement } from "./amusement";
+import { buildOnsen } from "./onsen";
 
 export type { World, Obstacle, Lighting } from "./kit";
 
@@ -46,6 +49,10 @@ export const MAPS: { id: string; name: string; build: () => World }[] = [
   { id: "pool", name: "Swimming Pool", build: buildPool },
   { id: "sakura", name: "Cherry Blossom Garden", build: buildSakura },
   { id: "meeting", name: "Meeting Room", build: buildMeeting },
+  // מפות נוספות (בקשת המשתמש)
+  { id: "school", name: "School", build: buildSchool },
+  { id: "amusement", name: "Amusement Park", build: buildAmusement },
+  { id: "onsen", name: "Hot Spring Inn", build: buildOnsen },
 ];
 
 export function buildMap(id: string): World {

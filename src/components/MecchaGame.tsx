@@ -49,6 +49,9 @@ const MAP_LIST = [
   { id: "pool", name: "Swimming Pool" },
   { id: "sakura", name: "Cherry Blossom Garden" },
   { id: "meeting", name: "Meeting Room" },
+  { id: "school", name: "School" },
+  { id: "amusement", name: "Amusement Park" },
+  { id: "onsen", name: "Hot Spring Inn" },
 ];
 const MODES: { id: Settings["mode"]; name: string; desc: string }[] = [
   { id: "normal", name: "Basic", desc: "Players split into two teams: hunters and runners.\nHide until the end to win" },
