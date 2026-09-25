@@ -6,6 +6,8 @@ import type { PoseId, SizeId, BodyType } from "@/game/meccha/character";
 import type { Net } from "@/game/meccha/net";
 import { setMuted as setSoundMuted, setVolume as setSoundVolume, sfxClick } from "@/lib/sound";
 import { t, getLang, setLang, onLang, isRtl, type Lang } from "@/game/meccha/i18n";
+import { THUMBS } from "@/game/meccha/thumbs";
+import { Splash, MainMenu, ServerScreen, SettingsScreen, MapsScreen, applySavedSettings, serverKey, type ServerForm } from "./MecchaMenu";
 
 /** מרנדר מחדש כשמחליפים שפה */
 function useLang() {
@@ -23,8 +25,8 @@ function LangToggle({ dark }: { dark?: boolean }) {
 }
 
 // מחרוזות הממשק לקוחות מהגרסה האנגלית של המשחק המקורי (בלי תרגומים מומצאים)
-// הפונט של המשחק: ממשק Unreal Engine באנגלית = Roboto (יפנית: Noto Sans JP)
-const FONT = `"Roboto", "Noto Sans JP", "Noto Sans Hebrew", system-ui, sans-serif`;
+// הפונט של המשחק (לפי צילומי המסך של התפריטים): עגול — M PLUS Rounded 1c
+const FONT = `"M PLUS Rounded 1c", "Noto Sans JP", system-ui, sans-serif`;
 const SERIF = `"Noto Serif", "Times New Roman", serif`;
 const OUTLINE = "0 2px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 6px rgba(0,0,0,.6)";
 const PLAYER_COLORS = ["#ff006e", "#3a86ff", "#ffbe0b", "#8338ec", "#fb5607", "#06d6a0", "#ef476f", "#118ab2"];
@@ -81,7 +83,14 @@ type Conn = { kind: "local" } | { kind: "room" } | { kind: "p2p"; code: string; 
 
 export function MecchaGame() {
   useLang();
-  const [screen, setScreen] = useState<"menu" | "game">("menu");
+  const [screen, setScreen] = useState<"splash" | "menu" | "create" | "find" | "settings" | "maps" | "game">("splash");
+  // בזמן מסך הטעינה טוענים מראש את כל מה שהמשחק צריך
+  const [ready] = useState(() => typeof window === "undefined" ? Promise.resolve() : Promise.all([
+    import("@/game/meccha/engine"), import("@/game/meccha/net"), import("@/game/meccha/poseicons"),
+    import("@/game/meccha/character").then((m) => m.loadCharacterModels()), import("@/game/meccha/paintings").then((m) => m.loadPaintings()),
+  ]));
+  const [form, setForm] = useState<ServerForm>({ name: "", server: "", password: "", region: "Not Specified", tags: ["Everyone Welcome"] });
+  const [showPublic, setShowPublic] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
   const [muted, setMuted] = useState(false);
@@ -124,96 +133,39 @@ export function MecchaGame() {
         muted={muted} onToggleMute={toggleMute} onExit={() => setScreen("menu")} />
     );
 
-  // מסך הפתיחה בסגנון המשחק במחשב: קיר לבנים (כמו בתמונת המפתח של המשחק), לוגו צבעוני, תפריט טקסט בצד שמאל
-  const item = "group relative w-fit text-left text-[30px] leading-none font-bold text-white tracking-tight py-1 transition hover:translate-x-2";
-  const under = (c: string) => <span className="absolute left-0 -bottom-0.5 h-[6px] w-0 group-hover:w-full transition-all rounded-full" style={{ background: c }} />;
-  const LOGO = ["#ff3d7f", "#ffb700", "#3ec7ff", "#7cf23a", "#ff6a00", "#b04dff"];
-  const logo = (w: string, o: number) => w.split("").map((ch, i) => (
-    <span key={i} style={{ background: `linear-gradient(135deg, ${LOGO[(i + o) % 6]}, ${LOGO[(i + o + 2) % 6]} 55%, ${LOGO[(i + o + 4) % 6]})`, WebkitBackgroundClip: "text", color: "transparent", display: "inline-block", transform: `rotate(${((i * 7) % 5) - 2}deg)` }}>{ch}</span>
-  ));
-  const panel = "rounded-md bg-[#101010]/85 border border-white/15 backdrop-blur-sm text-white p-5 w-[420px] max-w-[92vw]";
-  const pbtn = "w-full rounded-md py-2.5 text-[15px] font-bold bg-white/10 hover:bg-white/20 border border-white/15 transition disabled:opacity-40";
-  return (
-    <div onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }} className="relative h-screen overflow-hidden select-none text-white" dir="ltr"
-      style={{ fontFamily: FONT, backgroundColor: "#8f4431", backgroundImage: `linear-gradient(rgba(25,12,8,.25), rgba(25,12,8,.45)), url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cg fill='%23a0513a' stroke='%23d9c6b0' stroke-width='3'%3E%3Crect x='1.5' y='1.5' width='57' height='27' rx='2'/%3E%3Crect x='61.5' y='1.5' width='57' height='27' rx='2' fill='%23944a34'/%3E%3Crect x='-28.5' y='31.5' width='57' height='27' rx='2' fill='%23a95b41'/%3E%3Crect x='31.5' y='31.5' width='57' height='27' rx='2' fill='%238f4431'/%3E%3Crect x='91.5' y='31.5' width='57' height='27' rx='2' fill='%23a95b41'/%3E%3C/g%3E%3C/svg%3E\")`, backgroundSize: "auto, 150px 75px" }}>
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0,0,0,.65) 100%)" }} />
-      {/* דמות לבנה חצי צבועה כמו בתמונת המפתח */}
-      <div className="absolute right-[6%] bottom-0 h-[78%] aspect-[3/5] pointer-events-none opacity-95" aria-hidden>
-        <svg viewBox="0 0 300 500" className="w-full h-full" style={{ filter: "drop-shadow(0 12px 18px rgba(0,0,0,.5))" }}>
-          <defs><linearGradient id="bodyPaint" x1="0" x2="1"><stop offset="0.55" stopColor="#f4f2ee" /><stop offset="0.56" stopColor="#b5563d" /></linearGradient></defs>
-          <g fill="url(#bodyPaint)">
-            <circle cx="150" cy="70" r="58" /><rect x="88" y="120" width="124" height="200" rx="60" />
-            <rect x="30" y="140" width="46" height="170" rx="23" transform="rotate(18 53 140)" /><rect x="224" y="140" width="46" height="170" rx="23" transform="rotate(-24 247 140)" />
-            <rect x="96" y="290" width="52" height="210" rx="26" /><rect x="152" y="290" width="52" height="210" rx="26" />
-          </g>
-          <path d="M125 62 q6 -8 12 0 M163 62 q6 -8 12 0 M128 92 q22 20 44 0" stroke="#222" strokeWidth="6" fill="none" strokeLinecap="round" />
-        </svg>
-      </div>
-
-      <div className="relative z-10 h-full flex flex-col justify-between px-[6vw] py-[6vh]" dir={isRtl() ? "rtl" : "ltr"}>
-        <div className="leading-[0.9] font-black text-[clamp(48px,8vw,110px)]" style={{ filter: "drop-shadow(0 6px 0 rgba(0,0,0,.45))" }}>
-          <div>{logo("MECCHA", 0)}</div><div>{logo("CHAMELEON", 3)}</div>
-        </div>
-
-        <div className="flex items-end gap-10">
-          <nav className="flex flex-col gap-2.5 pb-1 shrink-0" style={{ textShadow: "0 3px 10px rgba(0,0,0,.6)" }}>
-            <button className={item} onClick={() => setSearch((v) => !v)}>{t("Start")}{under("#ffb700")}</button>
-            <button className={item} onClick={() => setOptsOpen(true)}>{t("Settings")}{under("#3ec7ff")}</button>
-            <Link to="/" className={item}>{t("Quit")}{under("#ff3d7f")}</Link>
-          </nav>
-
-          {search && (
-            <div className={panel}>
-              <div className="flex gap-1 mb-4 border-b border-white/15">
-                {(["create", "find"] as const).map((k) => (
-                  <button key={k} onClick={() => setTab(k)} className={`px-3 pb-2 text-[15px] font-bold border-b-2 -mb-px ${tab === k ? "border-[#ffb700] text-white" : "border-transparent text-white/60"}`}>{t(k === "create" ? "Create Server" : "Find Server")}</button>
-                ))}
-              </div>
-              <label className="grid gap-1 mb-3 text-[13px]">
-                <span className="text-white/70">{t("Name")}</span>
-                <input id="meccha-name" value={name} maxLength={14} onChange={(e) => setName(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[15px] outline-none focus:border-white/50" />
-              </label>
-              {tab === "create" ? (
-                <div className="grid gap-2 text-[13px]">
-                  <label className="grid gap-1"><span className="text-white/70">{t("Server Name")}</span>
-                    <input value={srvName} maxLength={24} placeholder={`${name || "Player"}'s server`} onChange={(e) => setSrvName(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[15px] outline-none focus:border-white/50" /></label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="grid gap-1"><span className="text-white/70">{t("Password")}</span>
-                      <input value={srvPw} maxLength={16} type="password" placeholder={t("(none)")} onChange={(e) => setSrvPw(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[15px] outline-none focus:border-white/50" /></label>
-                    <label className="grid gap-1"><span className="text-white/70">{t("Max Players")}</span>
-                      <select value={srvMax} onChange={(e) => setSrvMax(Number(e.target.value))} className="bg-black/50 border border-white/20 rounded px-2 py-1.5 text-[15px] outline-none">
-                        {Array.from({ length: 23 }, (_, i) => i + 2).map((n) => <option key={n} value={n} className="bg-black">{n}</option>)}
-                      </select></label>
-                  </div>
-                  <div className="flex gap-2 mt-1">
-                    <button className={`${pbtn} !bg-[#2e9e44] hover:!bg-[#38b951]`} onClick={async () => { const { randomCode } = await import("@/game/meccha/net"); go({ kind: "p2p", code: randomCode(), host: true, password: srvPw || undefined, max: srvMax }); }}>{t("Create Server")}</button>
-                    <button className={pbtn} onClick={() => go({ kind: "local" })}>{t("Offline (with Bots)")}</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  <div className="text-[12px] text-white/60">{t("Search Public Servers")}</div>
-                  <div className="rounded border border-white/15 bg-black/40 min-h-[48px] p-1.5 text-[14px]">
-                    {roomNet ? (
-                      <button onClick={() => go({ kind: "room" })} className="w-full flex justify-between items-center rounded px-2 py-1.5 hover:bg-white/10"><span>{t("This page's server")}</span><span className="text-[#7cf23a] text-[12px]">{t("Join")}</span></button>
-                    ) : <div className="px-2 py-1.5 text-white/50">{roomNet === undefined ? t("Checking for a shared server…") : t("No public servers found")}</div>}
-                  </div>
-                  <div className="text-[12px] text-white/60 mt-1">{t("Search Server")}</div>
-                  <div className="flex gap-2">
-                    <input id="meccha-code" value={joinCode} placeholder={t("CODE")} dir="ltr" onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5))}
-                      className="flex-1 min-w-0 bg-black/50 border border-white/20 rounded px-2.5 text-[18px] tracking-[0.3em] text-center outline-none" />
-                    <button disabled={joinCode.length !== 5} onClick={() => go({ kind: "p2p", code: joinCode, host: false, password: joinPw || undefined })} className={`${pbtn} !w-auto px-5`}>{t("Join")}</button>
-                  </div>
-                  <input value={joinPw} type="password" maxLength={16} placeholder={t("Password")} onChange={(e) => setJoinPw(e.target.value)} className="bg-black/50 border border-white/20 rounded px-2.5 py-1.5 text-[14px] outline-none" />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-      <button onClick={toggleMute} className="absolute bottom-4 right-4 z-20 rounded-full bg-black/45 border border-white/30 p-2.5" aria-label="Mute">{muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}</button>
-      {optsOpen && <MenuSettings onClose={() => setOptsOpen(false)} />}
-    </div>
+  const back = () => setScreen("menu");
+  const myName = (form.name || name).trim().slice(0, 30) || "Player";
+  const wrap = (el: React.ReactNode) => (
+    <div dir="ltr" style={{ fontFamily: FONT }} onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>{el}</div>
+  );
+  if (screen === "splash") return wrap(<Splash ready={ready} onDone={() => setScreen("menu")} />);
+  if (screen === "settings") return wrap(<SettingsScreen engine={null} inGame={false} muted={muted} onToggleMute={toggleMute} onClose={back} />);
+  if (screen === "maps") return wrap(<MapsScreen maps={MAP_LIST} onBack={back} />);
+  if (screen === "create" || screen === "find") {
+    const pub = roomNet && (screen === "create" || showPublic) ? [{ id: "room", name: t("This page's server"), players: `${Math.max(1, roomNet.peers().length)}/24`, tags: ["Everyone Welcome", "Basic Mode Main"], join: () => { setName(myName); go({ kind: "room" }); } }] : [];
+    const mine = screen === "create" ? [{ id: "mine", name: form.server || `${myName}'s server`, players: "1/24", tags: [form.region, ...form.tags].filter((x) => x !== "Not Specified"), join: () => create() }] : [];
+    function create() {
+      setName(myName);
+      const key = serverKey(form.server || `${myName} server`) || Math.random().toString(36).slice(2, 8);
+      go({ kind: "p2p", code: key, host: true, password: form.password || undefined, max: 24 });
+    }
+    return wrap(
+      <ServerScreen mode={screen} form={{ ...form, name: form.name || name }} setForm={(f) => { setForm(f); setName(f.name); }}
+        results={screen === "create" ? mine : pub}
+        onPrimary={() => {
+          if (screen === "create") return create();
+          if (!form.server.trim()) { setShowPublic(true); return; }
+          setName(myName);
+          go({ kind: "p2p", code: serverKey(form.server) || form.server, host: false, password: form.password || undefined });
+        }}
+        onPublic={() => setShowPublic(true)} onOffline={() => { setName(myName); go({ kind: "local" }); }} onBack={back} />,
+    );
+  }
+  return wrap(
+    <>
+      <MainMenu onCreate={() => setScreen("create")} onFind={() => { setShowPublic(false); setScreen("find"); }} onSettings={() => setScreen("settings")}
+        onQuit={() => { try { window.location.assign("/"); } catch { /* ignore */ } }} onMaps={() => setScreen("maps")} />
+    </>,
   );
 }
 
@@ -268,13 +220,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         eng.onChatKey = () => setChatOpen(true);
         eng.onTab = () => setMissedOpen((v) => !v);
         engineRef.current = eng;
-        try {
-          const num = (k: string) => { const v = localStorage.getItem(k); return v === null ? null : Number(v); };
-          const sens = num("meccha_sens"); if (sens !== null) eng.setSensitivity(sens);
-          const vol = num("meccha_vol"); if (vol !== null) setSoundVolume(vol);
-          const sh = num("meccha_shadow"); if (sh !== null) eng.setShadowQuality(sh as 0 | 1 | 2);
-          if (num("meccha_perf") === 1) eng.setPerformance(true);
-        } catch { /* ignore */ }
+        applySavedSettings(eng); // הגדרות שמורות (גרפיקה, סאונד, רגישות)
         setIcons((await import("@/game/meccha/poseicons")).POSE_ICONS); // מוכנים מראש — לא מרנדרים 35 תנוחות בכל פתיחה
         if (import.meta.env.DEV) (window as unknown as { __meccha: Engine }).__meccha = eng;
       } catch (e) {
@@ -482,7 +428,8 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
 
           {hud.paintMode && <PaintPanel hud={hud} engine={e} touch={touch} />}
           {poseMenu && <PoseWheel icons={icons} current={hud.pose} hover={poseHover} onPick={(p) => e?.setPose(p)} onClose={() => setPoseMenu(false)} touch={touch} />}
-          {optionsOpen && <OptionsPanel engine={e} muted={muted} onToggleMute={onToggleMute} onClose={() => setOptionsOpen(false)} onLeave={onExit} />}
+          {optionsOpen && <SettingsScreen engine={e} inGame muted={muted} onToggleMute={onToggleMute} onClose={() => setOptionsOpen(false)} onReturnTitle={onExit}
+            players={hud.players.filter((p) => !p.bot).map((p) => ({ id: p.id, name: p.name, me: p.me }))} />}
           {settingsOpen && <SettingsPanel hud={hud} engine={e} onClose={() => setSettingsOpen(false)} />}
           {charOpen && <CharPanel hud={hud} engine={e} onClose={() => setCharOpen(false)} />}
 
@@ -681,83 +628,81 @@ const secs = (list: number[]) => list.map((v) => ({ v, n: v >= 60 ? `${Math.floo
 const nums = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => ({ v: a + i, n: String(a + i) }));
 const onOff = [{ v: true, n: "ON" }, { v: false, n: "OFF" }];
 
+/** "Configure Map" — כמו במשחק: חוקים משמאל (ו־Start Game), פילטר וסוג גוף באמצע, תמונת מפה ורשימת מפות מימין */
 function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | null; onClose: () => void }) {
   const s = hud.settings;
   const dis = !hud.isHost;
   const set = (p: Partial<Settings>) => engine?.setSettings(p);
   const solo = hud.net === "local";
-  const col = "rounded border border-white/15 bg-black/35 p-3 min-h-0 overflow-auto";
-  const h = "text-sm font-bold mb-2";
+  const panel = "rounded-md bg-[#3a3a3a]/80 border border-white/10 backdrop-blur-[2px] p-3 min-h-0 overflow-auto";
+  const h = "text-[15px] font-bold mb-1.5 text-white";
+  const sec = (list: number[]) => list.map((v) => ({ v, n: String(v) }));
+  const pic = s.map === "random" ? null : THUMBS[s.map];
+  const bodies: { id: BodyType; n: string }[] = [{ id: "normal", n: "Normal" }, { id: "cube", n: "Cube" }, { id: "plump", n: "Plump" }];
   return (
-    <div className="absolute inset-0 z-40 bg-black/50 p-2 sm:p-4 grid place-items-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div dir={isRtl() ? "rtl" : "ltr"} className="relative w-full max-w-5xl h-full max-h-[640px] rounded-md bg-[#121212]/92 text-white border border-white/15 shadow-2xl backdrop-blur-sm p-3 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">{t("Configure Map")}</h2>
-          <button onClick={onClose} className="rounded-full bg-black text-white p-1" aria-label="Close"><X className="w-4 h-4" /></button>
+    <div className="absolute inset-0 z-40 p-3 sm:p-6 flex items-center justify-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
+      <div dir={isRtl() ? "rtl" : "ltr"} className="relative w-full max-w-[1180px] h-full max-h-[700px] grid grid-cols-1 md:grid-cols-[1.05fr_0.85fr_1fr] gap-3 text-white">
+        {/* חוקים */}
+        <div className={`${panel} flex flex-col`}>
+          <div className="flex-1 min-h-0 overflow-auto">
+            <Opt label="Game Mode" value={s.mode} disabled={dis} options={MODES.map((m) => ({ v: m.id, n: m.name }))} onChange={(v) => set({ mode: v })} />
+            <Opt label="Number of Hunters" value={s.hunters} disabled={dis || s.mode === "double"} options={nums(1, 6)} onChange={(v) => set({ hunters: v })} />
+            <Opt label="Hunter Wait Time(sec)" value={s.hideTime} disabled={dis} options={sec([30, 45, 60, 75, 90, 120, 150, 180, 200, 240, 300])} onChange={(v) => set({ hideTime: v })} />
+            <Opt label="Search Time(sec)" value={s.huntTime} disabled={dis} options={sec([60, 90, 120, 150, 180, 200, 240, 300, 420, 600])} onChange={(v) => set({ huntTime: v })} />
+            <Opt label="Answer Check Time(sec)" value={s.checkTime} disabled={dis} options={sec([5, 15, 30, 45, 60, 90])} onChange={(v) => set({ checkTime: v })} />
+            <Opt label="Forced Taunt Interval(sec)" value={s.whistle} disabled={dis} options={sec([0, 5, 10, 15, 20, 30, 45, 60, 90, 120])} onChange={(v) => set({ whistle: v })} />
+            <Opt label="Show Missed-Spot Ranking to Hunters" value={s.missed} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ missed: v })} />
+            <Opt label="Ammo Limit" value={s.ammoLimit} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ ammoLimit: v })} />
+            {s.ammoLimit && <Opt label="Ammo" value={s.ammo} disabled={dis} options={nums(1, 99)} onChange={(v) => set({ ammo: v })} />}
+            <Opt label="Allow Petit Chameleon" value={s.allowPetit} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ allowPetit: v })} />
+            <Opt label="Hunter TPS" value={s.hunterTps} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ hunterTps: v })} />
+            {solo && <Opt label="Bots" value={s.bots} disabled={dis} options={nums(1, 8)} onChange={(v) => set({ bots: v })} />}
+            {solo && <Opt label="Bot Level" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />}
+            {dis && <p className="text-[12px] text-white/60 mt-2">{t("Only the host can change the settings.")}</p>}
+          </div>
+          <div className="flex items-end justify-between pt-2">
+            {hud.isHost ? (
+              <button onClick={() => { engine?.startCountdown(); onClose(); }} className="rounded-sm bg-[#1b1b1b] border-2 border-[#3ddc4a] px-5 py-1.5 text-[16px] font-bold hover:text-[#5dff5d]">{t("Start Game")}</button>
+            ) : <span />}
+            <button onClick={onClose} className="flex items-center gap-1 text-[12px] text-white/85"><KeyBox k="Esc" /> {t("Back")}</button>
+          </div>
         </div>
-        {dis && <p className="text-xs font-bold text-white/60 -mt-1">{t("Only the host can change the settings.")}</p>}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 flex-1 min-h-0 overflow-auto md:overflow-hidden">
-          {/* מפה */}
-          <div className={col}>
-            <div className={h}>{t("Map")}</div>
-            <button disabled={dis} onClick={() => set({ map: "random" })}
-              className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-bold ${s.map === "random" ? "border-[#ffb700] bg-[#ffb700]/25" : "border-white/10 hover:bg-white/10"}`}>🎲 {t("Random")}</button>
-            {MAP_LIST.map((m) => (
-              <div key={m.id} className={`flex items-center gap-1.5 rounded-xl border-2 px-2 py-1 mb-1 ${s.map === m.id ? "border-[#3ec7ff] bg-[#3ec7ff]/25" : "border-white/10 hover:bg-white/10"}`}>
-                <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-start text-sm font-bold truncate">{t(m.name)}</button>
-                <label className="flex items-center gap-1 text-[10px] font-bold text-white/60" title={t("Include in Random")}>
-                  <input type="checkbox" disabled={dis} checked={s.pool.includes(m.id)}
-                    onChange={(ev) => set({ pool: ev.target.checked ? [...s.pool, m.id] : s.pool.filter((x) => x !== m.id) })} /> {t("random")}
-                </label>
+        {/* פילטר + סוג גוף */}
+        <div className={panel}>
+          <div className={h}>{t("Filter")}</div>
+          {([["mono", "Monochrome"], ["horror", "Horror"], ["mosaic", "Mosaic"]] as const).map(([k, n]) => (
+            <Opt key={k} label={n} value={s.filters[k]} disabled={dis} options={[{ v: false, n: "Off" }, { v: true, n: "On" }]} onChange={(v) => set({ filters: { ...s.filters, [k]: v } })} />
+          ))}
+          <div className={`${h} mt-4`}>{t("Body Type")}</div>
+          <div className="grid grid-cols-3 gap-2">
+            {bodies.map((b) => (
+              <button key={b.id} onClick={() => engine?.setMyBody(b.id)} className={`rounded border-2 p-1.5 flex flex-col items-center gap-1 ${hud.bodyType === b.id ? "border-[#3ddc4a] bg-white/10" : "border-white/15 hover:bg-white/10"}`}>
+                <svg viewBox="0 0 40 70" className="w-10 h-16" aria-hidden>
+                  {b.id === "cube" ? <g fill="#eee"><rect x="11" y="2" width="18" height="18" rx="3" /><rect x="9" y="22" width="22" height="24" rx="3" /><rect x="2" y="23" width="6" height="20" rx="2" /><rect x="32" y="23" width="6" height="20" rx="2" /><rect x="10" y="47" width="8" height="21" rx="2" /><rect x="22" y="47" width="8" height="21" rx="2" /></g>
+                    : <g fill="#eee"><circle cx="20" cy="11" r="9" /><rect x={b.id === "plump" ? 6 : 10} y="21" width={b.id === "plump" ? 28 : 20} height="26" rx={b.id === "plump" ? 13 : 9} /><rect x={b.id === "plump" ? 0 : 3} y="23" width="6" height="21" rx="3" /><rect x={b.id === "plump" ? 34 : 31} y="23" width="6" height="21" rx="3" /><rect x="11" y="44" width="8" height="24" rx="4" /><rect x="21" y="44" width="8" height="24" rx="4" /></g>}
+                </svg>
+                <span className="text-[12px]">{t(b.n)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* מפה */}
+        <div className={`${panel} flex flex-col`}>
+          <div className={h}>{t("Map")}</div>
+          <div className="aspect-[16/10] w-full rounded bg-[#222] grid place-items-center overflow-hidden mb-2 shrink-0">
+            {pic ? <img src={pic} alt="" className="w-full h-full object-cover" /> : <span className="text-[90px] font-black text-[#3ddc4a] leading-none">?</span>}
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto grid gap-1 content-start">
+            {[{ id: "random", name: "Random" }, ...MAP_LIST].map((m) => (
+              <div key={m.id} className={`flex items-center gap-2 rounded-sm px-2 py-1 border ${s.map === m.id ? "bg-[#2fb83a] border-[#5dff5d]" : "bg-black/30 border-white/10 hover:bg-white/10"}`}>
+                <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-center text-[14px] font-bold truncate">{t(m.name)}</button>
+                {m.id !== "random" && (
+                  <input type="checkbox" title={t("Include in Random")} disabled={dis} checked={s.pool.includes(m.id)} className="w-3.5 h-3.5 accent-[#3ddc4a]"
+                    onChange={(ev) => set({ pool: ev.target.checked ? [...s.pool, m.id] : s.pool.filter((x) => x !== m.id) })} />
+                )}
               </div>
             ))}
           </div>
-          {/* מצב + פילטרים */}
-          <div className={col}>
-            <div className={h}>{t("Game Mode")}</div>
-            {MODES.map((m) => (
-              <button key={m.id} disabled={dis} onClick={() => set({ mode: m.id })}
-                className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 ${s.mode === m.id ? "border-[#7cf23a] bg-[#7cf23a]/20" : "border-white/10 hover:bg-white/10"}`}>
-                <div className="text-sm font-bold">{t(m.name)}</div>
-                <div className="text-[11px] font-bold text-white/60 leading-tight">{t(m.desc)}</div>
-              </button>
-            ))}
-            <div className={`${h} mt-3`}>{t("Filters")}</div>
-            {([["mono", "Monochrome"], ["horror", "Horror"], ["mosaic", "Mosaic"]] as const).map(([k, n]) => (
-              <label key={k} className="flex items-center gap-2 rounded border border-white/10 px-2 py-1.5 mb-1 text-sm">
-                <input type="checkbox" disabled={dis} checked={s.filters[k]} onChange={(ev) => set({ filters: { ...s.filters, [k]: ev.target.checked } })} /> {t(n)}
-              </label>
-            ))}
-          </div>
-          {/* חוקים */}
-          <div className={col}>
-            <div className={h}>{t("Rules")}</div>
-            <Opt label="Number of Hunters" value={s.hunters} disabled={dis || s.mode === "double"} options={nums(1, 6)} onChange={(v) => set({ hunters: v })} />
-            <Opt label="Hunter Wait Time" value={s.hideTime} disabled={dis} options={secs([30, 45, 60, 75, 90, 120, 150, 180, 200, 240, 300])} onChange={(v) => set({ hideTime: v })} />
-            <Opt label="Search Time" value={s.huntTime} disabled={dis} options={secs([60, 90, 120, 150, 180, 200, 240, 300, 420, 600])} onChange={(v) => set({ huntTime: v })} />
-            <Opt label="Answer Check Time" value={s.checkTime} disabled={dis} options={secs([15, 30, 45, 60, 90])} onChange={(v) => set({ checkTime: v })} />
-            <Opt label="Forced Taunt" value={s.whistle} disabled={dis} options={[{ v: 0, n: "OFF" }, ...secs([5, 10, 15, 20, 30, 45, 60, 90, 120])]} onChange={(v) => set({ whistle: v })} />
-            <Opt label="Missed-Points Ranking for Hunters" value={s.missed} disabled={dis} options={onOff} onChange={(v) => set({ missed: v })} />
-            <Opt label="Ammo Limit" value={s.ammoLimit} disabled={dis} options={onOff} onChange={(v) => set({ ammoLimit: v })} />
-            {s.ammoLimit && <Opt label="Ammo" value={s.ammo} disabled={dis} options={nums(1, 99)} onChange={(v) => set({ ammo: v })} />}
-            <Opt label="Allow Petit Chameleon" value={s.allowPetit} disabled={dis} options={onOff} onChange={(v) => set({ allowPetit: v })} />
-            <Opt label="Hunter TPS" value={s.hunterTps} disabled={dis} options={onOff} onChange={(v) => set({ hunterTps: v })} />
-            {solo && (
-              <>
-                <div className="text-[11px] font-bold mt-3 text-white/60">{t("Practice (solo only)")}</div>
-                <Opt label="Bots" value={s.bots} disabled={dis} options={nums(1, 8)} onChange={(v) => set({ bots: v })} />
-                <Opt label="Bot Level" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />
-              </>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {hud.isHost && (
-            <button onClick={() => { engine?.startCountdown(); onClose(); }} className="rounded-md bg-[#2e9e44] hover:bg-[#38b951] border border-white/25 px-10 py-2.5 text-lg font-bold">
-              {t("Start")}
-            </button>
-          )}
-          <span className="text-xs font-bold text-white/60">{t("{n} players", { n: hud.players.length })} · {s.map === "random" ? t("Random map") : t(MAP_LIST.find((m) => m.id === s.map)?.name ?? "")}</span>
         </div>
       </div>
     </div>

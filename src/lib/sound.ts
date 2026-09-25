@@ -11,6 +11,11 @@ function getCtx() {
 }
 
 let masterVolume = 1;
+let bgmVolume = 1;
+let seVolume = 1;
+/** עוצמות נפרדות (לשונית Sound): מוזיקה / אפקטים */
+export function setBgmVolume(v: number) { bgmVolume = Math.max(0, Math.min(1, v)); }
+export function setSeVolume(v: number) { seVolume = Math.max(0, Math.min(1, v)); }
 /** עוצמה כללית 0..1 (מתפריט ההגדרות) */
 export function setVolume(v: number) {
   masterVolume = Math.max(0, Math.min(1, v));
@@ -31,7 +36,7 @@ export function playNoise(duration = 0.2, volume = 0.2, freq = 2000, type: Biqua
   f.type = type;
   f.frequency.value = freq;
   const g = ac.createGain();
-  g.gain.value = volume * masterVolume;
+  g.gain.value = volume * masterVolume * seVolume;
   src.connect(f).connect(g).connect(ac.destination);
   src.start(ac.currentTime + delay);
 }
@@ -41,7 +46,8 @@ export function setMuted(v: boolean) {
   if (v) stopMusic();
 }
 
-export function playTone(freq: number, duration = 0.15, type: OscillatorType = "square", volume = 0.15) {
+export function playTone(freq: number, duration = 0.15, type: OscillatorType = "square", volume = 0.15, bus: "se" | "bgm" = "se") {
+  volume *= bus === "bgm" ? bgmVolume : seVolume;
   if (masterMuted) return;
   const ac = getCtx();
   if (!ac) return;
@@ -102,8 +108,8 @@ export function startMusic() {
   const lead = [220, 277, 330, 415, 330, 277, 220, 277];
   musicInterval = window.setInterval(() => {
     if (masterMuted) return;
-    if (musicStep % 4 === 0) playTone(bass[(musicStep / 4) % bass.length], 0.3, "triangle", 0.04);
-    playTone(lead[musicStep % lead.length], 0.12, "square", 0.02);
+    if (musicStep % 4 === 0) playTone(bass[(musicStep / 4) % bass.length], 0.3, "triangle", 0.04, "bgm");
+    playTone(lead[musicStep % lead.length], 0.12, "square", 0.02, "bgm");
     musicStep++;
   }, 220);
 }
@@ -121,7 +127,7 @@ let water: { g: GainNode } | null = null;
 export function setWaterAmbience(level: number) {
   const ac = getCtx();
   if (!ac) return;
-  const target = masterMuted ? 0 : Math.max(0, Math.min(1, level)) * 0.2 * masterVolume;
+  const target = masterMuted ? 0 : Math.max(0, Math.min(1, level)) * 0.2 * masterVolume * seVolume;
   if (!water) {
     if (target < 0.002) return;
     const len = ac.sampleRate * 4;

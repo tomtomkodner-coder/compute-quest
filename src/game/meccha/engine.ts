@@ -8,6 +8,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { AfterimagePass } from "three/examples/jsm/postprocessing/AfterimagePass.js";
 import { buildMap, MAPS, type World } from "./maps";
 import { buildNav, type Nav } from "./nav";
 import { loadHdri } from "./hdri";
@@ -449,6 +450,9 @@ export class Engine {
         this.gtao.blendIntensity = 0.85;
         this.composer.addPass(this.gtao);
       }
+      this.blurPass = new AfterimagePass(0);
+      this.blurPass.enabled = false;
+      this.composer.addPass(this.blurPass);
       this.composer.addPass(new OutputPass());
       this.filterPass = new ShaderPass(FILTER_SHADER);
       this.filterPass.enabled = false;
@@ -706,12 +710,12 @@ export class Engine {
   /** מצלמים את המפה עצמה לקובייה (פעם אחת) — רצפות מבריקות, מתכת וזכוכית משקפות את החדר האמיתי */
   private bakeProbe() {
     const L = this.world.lighting;
-    if (L.hdriBackground || this.perfMode) return; // מפות פתוחות: השמיים (HDRI) הם ההשתקפות
+    if (L.hdriBackground || this.perfMode || this.gfx.reflection === 0) return; // מפות פתוחות: השמיים (HDRI) הם ההשתקפות
     const B = this.world.bounds;
     const sp = this.world.hiderSpawns;
     const c = sp.length ? sp.reduce((a, v) => a.add(v), new THREE.Vector3()).multiplyScalar(1 / sp.length) : new THREE.Vector3((B.minX + B.maxX) / 2, 0, (B.minZ + B.maxZ) / 2);
     c.y = 1.8;
-    const rt = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType });
+    const rt = new THREE.WebGLCubeRenderTarget([64, 64, 128, 256, 512][this.gfx.reflection], { type: THREE.HalfFloatType });
     const cam = new THREE.CubeCamera(0.1, 250, rt);
     cam.position.copy(c);
     const hidden: THREE.Object3D[] = [];
@@ -1585,9 +1589,41 @@ export class Engine {
   // ================= לולאה =================
 
   private bgIv = 0;
+  private lastDraw = 0;
+  private blurPass: AfterimagePass | null = null;
+  /** הגדרות גרפיקה (כמו בלשונית Graphics במשחק): 0..4 = Off/Low/Medium/High/Highest */
+  gfx = { res: 0, shadow: 4, texture: 4, gi: 4, effects: 4, aa: 3, shading: 4, reflection: 4, motionBlur: 0, fpsLimit: 60, fov: 70 };
+  setGraphics(g: Partial<Engine["gfx"]>) {
+    Object.assign(this.gfx, g);
+    const G = this.gfx;
+    // צל
+    const size = [0, 512, 1024, 2048, 2048][G.shadow];
+    this.renderer.shadowMap.enabled = G.shadow > 0;
+    if (size && this.sun.shadow.mapSize.x !== size) { this.sun.shadow.mapSize.set(size, size); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
+    this.sun.shadow.radius = G.shading >= 3 ? 3 : 1;
+    // תאורה גלובלית (AO)
+    if (this.gtao) { this.gtao.enabled = G.gi > 0 && !this.perfMode; this.gtao.blendIntensity = [0, 0.5, 0.7, 0.85, 1][G.gi]; }
+    // טקסטורות: סינון אנאיזוטרופי
+    const an = [1, 2, 4, 8, 16][G.texture];
+    this.world?.group.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.map && m.map.anisotropy !== an) { m.map.anisotropy = an; m.map.needsUpdate = true; } });
+    // טשטוש תנועה
+    if (this.blurPass) { this.blurPass.enabled = G.motionBlur > 0; this.blurPass.uniforms.damp.value = Math.min(0.92, G.motionBlur / 100 * 0.92); }
+    // רזולוציה × החלקת קצוות = יחס פיקסלים
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const resScale = G.res > 0 ? Math.max(0.4, Math.min(2, G.res / Math.max(1, window.innerHeight))) : dpr;
+    this.renderer.setPixelRatio(this.perfMode ? 1 : resScale * [0.6, 0.75, 0.9, 1, 1][G.aa]);
+    this.camera.fov = G.fov;
+    this.camera.updateProjectionMatrix();
+    this.resize();
+    this.probeDue = G.reflection > 0 ? 2 : 0;
+    if (G.reflection === 0 && this.probeEnv) { this.scene.environment = this.envCache.get(this.world.lighting.hdri ?? "") ?? this.roomEnv; }
+    this.scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.needsUpdate = true; });
+  }
   private frame = (now: number) => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
+    if (this.gfx.fpsLimit > 0 && now - this.lastDraw < 1000 / this.gfx.fpsLimit - 1.5) return; // Frame Rate Limit
+    this.lastDraw = now;
     const real = Math.max(0, Math.min(0.25, (now - this.last) / 1000));
     this.last = now;
     try {
