@@ -425,7 +425,7 @@ export class Engine {
     this.hemi = new THREE.HemisphereLight("#ffffff", "#888888", 1.2);
     this.sun = new THREE.DirectionalLight("#ffffff", 1.6);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(4096, 4096);
+    this.sun.shadow.mapSize.set(2048, 2048);
     Object.assign(this.sun.shadow.camera, { left: -27, right: 27, top: 24, bottom: -24, near: 1, far: 90 });
     this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.shadow.bias = -0.0005;
@@ -505,6 +505,15 @@ export class Engine {
     this.syncPeers();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
+    // לשונית מוסתרת (Alt-Tab): הדפדפן עוצר את requestAnimationFrame — ממשיכים להריץ את לוגיקת המשחק והרשת
+    // בטיימר, כדי שהסיבוב לא ייעצר לכולם כשהמארח עובר חלון
+    this.bgIv = window.setInterval(() => {
+      if (this.disposed || !document.hidden) return;
+      const now = performance.now();
+      const real = Math.max(0, Math.min(1, (now - this.last) / 1000));
+      this.last = now;
+      try { this.update(Math.min(0.05, real), real); } catch (e) { console.error(e); }
+    }, 250);
   }
 
   // ================= עולם =================
@@ -562,7 +571,7 @@ export class Engine {
     this.points = L.points.map((pt, i) => {
       const l = new THREE.PointLight(pt.color, pt.int, pt.dist, 1.6);
       l.position.set(...pt.pos);
-      if (strong.includes(i) && this.shadowQ === 2 && !this.perfMode) {
+      if (false && strong.includes(i) && this.shadowQ === 2 && !this.perfMode) { // צללי מנורות: כבד מדי (6 רינדורים לכל מנורה בכל פריים)
         l.castShadow = true;
         l.shadow.mapSize.set(512, 512);
         l.shadow.bias = -0.002;
@@ -1474,6 +1483,7 @@ export class Engine {
 
   // ================= לולאה =================
 
+  private bgIv = 0;
   private frame = (now: number) => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
@@ -2902,7 +2912,7 @@ export class Engine {
     this.shadowQ = q;
     this.renderer.shadowMap.enabled = q > 0;
     for (const p of this.points) p.castShadow = p.castShadow && q === 2;
-    const size = q === 2 ? 4096 : 1024;
+    const size = q === 2 ? 2048 : 1024;
     if (this.sun.shadow.mapSize.x !== size) { this.sun.shadow.mapSize.set(size, size); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
     this.scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.needsUpdate = true; });
   }
@@ -3160,6 +3170,7 @@ export class Engine {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    window.clearInterval(this.bgIv);
     stopMusic();
     this.ro.disconnect();
     this.offs.forEach((f) => f());
