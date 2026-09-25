@@ -245,10 +245,15 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
         if (conn.kind === "room" && roomNet) net = roomNet;
         else if (conn.kind === "p2p") net = await netMod.createP2PNet(conn.code, conn.host, { password: conn.password, max: conn.max });
         else net = netMod.createLocalNet();
+        performance.mark("m-net");
         const { Engine } = await import("@/game/meccha/engine");
+        performance.mark("m-import");
         await Promise.all([(await import("@/game/meccha/character")).loadCharacterModels(), (await import("@/game/meccha/paintings")).loadPaintings()]);
         if (!alive || !mountRef.current) { if (net.kind === "p2p") net.close(); return; }
+        performance.mark("m-assets");
         eng = new Engine(mountRef.current, net, { name, color, muted, defaultBots: net.kind === "local" ? 3 : 0, onHud: setHud });
+        performance.mark("m-engine");
+        performance.measure("import", "m-net", "m-import"); performance.measure("assets", "m-import", "m-assets"); performance.measure("engine", "m-assets", "m-engine");
         eng.onPoseMenu = (open) => {
           if (open) { poseHover.current = null; setPoseMenu(true); return; }
           if (poseHover.current) eng?.setPose(poseHover.current); // משחררים R = בוחרים
@@ -266,7 +271,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           const sh = num("meccha_shadow"); if (sh !== null) eng.setShadowQuality(sh as 0 | 1 | 2);
           if (num("meccha_perf") === 1) eng.setPerformance(true);
         } catch { /* ignore */ }
-        try { setIcons(eng.poseIcons()); } catch { /* אין אייקונים */ }
+        setIcons((await import("@/game/meccha/poseicons")).POSE_ICONS); // מוכנים מראש — לא מרנדרים 35 תנוחות בכל פתיחה
         if (import.meta.env.DEV) (window as unknown as { __meccha: Engine }).__meccha = eng;
       } catch (e) {
         console.error(e);

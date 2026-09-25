@@ -21,6 +21,7 @@ import { Fx, rainbow, type Surface } from "./fx";
 const DOWN = new THREE.Vector3(0, -1, 0);
 const STEP_ORIGIN = new THREE.Vector3();
 import { buildShotgun } from "./gun";
+import { THUMBS } from "./thumbs";
 import type { Net, Presence } from "./net";
 import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic } from "@/lib/sound";
 
@@ -432,7 +433,9 @@ export class Engine {
     this.scene.add(this.hemi, this.sun, this.camera);
     // החזרי סביבה (PBR) + הצללה סביבתית (AO) — מה שנותן למפות מראה מציאותי
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    performance.mark("e-0");
     this.roomEnv = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    performance.mark("e-pmrem");
     this.scene.environment = this.roomEnv;
     const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
     try {
@@ -464,7 +467,9 @@ export class Engine {
     this.viewGun.visible = false;
 
     this.rs = { id: 0, ph: "lobby", t: 0, s: { ...DEFAULT_SETTINGS, bots: opts.defaultBots }, map: "lobby", roles: {}, dead: [], conv: [], deadAt: {}, final: {} };
+    performance.mark("e-pre");
     this.loadWorld("lobby");
+    performance.mark("e-lobby");
 
     this.me = this.makePlayer(net.selfId(), opts.name, opts.color, false, true);
     this.me.likes = this.likes;
@@ -511,7 +516,9 @@ export class Engine {
       this.world.dispose();
     }
     this.fx.clearDecals();
-    this.world = buildMap(id);
+    this.world = this.prebuilt?.id === id ? this.prebuilt.world : buildMap(id);
+    if (this.prebuilt && this.prebuilt.id !== id) this.prebuilt.world.dispose();
+    this.prebuilt = null;
     this.worldId = id;
     this.scene.add(this.world.group);
     const L = this.world.lighting;
@@ -616,10 +623,15 @@ export class Engine {
 
   private applyBoards() {
     for (const b of this.world.boards ?? []) {
-      const tex = this.thumbs.get(b.mapId);
       const m = b.mesh.material as THREE.MeshStandardMaterial;
+      let tex = this.thumbs.get(b.mapId);
+      if (!tex && THUMBS[b.mapId]) {
+        // צילום מוכן מראש (לא בונים את המפה בזמן ריצה — זה היה גורם לגמגומים בלובי)
+        tex = new THREE.TextureLoader().load(THUMBS[b.mapId]);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        this.thumbs.set(b.mapId, tex);
+      }
       if (tex) { m.map = tex; m.color.set("#ffffff"); m.roughness = 0.35; m.needsUpdate = true; }
-      else if (!this.thumbQueue.includes(b.mapId)) this.thumbQueue.push(b.mapId);
     }
   }
 
@@ -683,7 +695,7 @@ export class Engine {
   }
 
   private updateThumbs(dt: number) {
-    if (this.worldId !== "lobby") return;
+    if (this.worldId !== "lobby" || !this.thumbQueue.length) return;
     this.thumbT -= dt;
     if (this.thumbJob) { if (!this.thumbWait) this.shootThumb(); return; }
     if (this.thumbT > 0 || !this.thumbQueue.length) return;
@@ -1002,8 +1014,19 @@ export class Engine {
 
   // ================= מצב הסיבוב =================
 
+  private prebuilt: { id: string; world: World } | null = null;
+  private prebuildT = 0;
   private onRS() {
     const rs = this.rs;
+    // בונים מראש את מפת הסיבוב בזמן הספירה לאחור, כך שהמעבר למפה מיידי
+    if (rs.ph === "countdown" && MAPS.some((m) => m.id === rs.map) && this.prebuilt?.id !== rs.map && !this.prebuildT) {
+      const id = rs.map;
+      this.prebuildT = window.setTimeout(() => {
+        this.prebuildT = 0;
+        if (this.disposed || this.rs.map !== id || this.worldId === id) return;
+        try { this.prebuilt?.world.dispose(); this.prebuilt = { id, world: buildMap(id) }; } catch (e) { console.warn("prebuild", e); }
+      }, 600);
+    }
     if (rs.t !== this.lastT) {
       this.lastT = rs.t;
       this.localEnd = performance.now() + rs.t * 1000;
@@ -1344,12 +1367,20 @@ export class Engine {
     this.setTimer(rs.s.checkTime);
   }
 
+  private pickMap() {
+    const s = this.rs.s;
+    const pool = MAPS.filter((m) => s.pool.includes(m.id));
+    const list = pool.length ? pool : MAPS;
+    return s.map === "random" ? list[Math.floor(Math.random() * list.length)].id : s.map;
+  }
+
   /** המארח לוחץ Start (בכן ה־PLAY) — מתחילה ספירה לאחור */
   startCountdown() {
     if (!this.isHost() || this.rs.ph !== "lobby") return;
     this.ensureBots();
     // לבד בחדר (כמו במשחק): אפשר להתחיל כדי לראות את המפה — אחרי זמן ההמתנה עוברים ישר לבדיקת התשובות
     this.rs.ph = "countdown";
+    this.rs.map = this.pickMap(); // כמו במשחק: אפשר לראות את המפה הנוכחית לפני ההתחלה
     this.setTimer(COUNTDOWN);
     this.pushRS();
   }
@@ -1372,9 +1403,7 @@ export class Engine {
       }
       for (const id of ids) rs.roles[id] = hunters.includes(id) ? "hunter" : "hider";
     }
-    const pool = MAPS.filter((m) => s.pool.includes(m.id));
-    const list = pool.length ? pool : MAPS;
-    rs.map = s.map === "random" ? list[Math.floor(Math.random() * list.length)].id : s.map;
+    if (!MAPS.some((m) => m.id === rs.map)) rs.map = this.pickMap(); // נבחרה כבר בתחילת הספירה
     rs.dead = [];
     rs.conv = [];
     rs.deadAt = {};
