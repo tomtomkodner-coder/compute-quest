@@ -23,7 +23,7 @@ const STEP_ORIGIN = new THREE.Vector3();
 import { buildShotgun } from "./gun";
 import { THUMBS } from "./thumbs";
 import type { Net, Presence } from "./net";
-import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic } from "@/lib/sound";
+import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic, setWaterAmbience, playDrip } from "@/lib/sound";
 
 // ================= טיפוסים =================
 
@@ -596,10 +596,12 @@ export class Engine {
         if (this.worldId !== wid) return;
         this.scene.environment = env;
         if (L.hdriBackground) { this.scene.background = tex; this.scene.backgroundBlurriness = L.hdriBackground; }
+        this.probeDue = 2; // אחרי שה־HDRI נטען — מצלמים מחדש את בדיקת ההשתקפות
       }).catch((e) => console.warn("hdri", e));
     }
     this.world.setGate(true);
     this.applyBoards();
+    this.setupAmbient();
     this.nav = buildNav(this.world);
     this.world.setGate(this.rs?.ph !== "hide");
     this.attached = null;
@@ -629,6 +631,105 @@ export class Engine {
   }
 
   // ---------- תמונות המפות בלובי ----------
+
+  // ---------- אווירה: מים זורמים + רחש מים, מנורות מהבהבות, השתקפויות אמיתיות של המפה ----------
+  private flowMats: { m: THREE.MeshStandardMaterial; f: [number, number] }[] = [];
+  private waterBoxes: THREE.Box3[] = [];
+  private flickers: { l: THREE.PointLight; base: number; ph: number; hard: boolean }[] = [];
+  private probeEnv: THREE.Texture | null = null;
+  private probeDue = 0;
+  private dripT = 2;
+  private setupAmbient() {
+    this.flowMats = [];
+    this.waterBoxes = [];
+    const seen = new Set<THREE.Material>();
+    this.world.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial;
+      const f = mat?.userData?.flow as [number, number] | undefined;
+      if (!f) return;
+      if (!seen.has(mat)) { seen.add(mat); this.flowMats.push({ m: mat, f }); }
+      this.waterBoxes.push(new THREE.Box3().setFromObject(m));
+    });
+    // יותר השתקפות: רצפות גדולות (לא שטיח/דשא) מבריקות קצת יותר
+    const bb = new THREE.Box3();
+    const glossed = new Set<THREE.Material>();
+    this.world.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial;
+      if (!mat || glossed.has(mat) || !("roughness" in mat) || mat.userData.flow || mat.transparent) return;
+      bb.setFromObject(m);
+      if (bb.max.y - bb.min.y < 0.35 && bb.min.y < 0.3 && (bb.max.x - bb.min.x) * (bb.max.z - bb.min.z) > 30 && mat.roughness > 0.45 && mat.roughness < 0.86) {
+        mat.roughness *= 0.72;
+        glossed.add(mat);
+      }
+    });
+    // מנורות מהבהבות: חלק מהמנורות (יותר במפות חשוכות — ביוב, בקרומס, דת' בורגר)
+    const dark = ["sewer", "backrooms", "deathburger"].includes(this.worldId);
+    this.flickers = [];
+    this.points.forEach((l, i) => {
+      const h = Math.sin(i * 12.9898 + this.worldId.length * 78.233) * 43758.5453;
+      const r = h - Math.floor(h);
+      if (this.worldId !== "lobby" && r < (dark ? 0.45 : 0.18)) this.flickers.push({ l, base: l.intensity, ph: r * 100, hard: dark && r < 0.2 });
+    });
+    this.probeDue = 2;
+    this.setWaterLevel(0);
+  }
+  private setWaterLevel(v: number) { setWaterAmbience(this.opts.muted ? 0 : v); }
+  private updateAmbient(dt: number) {
+    const t = performance.now() / 1000;
+    for (const { m, f } of this.flowMats) {
+      if (m.map) { m.map.offset.x += f[0] * dt; m.map.offset.y += f[1] * dt; }
+      if (m.normalMap) { m.normalMap.offset.x -= f[1] * dt * 0.6; m.normalMap.offset.y += f[0] * dt * 0.6 + f[1] * dt * 0.8; }
+    }
+    for (const fl of this.flickers) {
+      // הבהוב: רעידה עדינה, ומדי פעם כיבוי קצר (במנורות "תקולות")
+      const n = Math.sin(t * 13 + fl.ph) * 0.5 + Math.sin(t * 29 + fl.ph * 2) * 0.3;
+      const cut = fl.hard && Math.sin(t * 0.9 + fl.ph) > 0.93 && Math.sin(t * 41 + fl.ph) > -0.2;
+      fl.l.intensity = cut ? fl.base * 0.05 : fl.base * (0.85 + 0.12 * n);
+    }
+    // רחש מים לפי המרחק מהמים הקרובים
+    if (this.waterBoxes.length) {
+      const p = this.cameraAnchor();
+      let d = Infinity;
+      for (const b of this.waterBoxes) d = Math.min(d, b.distanceToPoint(p));
+      const lv = Math.max(0, 1 - d / 14);
+      this.setWaterLevel(lv);
+      this.dripT -= dt;
+      if (this.dripT <= 0) { this.dripT = 0.6 + Math.random() * 2.4; if (lv > 0.15 && !this.opts.muted) playDrip(0.05 + lv * 0.08); }
+    }
+    if (this.probeDue > 0 && --this.probeDue === 0) this.bakeProbe();
+  }
+  private cameraAnchor() { return this.camera.getWorldPosition(new THREE.Vector3()); }
+  /** מצלמים את המפה עצמה לקובייה (פעם אחת) — רצפות מבריקות, מתכת וזכוכית משקפות את החדר האמיתי */
+  private bakeProbe() {
+    const L = this.world.lighting;
+    if (L.hdriBackground || this.perfMode) return; // מפות פתוחות: השמיים (HDRI) הם ההשתקפות
+    const B = this.world.bounds;
+    const sp = this.world.hiderSpawns;
+    const c = sp.length ? sp.reduce((a, v) => a.add(v), new THREE.Vector3()).multiplyScalar(1 / sp.length) : new THREE.Vector3((B.minX + B.maxX) / 2, 0, (B.minZ + B.maxZ) / 2);
+    c.y = 1.8;
+    const rt = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType });
+    const cam = new THREE.CubeCamera(0.1, 250, rt);
+    cam.position.copy(c);
+    const hidden: THREE.Object3D[] = [];
+    for (const p of this.players.values()) if (p.ch.root.visible) { p.ch.root.visible = false; hidden.push(p.ch.root); }
+    const vg = this.viewGun.visible;
+    this.viewGun.visible = false;
+    const prevEnv = this.scene.environment;
+    try {
+      cam.update(this.renderer, this.scene);
+      const env = this.pmrem.fromCubemap(rt.texture).texture;
+      this.probeEnv?.dispose();
+      this.probeEnv = env;
+      this.scene.environment = env;
+    } catch (e) { console.warn("probe", e); this.scene.environment = prevEnv; }
+    for (const h of hidden) h.visible = true;
+    this.viewGun.visible = vg;
+    rt.dispose();
+  }
 
   private applyBoards() {
     for (const b of this.world.boards ?? []) {
@@ -1491,6 +1592,7 @@ export class Engine {
     this.last = now;
     try {
       this.update(Math.min(0.05, real), real);
+      this.updateAmbient(real);
     } catch (e) {
       console.error(e);
     }
@@ -3171,6 +3273,7 @@ export class Engine {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     window.clearInterval(this.bgIv);
+    setWaterAmbience(0);
     stopMusic();
     this.ro.disconnect();
     this.offs.forEach((f) => f());

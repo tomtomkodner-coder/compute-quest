@@ -104,6 +104,7 @@ export function buildSewer(): World {
   const concDark = k.mat(conc.ptex, "#77797a", [1, 1], { roughness: 0.9, bump: 0.7 });
   const stone = k.mat(conc.ptex, "#c4c2bc", [1, 1], { roughness: 0.8, bump: 0.9 });
   const waterM = k.mat(k.tex("s2-water", () => S.mudWater(10)), "#fff", [1, 1], { roughness: 0.1, metalness: 0.2, bump: 0.9 });
+  waterM.m.userData.flow = [0.004, 0.035]; // המים בתעלה זורמים (המנוע מזיז את הטקסטורה ומשמיע רחש מים)
   const mudM = k.mat(waterM.ptex, "#8a8070", [1, 1], { roughness: 0.3, bump: 1.0 });
   const rustM = k.mat(k.tex("s2-rust", () => S.rust(5, null)), "#fff", [1, 1], { metalness: 0.45, roughness: 0.75, bump: 1.0 });
   const rustDark = k.mat(rustM.ptex, "#8a7064", [1, 1], { metalness: 0.5, roughness: 0.7, bump: 1.0 });
