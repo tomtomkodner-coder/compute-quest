@@ -891,3 +891,374 @@ export function fastNormal(t: PaintTex): THREE.CanvasTexture {
   t.normal = tex as unknown as THREE.CanvasTexture;
   return t.normal;
 }
+
+// ======================================================================
+// v2: textures matched to the real game screenshots
+// ======================================================================
+
+/** one pointed leaf (for damask ornaments) */
+function leafPath(g: G, x: number, y: number, len: number, wid: number, ang: number, curl = 0) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const P = (u: number, v: number): [number, number] => [x + c * u - s * v, y + s * u + c * v];
+  g.beginPath();
+  g.moveTo(...P(0, 0));
+  g.bezierCurveTo(...P(len * 0.3, -wid), ...P(len * 0.75, -wid * 0.8 + curl), ...P(len, curl * 1.4));
+  g.bezierCurveTo(...P(len * 0.7, wid * 0.7 + curl), ...P(len * 0.3, wid * 0.9), ...P(0, 0));
+  g.fill();
+}
+/** ornate damask ornament (mirror-symmetric), height ~ 1 unit = s px, centred at cx, cy */
+function damaskOrnament(g: G, cx: number, cy: number, s: number, hi: string, fg: string) {
+  g.save();
+  g.translate(cx, cy);
+  for (const m of [1, -1]) {
+    g.save();
+    g.scale(m, 1);
+    g.fillStyle = fg;
+    // big curling acanthus leaves at the waist
+    leafPath(g, 0.02 * s, 0.05 * s, 0.34 * s, 0.1 * s, -0.5, -0.04 * s);
+    leafPath(g, 0.02 * s, 0.12 * s, 0.3 * s, 0.09 * s, 0.35, 0.05 * s);
+    // upper fronds (palmette)
+    leafPath(g, 0.0, -0.12 * s, 0.26 * s, 0.07 * s, -1.05, -0.03 * s);
+    leafPath(g, 0.0, -0.14 * s, 0.2 * s, 0.06 * s, -1.35, 0);
+    // "bird" wing leaves at the bottom
+    leafPath(g, 0.03 * s, 0.26 * s, 0.24 * s, 0.08 * s, 0.9, 0.05 * s);
+    leafPath(g, 0.18 * s, 0.34 * s, 0.14 * s, 0.05 * s, -0.2, 0);
+    // side scrolls
+    g.lineWidth = 0.022 * s;
+    g.strokeStyle = fg;
+    g.beginPath();
+    g.moveTo(0.28 * s, -0.08 * s);
+    g.bezierCurveTo(0.42 * s, -0.2 * s, 0.44 * s, 0.05 * s, 0.34 * s, 0.02 * s);
+    g.stroke();
+    // highlight veins
+    g.fillStyle = hi;
+    leafPath(g, 0.05 * s, 0.05 * s, 0.24 * s, 0.03 * s, -0.5, -0.02 * s);
+    leafPath(g, 0.03 * s, -0.13 * s, 0.17 * s, 0.022 * s, -1.05, 0);
+    leafPath(g, 0.05 * s, 0.26 * s, 0.16 * s, 0.025 * s, 0.9, 0.02 * s);
+    g.restore();
+  }
+  // centre stem, bud and crown
+  g.fillStyle = fg;
+  g.beginPath();
+  g.ellipse(0, 0.02 * s, 0.07 * s, 0.16 * s, 0, 0, Math.PI * 2);
+  g.fill();
+  leafPath(g, 0, -0.14 * s, 0.3 * s, 0.07 * s, -Math.PI / 2, 0);
+  g.beginPath();
+  g.arc(0, -0.47 * s, 0.035 * s, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.moveTo(0, 0.18 * s);
+  g.lineTo(0.05 * s, 0.4 * s);
+  g.lineTo(0, 0.46 * s);
+  g.lineTo(-0.05 * s, 0.4 * s);
+  g.fill();
+  g.fillStyle = hi;
+  g.beginPath();
+  g.ellipse(0, 0.02 * s, 0.03 * s, 0.1 * s, 0, 0, Math.PI * 2);
+  g.fill();
+  leafPath(g, 0, -0.18 * s, 0.2 * s, 0.025 * s, -Math.PI / 2, 0);
+  g.restore();
+}
+/** small filler sprig between the big ornaments */
+function damaskSprig(g: G, cx: number, cy: number, s: number, fg: string) {
+  g.fillStyle = fg;
+  for (let i = 0; i < 4; i++) leafPath(g, cx, cy, 0.1 * s, 0.035 * s, (i / 4) * Math.PI * 2 + Math.PI / 4, 0);
+  g.beginPath();
+  g.arc(cx, cy, 0.025 * s, 0, Math.PI * 2);
+  g.fill();
+}
+/** damask wallpaper: ornate half-drop repeat, 2 ornaments per tile. Tile covers ~0.6 m. */
+export const damask2 = (bg: string, fg: string, hi: string, seed = 31, flecks = 0) =>
+  makeTex(512, 512, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    const s = h * 0.5;
+    // tone-on-tone background lattice
+    g.strokeStyle = shade(bg, 0.03);
+    g.lineWidth = 3;
+    for (let i = -2; i < 4; i++) { g.beginPath(); g.moveTo(i * w * 0.5, 0); g.lineTo(i * w * 0.5 + w, h); g.stroke(); g.beginPath(); g.moveTo(i * w * 0.5 + w, 0); g.lineTo(i * w * 0.5, h); g.stroke(); }
+    const spots: [number, number][] = [[w * 0.25, h * 0.27], [w * 0.75, h * 0.77]];
+    for (const [x, y] of spots)
+      for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) damaskOrnament(g, x + ox, y + oy, s, hi, fg);
+    for (const [x, y] of [[w * 0.75, h * 0.27], [w * 0.25, h * 0.77]] as const)
+      for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) damaskSprig(g, x + ox, y + oy, s, fg);
+    // fabric / paper grain
+    for (let y = 0; y < h; y += 2) { g.fillStyle = `rgba(0,0,0,${y % 4 ? 0.05 : 0})`; g.fillRect(0, y, w, 1); }
+    specks(g, w, h, r, 5000, 0.07, 1);
+    blotches(g, w, h, r, 16, 0.08, 90, 0.6);
+    if (flecks) {
+      g.fillStyle = "rgba(235,235,230,0.85)";
+      for (let i = 0; i < flecks; i++) { const x = r() * w, y = r() * h; g.save(); g.translate(x, y); g.rotate(r() * 3); g.fillRect(-1, -4 - r() * 5, 2 + r() * 2, 8 + r() * 8); g.restore(); }
+    }
+  });
+
+/** small geometric wallpaper (storage / laundry): diamonds + rosettes */
+export const smallPattern = (bg: string, fg: string, seed = 32) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    const n = 4, c = w / n;
+    g.strokeStyle = fg;
+    g.fillStyle = fg;
+    g.lineWidth = 2.2;
+    for (let y = 0; y <= n; y++)
+      for (let x = 0; x <= n; x++) {
+        const cx = x * c, cy = y * c;
+        g.beginPath(); g.moveTo(cx, cy - c * 0.42); g.lineTo(cx + c * 0.42, cy); g.lineTo(cx, cy + c * 0.42); g.lineTo(cx - c * 0.42, cy); g.closePath(); g.stroke();
+        for (let i = 0; i < 6; i++) leafPath(g, cx + c / 2, cy + c / 2, c * 0.2, c * 0.06, (i / 6) * Math.PI * 2, 0);
+        g.beginPath(); g.arc(cx, cy, c * 0.07, 0, Math.PI * 2); g.fill();
+      }
+    for (let y = 0; y < h; y += 2) { g.fillStyle = `rgba(0,0,0,${y % 4 ? 0.05 : 0})`; g.fillRect(0, y, w, 1); }
+    specks(g, w, h, r, 2500, 0.07, 1);
+    blotches(g, w, h, r, 8, 0.1, 60, 0.7);
+  });
+
+/** worn black/white checker tile (8x8 tiles per texture) */
+export const checker2 = (a: string, b: string, seed = 33) =>
+  makeTex(512, 512, (g, w, h) => {
+    const r = rng(seed);
+    const n = 8, s = w / n;
+    g.fillStyle = "#6a6660";
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const dark = (x + y) % 2 === 1;
+        g.fillStyle = shade(dark ? b : a, (r() - 0.5) * (dark ? 0.03 : 0.05));
+        g.fillRect(x * s + 1, y * s + 1, s - 2, s - 2);
+      }
+    blotches(g, w, h, r, 26, 0.12, 60, 0.85);
+    specks(g, w, h, r, 4000, 0.08, 1);
+    g.strokeStyle = "rgba(40,35,30,0.25)";
+    g.lineWidth = 0.6;
+    for (let i = 0; i < 8; i++) { g.beginPath(); let x = r() * w, y = r() * h; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (r() - 0.5) * 30; y += (r() - 0.5) * 30; g.lineTo(x, y); } g.stroke(); }
+  });
+
+/** beige marble tiles (2x2 per texture) with small black diamond inserts at the corners */
+export const marbleDiamond = (base: string, seed = 34) =>
+  makeTex(512, 512, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    blotches(g, w, h, r, 30, 0.07, 80, 0.5);
+    for (let i = 0; i < 18; i++) {
+      g.strokeStyle = `rgba(150,120,85,${0.15 + r() * 0.2})`;
+      g.lineWidth = 0.6 + r() * 1.5;
+      g.beginPath();
+      let x = r() * w, y = r() * h;
+      g.moveTo(x, y);
+      const dx = (r() - 0.5) * 2, dy = (r() - 0.5) * 2;
+      for (let k = 0; k < 14; k++) { x += dx * 12 + (r() - 0.5) * 16; y += dy * 12 + (r() - 0.5) * 16; g.lineTo(x, y); }
+      g.stroke();
+    }
+    specks(g, w, h, r, 3000, 0.04, 1);
+    const s = w / 2;
+    g.fillStyle = "rgba(120,105,85,0.55)";
+    for (let i = 0; i <= 2; i++) { g.fillRect(i * s - 1, 0, 2, h); g.fillRect(0, i * s - 1, w, 2); }
+    const d = s * 0.13;
+    for (let y = 0; y <= 2; y++)
+      for (let x = 0; x <= 2; x++) {
+        g.fillStyle = "#1a1917";
+        g.beginPath(); g.moveTo(x * s, y * s - d); g.lineTo(x * s + d, y * s); g.lineTo(x * s, y * s + d); g.lineTo(x * s - d, y * s); g.fill();
+        g.fillStyle = "rgba(255,255,255,0.06)";
+        g.beginPath(); g.moveTo(x * s, y * s - d * 0.8); g.lineTo(x * s + d * 0.4, y * s - d * 0.3); g.lineTo(x * s - d * 0.3, y * s - d * 0.2); g.fill();
+      }
+  });
+
+/** blue hexagon mosaic tile (kitchen floor): 8 columns x 8 rows of pointy-top hexes, seamless */
+export const hexTile = (base: string, seed = 35) => {
+  const R = 16, hw = Math.sqrt(3) * R;
+  return makeTex(Math.round(8 * hw), 8 * 1.5 * R, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = "#b8c6cc";
+    g.fillRect(0, 0, w, h);
+    const sx = w / 8;
+    for (let row = -1; row <= 8; row++)
+      for (let col = -1; col <= 8; col++) {
+        const cx = col * sx + (((row % 2) + 2) % 2 ? sx / 2 : 0), cy = row * 1.5 * R;
+        g.fillStyle = shade(base, (r() - 0.5) * 0.12, (r() - 0.5) * 0.02);
+        g.beginPath();
+        for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + Math.PI / 6; g.lineTo(cx + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.9); }
+        g.fill();
+        g.fillStyle = "rgba(255,255,255,0.12)";
+        g.beginPath(); g.arc(cx - R * 0.3, cy - R * 0.3, R * 0.25, 0, Math.PI * 2); g.fill();
+      }
+    specks(g, w, h, r, 1500, 0.06, 1);
+  });
+};
+
+/** white relief wall tile (concentric square emboss), 4x4 tiles */
+export const reliefTile = (base: string, seed = 36) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    const n = 4, s = w / n;
+    g.fillStyle = shade(base, -0.25);
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const x0 = x * s + 1.5, y0 = y * s + 1.5, ss = s - 3;
+        g.fillStyle = shade(base, (r() - 0.5) * 0.03);
+        g.fillRect(x0, y0, ss, ss);
+        for (let k = 1; k <= 3; k++) {
+          const i = ss * 0.12 * k;
+          g.strokeStyle = "rgba(0,0,0,0.16)";
+          g.lineWidth = 2;
+          g.strokeRect(x0 + i + 1, y0 + i + 1, ss - i * 2, ss - i * 2);
+          g.strokeStyle = "rgba(255,255,255,0.5)";
+          g.strokeRect(x0 + i, y0 + i, ss - i * 2, ss - i * 2);
+        }
+      }
+    blotches(g, w, h, r, 6, 0.06, 60, 0.8);
+  });
+
+/** herringbone parquet (period 128 px) */
+export const herringbone = (base: string, seed = 37) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = shade(base, -0.2);
+    g.fillRect(0, 0, w, h);
+    const T = 16, L = 64;
+    for (let b = -8; b < 8; b++)
+      for (let n = -20; n < 36; n++) {
+        const ox = n * T + b * L, oy = n * T - b * L;
+        if (ox > w + L || oy > h + L || ox < -2 * L || oy < -2 * L) continue;
+        const c1 = shade(base, (r() - 0.5) * 0.16), c2 = shade(base, (r() - 0.5) * 0.16);
+        for (const [x, y, bw, bh, c] of [[ox, oy, L, T, c1], [ox, oy + T, T, L, c2]] as const) {
+          g.fillStyle = c as string;
+          for (const px of [-128, 0, 128, 256]) for (const py of [-128, 0, 128, 256]) {
+            const X = (x as number) + px, Y = (y as number) + py;
+            if (X > w || Y > h || X + (bw as number) < 0 || Y + (bh as number) < 0) continue;
+            g.fillRect(X + 0.7, Y + 0.7, (bw as number) - 1.4, (bh as number) - 1.4);
+          }
+        }
+      }
+    for (let k = 0; k < 50; k++) { g.strokeStyle = `rgba(30,15,5,${0.04 + r() * 0.06})`; g.lineWidth = 0.7; wavyH(g, r() * h, w, 1.5, 2, r() * 6); }
+    specks(g, w, h, r, 1500, 0.05, 1);
+  });
+
+/** raised wood panels for wainscot walls: one panel per tile */
+export const woodPanels = (base: string, seed = 38, aspect = 1.4) =>
+  makeTex(256, Math.round(256 * aspect), (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 40; i++) { g.strokeStyle = `rgba(30,12,4,${0.05 + r() * 0.12})`; g.lineWidth = 0.6 + r() * 1.5; wavyV(g, r() * w, h, 1 + r() * 3, 1, r() * 6); }
+    const m = 22;
+    // frame shadow/highlight (raised panel)
+    g.fillStyle = "rgba(0,0,0,0.35)";
+    g.fillRect(m, m, w - m * 2, 5); g.fillRect(m, m, 5, h - m * 2);
+    g.fillStyle = "rgba(255,220,180,0.16)";
+    g.fillRect(m, h - m - 5, w - m * 2, 5); g.fillRect(w - m - 5, m, 5, h - m * 2);
+    g.fillStyle = "rgba(255,220,180,0.1)";
+    g.fillRect(m + 14, m + 14, w - m * 2 - 28, 4); g.fillRect(m + 14, m + 14, 4, h - m * 2 - 28);
+    g.fillStyle = "rgba(0,0,0,0.25)";
+    g.fillRect(m + 14, h - m - 18, w - m * 2 - 28, 4); g.fillRect(w - m - 18, m + 14, 4, h - m * 2 - 28);
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h);
+    specks(g, w, h, r, 800, 0.04, 1);
+  });
+
+/** green marble wall tiles (bathroom) */
+export const greenTile = (seed = 39) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    const n = 4, s = w / n;
+    g.fillStyle = "#8fb0a4";
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        g.save();
+        g.beginPath(); g.rect(x * s + 1.5, y * s + 1.5, s - 3, s - 3); g.clip();
+        g.fillStyle = shade("#0f4a3e", (r() - 0.5) * 0.06);
+        g.fillRect(x * s, y * s, s, s);
+        blotches(g, w, h, r, 3, 0.18, 30, 0.5);
+        g.restore();
+      }
+  });
+
+/** raw meat (marbled red with fat) */
+export const meat = (seed = 40) =>
+  makeTex(128, 128, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = "#b8343a";
+    g.fillRect(0, 0, w, h);
+    blotches(g, w, h, r, 20, 0.2, 20, 0.5);
+    g.strokeStyle = "rgba(245,225,215,0.75)";
+    for (let i = 0; i < 16; i++) { g.lineWidth = 1 + r() * 3; wavyH(g, r() * h, w, 3 + r() * 6, 1 + Math.floor(r() * 2), r() * 6); }
+    specks(g, w, h, r, 600, 0.12, 1);
+  });
+
+/** book spine with gold ornaments (one design per texture; the whole series of a colour shares it) */
+export const goldSpine = (base: string, design: number, seed = 41) =>
+  makeTex(64, 256, (g, w, h) => {
+    const r = rng(seed + design);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    const gold = "#d4a843";
+    g.fillStyle = gold;
+    for (const y of [14, 24, h - 30, h - 20]) g.fillRect(2, y, w - 4, 4);
+    const cx = w / 2;
+    if (design === 0) {
+      for (const y of [78, 138]) { g.fillRect(cx - 4, y - 16, 8, 32); g.fillRect(cx - 16, y - 4, 32, 8); g.beginPath(); g.arc(cx, y, 8, 0, Math.PI * 2); g.fill(); }
+      g.strokeStyle = gold; g.lineWidth = 4; g.beginPath(); g.arc(cx, 196, 13, 0, Math.PI * 2); g.stroke();
+    } else if (design === 1) {
+      for (const y of [64, 110, 156, 202]) { g.beginPath(); g.moveTo(cx, y - 14); g.lineTo(cx + 12, y); g.lineTo(cx, y + 14); g.lineTo(cx - 12, y); g.fill(); }
+    } else if (design === 2) {
+      g.beginPath(); g.arc(cx, 90, 16, 0, Math.PI * 2); g.fill();
+      g.fillStyle = base; g.beginPath(); g.arc(cx + 7, 85, 14, 0, Math.PI * 2); g.fill();
+      g.fillStyle = gold; g.fillRect(8, 150, w - 16, 34);
+      g.fillStyle = base; g.fillRect(12, 154, w - 24, 26);
+    } else {
+      g.fillRect(8, 60, w - 16, 3); g.fillRect(8, 200, w - 16, 3);
+      for (const y of [100, 130, 160]) { g.beginPath(); g.arc(cx, y, 6, 0, Math.PI * 2); g.fill(); }
+    }
+    g.fillStyle = "rgba(0,0,0,0.35)";
+    g.fillRect(0, 0, 4, h); g.fillRect(w - 4, 0, 4, h);
+    g.fillStyle = "rgba(255,255,255,0.08)";
+    g.fillRect(w * 0.3, 0, 5, h);
+    specks(g, w, h, r, 500, 0.06, 1);
+  });
+
+/** 2x2 atlas: BOOKMAN poster, bread poster, circus clown poster, vintage portrait */
+export const posterAtlas2 = () =>
+  makeTex(512, 512, (g) => {
+    const r = rng(42);
+    const cell = (i: number, draw: () => void) => { g.save(); g.translate((i % 2) * 256, Math.floor(i / 2) * 256); g.beginPath(); g.rect(0, 0, 256, 256); g.clip(); draw(); specks(g, 256, 256, r, 1600, 0.08); blotches(g, 256, 256, r, 6, 0.1, 60, 0.6); g.restore(); };
+    cell(0, () => {
+      g.fillStyle = "#e9dfc4"; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = "#2d5a3a"; g.fillRect(14, 14, 228, 228);
+      g.fillStyle = "#d9b04a"; g.fillRect(22, 58, 212, 176);
+      g.fillStyle = "#1f2a4a"; g.beginPath(); g.ellipse(128, 150, 52, 76, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#e8d6b0"; g.beginPath(); g.arc(128, 86, 22, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#7a2a1a"; g.fillRect(96, 140, 64, 40);
+      g.fillStyle = "#e9dfc4"; g.font = "bold 34px Georgia, serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("BOOKMAN", 128, 38);
+    });
+    cell(1, () => {
+      g.fillStyle = "#efe2b8"; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = "#23407a"; g.fillRect(10, 10, 236, 236);
+      g.fillStyle = "#f0e2b0"; g.beginPath(); g.ellipse(128, 118, 96, 84, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#9a5a26"; g.beginPath(); g.ellipse(140, 130, 70, 30, -0.4, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#d8a860"; g.beginPath(); g.ellipse(100, 160, 30, 12, 0, 0, Math.PI * 2); g.fill();
+      for (const [x, y] of [[50, 46], [206, 46], [206, 190]]) { g.fillStyle = "#d8402a"; g.beginPath(); g.arc(x, y, 20, 0, Math.PI * 2); g.fill(); g.fillStyle = "#3a6a2a"; leafPath(g, x, y + 16, 26, 7, 1.2, 0); }
+      g.fillStyle = "#f0e2b0"; g.font = "bold 20px Georgia, serif"; g.textAlign = "center"; g.fillText("NE PAS GASPILLER", 128, 222); g.font = "bold 16px Georgia, serif"; g.fillText("LE PAIN", 128, 240);
+    });
+    cell(2, () => {
+      g.fillStyle = "#e8c23a"; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = "#c0301e"; g.fillRect(0, 0, 256, 44);
+      g.fillStyle = "#1a1a1a"; g.fillRect(84, 52, 88, 44); g.fillRect(64, 92, 128, 10);
+      g.fillStyle = "#f0c8a0"; g.beginPath(); g.arc(128, 140, 46, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#c0301e"; g.beginPath(); g.arc(128, 150, 10, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#1a1a1a"; g.beginPath(); g.arc(112, 128, 5, 0, Math.PI * 2); g.arc(144, 128, 5, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#1f3a7a"; g.fillRect(60, 190, 136, 66);
+      g.fillStyle = "#f4efe0"; g.font = "bold 24px Georgia, serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("HAPPY HOOLIGAN", 128, 24);
+    });
+    cell(3, () => {
+      g.fillStyle = "#c93a2a"; g.fillRect(0, 0, 256, 256);
+      g.fillStyle = "#1a1512"; g.fillRect(16, 16, 224, 224);
+      g.fillStyle = "#e8d8b0"; g.beginPath(); g.ellipse(128, 104, 40, 50, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#2a1a12"; g.beginPath(); g.ellipse(128, 70, 44, 22, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#3a3050"; g.beginPath(); g.moveTo(60, 240); g.quadraticCurveTo(128, 120, 196, 240); g.fill();
+      g.fillStyle = "#e8c23a"; g.font = "bold 22px Georgia, serif"; g.textAlign = "center"; g.fillText("GRAND TOUR", 128, 226);
+    });
+  });
