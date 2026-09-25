@@ -581,4 +581,307 @@ export const bushArt = (pts: Pts) =>
     outline(g, pts, w, h, "#1f4a1b", 5);
   });
 
+
+// =============================================================================================
+// REAL-GAME look (teal sky mural hall, mown grass carpet, Holstein standees, striped balloon…)
+
+/** teal painted sky mural with dark-teal cloud washes, white cloud outlines, green hills and fence doodles.
+ *  512×256 covers ~16 m × 8 m of wall. */
+export const tealMural = (seed = 3) =>
+  makeTex(512, 256, (g, w, h) => {
+    const r = rng(seed);
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, "#0b9ea3");
+    grd.addColorStop(0.5, "#13b3ad");
+    grd.addColorStop(1, "#22c2b0");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    // big soft darker washes (painted cloud shadows)
+    for (let i = 0; i < 14; i++) {
+      const x = r() * w, y = r() * h * 0.7, rx = 30 + r() * 70, ry = 12 + r() * 26;
+      const gr = g.createRadialGradient(x, y, 0, x, y, rx);
+      gr.addColorStop(0, `rgba(14,120,150,${0.35 + r() * 0.25})`);
+      gr.addColorStop(1, "rgba(14,120,150,0)");
+      g.save(); g.translate(x, y); g.scale(1, ry / rx); g.translate(-x, -y);
+      g.fillStyle = gr; g.fillRect(x - rx, y - rx, rx * 2, rx * 2);
+      g.restore();
+    }
+    // brush strokes
+    for (let i = 0; i < 260; i++) {
+      const light = r() < 0.5;
+      g.strokeStyle = light ? `rgba(160,255,245,${0.04 + r() * 0.06})` : `rgba(10,90,110,${0.04 + r() * 0.07})`;
+      g.lineWidth = 2 + r() * 7;
+      const x = r() * w, y = r() * h * 0.85, a = (r() - 0.5) * 0.8, l = 12 + r() * 40;
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * l * 0.5, y + Math.sin(a) * l * 0.5 + (r() - 0.5) * 6, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+    // cartoon clouds: darker teal body with light rim (like the real mural)
+    const cloud = (cx: number, cy: number, s: number) => {
+      const n = 3 + Math.floor(r() * 3);
+      const blobs: [number, number, number][] = [];
+      for (let k = 0; k < n; k++) blobs.push([cx + (k - (n - 1) / 2) * s * 0.8, cy - Math.sin(((k + 0.5) / n) * Math.PI) * s * 0.5, s * (0.5 + r() * 0.35)]);
+      g.fillStyle = "rgba(230,255,252,0.55)";
+      for (const [x, y, rr] of blobs) { g.beginPath(); g.arc(x, y - 2, rr + 2.5, 0, Math.PI * 2); g.fill(); }
+      g.fillStyle = "rgba(20,150,170,0.9)";
+      for (const [x, y, rr] of blobs) { g.beginPath(); g.arc(x, y, rr, 0, Math.PI * 2); g.fill(); }
+      g.fillStyle = "rgba(20,150,170,0.9)";
+      g.fillRect(cx - n * s * 0.42, cy - s * 0.1, n * s * 0.84, s * 0.45);
+      g.fillStyle = "rgba(8,110,135,0.5)";
+      g.fillRect(cx - n * s * 0.42, cy + s * 0.2, n * s * 0.84, s * 0.15);
+    };
+    for (let i = 0; i < 5; i++) cloud(50 + i * 100 + r() * 40, 45 + r() * 70, 12 + r() * 12);
+    // hills: far lighter green, near saturated green, with dark outline
+    const hill = (base: number, amp: number, col: string, ph: number, f: number) => {
+      g.beginPath(); g.moveTo(0, h);
+      for (let x = 0; x <= w; x += 4) g.lineTo(x, base - Math.sin((x / w) * Math.PI * 2 * f + ph) * amp - Math.sin((x / w) * Math.PI * 2 * (f * 2 + 1) + ph * 2) * amp * 0.35);
+      g.lineTo(w, h); g.closePath();
+      g.fillStyle = col; g.fill();
+      g.strokeStyle = "rgba(20,70,30,0.45)"; g.lineWidth = 2; g.stroke();
+    };
+    hill(h - 78, 16, "#66c35a", seed * 1.7, 2);
+    hill(h - 50, 13, "#3fa845", seed * 0.9 + 1, 3);
+    // painted white fence doodles on the hills (the "#" marks)
+    g.strokeStyle = "rgba(245,250,245,0.85)"; g.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {
+      const x = r() * (w - 30), y = h - 60 + r() * 30;
+      g.beginPath();
+      for (let k = 0; k < 4; k++) { g.moveTo(x + k * 6, y); g.lineTo(x + k * 6 + 1, y + 12); }
+      g.moveTo(x - 2, y + 4); g.lineTo(x + 22, y + 3); g.moveTo(x - 2, y + 9); g.lineTo(x + 22, y + 8);
+      g.stroke();
+    }
+    // grass tufts at the bottom + brush speckle
+    for (let i = 0; i < 400; i++) {
+      g.strokeStyle = r() < 0.5 ? "rgba(30,110,40,0.5)" : "rgba(120,210,100,0.4)";
+      g.lineWidth = 1;
+      const x = r() * w, y = h - r() * 44;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 3, y - 3 - r() * 5); g.stroke();
+    }
+    speckle(g, w, h, r, 1800, 0.035);
+  });
+
+/** mown grass carpet: 2 stripes (light / dark) with blades; tile covers 4 m, stripes run along V */
+export const grassStripes = () =>
+  makeTex(512, 512, (g, w, h) => {
+    const r = rng(33);
+    for (let x = 0; x < w; x++) {
+      const t = (x / w) * Math.PI * 2;
+      const s = Math.tanh(Math.sin(t) * 3) * 0.5 + 0.5; // soft-edged bands
+      const l = 27 + s * 8;
+      g.fillStyle = `hsl(${96 - s * 8},${58 + s * 6}%,${l}%)`;
+      g.fillRect(x, 0, 1, h);
+    }
+    // large mottling (wear, yellow patches)
+    for (let i = 0; i < 40; i++) {
+      const x = r() * w, y = r() * h, rr = 20 + r() * 60;
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr);
+      gr.addColorStop(0, r() < 0.4 ? "rgba(190,190,70,0.16)" : "rgba(20,70,20,0.12)");
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr; g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+    }
+    // blades
+    for (let i = 0; i < 7000; i++) {
+      const x = r() * w, y = r() * h;
+      const c = r();
+      g.strokeStyle = c < 0.3 ? "rgba(40,95,25,0.55)" : c < 0.6 ? "rgba(140,200,70,0.5)" : c < 0.9 ? "rgba(90,160,45,0.5)" : "rgba(200,200,90,0.45)";
+      g.lineWidth = 1;
+      const a = -Math.PI / 2 + (r() - 0.5) * 1.2, l = 2 + r() * 4;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+  });
+
+/** dark ceiling (painted black-olive acoustic deck) */
+export const darkCeiling = () =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(63);
+    g.fillStyle = "#3a3d33";
+    g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 32) { g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(x, 0, 2, h); }
+    speckle(g, w, h, r, 2500, 0.05);
+  });
+
+/** photo-like Holstein print for the cow cut-outs */
+export const holsteinArt = (pts: Pts, seed = 5) =>
+  makeTex(512, 352, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = "#e9e3d6";
+    g.fillRect(0, 0, w, h);
+    pathPts(g, pts, w, h);
+    g.fillStyle = "#f4f1ea";
+    g.fill();
+    g.save(); pathPts(g, pts, w, h); g.clip();
+    // body shading (rounded belly, darker under)
+    const sh = g.createLinearGradient(0, 0, 0, h);
+    sh.addColorStop(0.1, "rgba(255,255,255,0)");
+    sh.addColorStop(0.6, "rgba(120,110,100,0.12)");
+    sh.addColorStop(0.75, "rgba(80,70,60,0.28)");
+    sh.addColorStop(1, "rgba(80,70,60,0.1)");
+    g.fillStyle = sh; g.fillRect(0, 0, w, h);
+    // irregular black patches
+    const patch = (u: number, v: number, s: number) => {
+      g.fillStyle = "#16130f";
+      g.beginPath();
+      const n = 14;
+      for (let i = 0; i <= n; i++) {
+        const a = (i / n) * Math.PI * 2, rr = s * (0.65 + r() * 0.55);
+        const x = u * w + Math.cos(a) * rr * 1.3, y = (1 - v) * h + Math.sin(a) * rr;
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.closePath(); g.fill();
+    };
+    for (const [u, v, s] of [[0.2, 0.62, 34], [0.33, 0.72, 28], [0.5, 0.64, 40], [0.62, 0.74, 22], [0.14, 0.45, 20], [0.43, 0.5, 18], [0.66, 0.52, 16], [0.25, 0.25, 10], [0.7, 0.22, 9]] as const)
+      patch(u + (r() - 0.5) * 0.04, v + (r() - 0.5) * 0.04, s * (0.8 + r() * 0.4));
+    // head: black with a white blaze
+    E(g, w, h, 0.9, 0.8, 0.075, 0.13, "#16130f", 0.5);
+    E(g, w, h, 0.93, 0.76, 0.02, 0.09, "#f2eee6", 0.45);
+    E(g, w, h, 0.965, 0.66, 0.04, 0.045, "#d99a9a"); // muzzle
+    E(g, w, h, 0.955, 0.665, 0.007, 0.01, "#4a2626");
+    E(g, w, h, 0.975, 0.66, 0.007, 0.01, "#4a2626");
+    E(g, w, h, 0.83, 0.93, 0.025, 0.02, "#16130f"); // ear
+    E(g, w, h, 0.835, 0.9, 0.012, 0.018, "#e8c21c"); // yellow ear tag
+    E(g, w, h, 0.885, 0.85, 0.01, 0.014, "#050505");
+    // udder + legs
+    E(g, w, h, 0.36, 0.3, 0.06, 0.05, "#e7aeae");
+    g.fillStyle = "#2b2622"; g.fillRect(0, (1 - 0.05) * h, w, 0.05 * h); // hooves
+    // tail tuft
+    E(g, w, h, 0.03, 0.4, 0.015, 0.04, "#16130f");
+    // hair texture
+    for (let i = 0; i < 900; i++) {
+      g.strokeStyle = r() < 0.5 ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)";
+      g.lineWidth = 1;
+      const x = r() * w, y = r() * h;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + 2, y + 3); g.stroke();
+    }
+    g.restore();
+  });
+
+/** vertical gores for the hot-air balloon (n pairs around) */
+export const gores = (a: string, b: string, n = 8) =>
+  makeTex(512, 256, (g, w, h) => {
+    const r = rng(7);
+    const sw = w / (n * 2);
+    for (let i = 0; i < n * 2; i++) { g.fillStyle = i % 2 ? b : a; g.fillRect(i * sw, 0, sw + 1, h); }
+    for (let i = 0; i < n * 2; i++) { g.fillStyle = "rgba(0,0,0,0.18)"; g.fillRect(i * sw, 0, 1.5, h); }
+    for (let y = 0; y < h; y += 32) { g.fillStyle = "rgba(0,0,0,0.08)"; g.fillRect(0, y, w, 1); }
+    speckle(g, w, h, r, 900, 0.04);
+  });
+
+/** wicker basket weave */
+export const wicker = () =>
+  makeTex(128, 128, (g, w, h) => {
+    const r = rng(19);
+    g.fillStyle = "#8a6232";
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 8) for (let x = 0; x < w; x += 16) {
+      const o = (y / 8) % 2 ? 8 : 0;
+      g.fillStyle = `hsl(33,${45 + r() * 10}%,${42 + r() * 10}%)`;
+      g.beginPath(); g.ellipse(x + o + 8, y + 4, 8, 3.2, 0, 0, Math.PI * 2); g.fill();
+    }
+    speckle(g, w, h, r, 400, 0.1);
+  });
+
+/** corrugated galvanised silo sheet (horizontal ribs) */
+export const corrugated = () =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(83);
+    for (let y = 0; y < h; y++) {
+      const s = Math.sin((y / 16) * Math.PI * 2);
+      const l = 58 + s * 12;
+      g.fillStyle = `hsl(200,4%,${l}%)`;
+      g.fillRect(0, y, w, 1);
+    }
+    for (let x = 0; x < w; x += 64) { g.fillStyle = "rgba(40,40,40,0.35)"; g.fillRect(x, 0, 2, h); for (let y = 6; y < h; y += 16) g.fillRect(x + 5, y, 2, 2); }
+    for (let i = 0; i < 40; i++) {
+      const x = r() * w, y = r() * h, rr = 10 + r() * 40;
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr);
+      gr.addColorStop(0, `rgba(${r() < 0.5 ? "90,80,60" : "230,230,230"},0.15)`);
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr; g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+    }
+  });
+
+/** IBC tote: translucent white tank behind a green steel grid cage */
+export const ibc = () =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(29);
+    g.fillStyle = "#1f8a3a";
+    g.fillRect(0, 0, w, h);
+    const c = 4, cw = w / c;
+    for (let i = 0; i < c; i++) for (let j = 0; j < c; j++) {
+      g.fillStyle = `hsl(130,${40 + r() * 10}%,${30 + r() * 6}%)`;
+      g.fillRect(i * cw + 6, j * cw + 6, cw - 12, cw - 12);
+    }
+    g.fillStyle = "#135c26";
+    for (let i = 0; i <= c; i++) { g.fillRect(i * cw - 3, 0, 6, h); g.fillRect(0, i * cw - 3, w, 6); }
+    g.fillStyle = "rgba(255,255,255,0.18)";
+    for (let i = 0; i <= c; i++) g.fillRect(i * cw - 3, 0, 2, h);
+    speckle(g, w, h, r, 900, 0.07);
+  });
+
+/** red / white circus-tent canvas stripes */
+export const tentStripes = () =>
+  makeTex(256, 128, (g, w, h) => {
+    const r = rng(47);
+    const n = 8, sw = w / n;
+    for (let i = 0; i < n; i++) { g.fillStyle = i % 2 ? "#f3efe6" : "#c8211c"; g.fillRect(i * sw, 0, sw + 1, h); }
+    for (let i = 0; i < 300; i++) { g.fillStyle = "rgba(0,0,0,0.05)"; g.fillRect(r() * w, r() * h, 1 + r() * 3, 1); }
+    speckle(g, w, h, r, 700, 0.05);
+  });
+
+/** loose straw-covered ridge (pale) for the pumpkin patch */
+export const paleStraw = () =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(37);
+    g.fillStyle = "#c7b79a";
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 1800; i++) {
+      g.strokeStyle = ["#ddd0b5", "#a8977a", "#e8dcc2", "#b9a584", "#8f7c5f"][Math.floor(r() * 5)];
+      g.lineWidth = 0.8 + r() * 1.2;
+      const x = r() * w, y = r() * h, a = r() * Math.PI, l = 4 + r() * 10;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+    speckle(g, w, h, r, 1000, 0.08);
+  });
+
+/** pumpkin skin with ribs (u around, v top→bottom) */
+export const pumpkinSkin = (base: string, rib: string, seed = 11) =>
+  makeTex(256, 128, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    const n = 10;
+    for (let i = 0; i < n; i++) {
+      const x = (i / n) * w;
+      const gr = g.createLinearGradient(x, 0, x + w / n, 0);
+      gr.addColorStop(0, rib); gr.addColorStop(0.18, "rgba(0,0,0,0)"); gr.addColorStop(0.82, "rgba(0,0,0,0)"); gr.addColorStop(1, rib);
+      g.fillStyle = gr; g.fillRect(x, 0, w / n, h);
+    }
+    for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${r() < 0.5 ? "255,230,150" : "120,50,0"},0.12)`; g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 3); }
+    const top = g.createLinearGradient(0, 0, 0, h);
+    top.addColorStop(0, "rgba(90,70,10,0.35)"); top.addColorStop(0.15, "rgba(0,0,0,0)"); top.addColorStop(0.9, "rgba(0,0,0,0)"); top.addColorStop(1, "rgba(60,40,0,0.3)");
+    g.fillStyle = top; g.fillRect(0, 0, w, h);
+  });
+
+/** white painted wood (fences, trims) with light wear */
+export const whitePaint = () =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(53);
+    g.fillStyle = "#e9ebe6";
+    g.fillRect(0, 0, w, h);
+    grainLines(g, w, h, r, 40, "#9aa09a", 0.12);
+    for (let i = 0; i < 25; i++) {
+      g.fillStyle = `rgba(110,100,80,${0.05 + r() * 0.1})`;
+      g.beginPath(); g.ellipse(r() * w, r() * h, 2 + r() * 12, 1 + r() * 2, 0, 0, Math.PI * 2); g.fill();
+    }
+    speckle(g, w, h, r, 900, 0.04);
+  });
+
+/** yellow painted lumber (standee A-frames) */
+export const yellowLumber = () =>
+  makeTex(128, 128, (g, w, h) => {
+    const r = rng(57);
+    g.fillStyle = "#e3b43a";
+    g.fillRect(0, 0, w, h);
+    grainLines(g, w, h, r, 22, "#9c6f14", 0.3);
+    speckle(g, w, h, r, 400, 0.06);
+  });
+
 export type { PaintTex };
