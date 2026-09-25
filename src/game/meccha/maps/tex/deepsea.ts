@@ -179,15 +179,15 @@ export const hullPlanks = (seed = 5, base = "#7a624a") =>
       g.fillStyle = "rgba(40,30,20,0.9)";
       for (const x of [j - 10, j + 12]) { g.beginPath(); g.arc(x, i * ph + ph * 0.3, 2.2, 0, 7); g.arc(x, i * ph + ph * 0.7, 2.2, 0, 7); g.fill(); }
     }
-    const lay = document.createElement("canvas");
-    lay.width = w; lay.height = h;
-    const lg = lay.getContext("2d")!;
-    field(lg, w, h, 96, (u, v, o) => {
-      const t = gr(u, v);
-      o[0] = 70; o[1] = 98; o[2] = 55;
-      o[3] = Math.max(0, Math.min(1, (t - 0.5) * 3.2)) * 170;
-    });
-    g.drawImage(lay, 0, 0);
+    // אצות על הקרשים: כתמים ירקרקים רכים (זול יותר מהשדה המלא)
+    for (let k = 0; k < 26; k++) {
+      const x = r() * w, y = r() * h, rad = 20 + r() * 70;
+      const gg = g.createRadialGradient(x, y, 0, x, y, rad);
+      gg.addColorStop(0, `rgba(70,98,55,${0.35 + r() * 0.3})`);
+      gg.addColorStop(1, "rgba(70,98,55,0)");
+      g.fillStyle = gg;
+      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
   });
 
 /** barrel staves (vertical along V) with two iron hoops */
