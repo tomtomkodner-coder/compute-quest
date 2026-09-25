@@ -1,0 +1,33 @@
+{
+  "name": "quiz-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kahoot-style Quiz Hack Lab for development & testing against a local Mock Server (or an API you are authorized to use).",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "plugins",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c magenta,cyan \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "npm run dev -w @quizlab/backend",
+    "dev:frontend": "npm run dev -w @quizlab/frontend",
+    "build": "npm run build -w @quizlab/frontend",
+    "start": "npm run start -w @quizlab/backend",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p shared && tsc -p plugins && tsc -p backend && tsc -p frontend"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
