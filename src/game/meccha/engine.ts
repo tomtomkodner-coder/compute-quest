@@ -413,7 +413,7 @@ export class Engine {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // צללים רכים
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     const cv = this.renderer.domElement;
@@ -424,7 +424,7 @@ export class Engine {
     this.hemi = new THREE.HemisphereLight("#ffffff", "#888888", 1.2);
     this.sun = new THREE.DirectionalLight("#ffffff", 1.6);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(4096, 4096);
     Object.assign(this.sun.shadow.camera, { left: -27, right: 27, top: 24, bottom: -24, near: 1, far: 90 });
     this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.shadow.bias = -0.0005;
@@ -520,16 +520,48 @@ export class Engine {
     this.hemi.color.set(L.hemi[0]);
     this.hemi.groundColor.set(L.hemi[1]);
     this.hemi.intensity = L.hemi[2];
+    // אור מפתח שמטיל צללים: השמש, ובמפות סגורות בלי שמש — אור עליון רך (כמו תאורת תקרה), כדי שלכל חפץ ודמות יהיה צל
+    const B = this.world.bounds;
+    const cx = (B.minX + B.maxX) / 2, cz = (B.minZ + B.maxZ) / 2;
+    const hx = (B.maxX - B.minX) / 2 + 3, hz = (B.maxZ - B.minZ) / 2 + 3;
+    this.sun.visible = true;
     if (L.sun) {
-      this.sun.visible = true;
       this.sun.color.set(L.sun.color);
       this.sun.intensity = L.sun.int;
-      this.sun.position.set(...L.sun.pos);
-    } else this.sun.visible = false;
-    for (const p of this.points) this.scene.remove(p);
-    this.points = L.points.map((pt) => {
+      this.sun.position.set(cx + L.sun.pos[0], L.sun.pos[1], cz + L.sun.pos[2]);
+    } else {
+      this.sun.color.set("#fff3e0");
+      this.sun.intensity = 0.55;
+      this.sun.position.set(cx + 3, 40, cz + 5);
+    }
+    // תקרות וגגות לא מטילים צל (אחרת אור המפתח העליון נחסם והכל חשוך)
+    const bb = new THREE.Box3();
+    this.world.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.castShadow) return;
+      bb.setFromObject(m);
+      const sx = bb.max.x - bb.min.x, sz = bb.max.z - bb.min.z, sy = bb.max.y - bb.min.y;
+      if (sy < 0.6 && bb.min.y > 2.3 && sx * sz > 30) m.castShadow = false;
+    });
+    this.sun.target.position.set(cx, 0, cz);
+    this.sun.target.updateMatrixWorld();
+    const r = Math.max(hx, hz) * 1.05;
+    Object.assign(this.sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: 140 });
+    this.sun.shadow.camera.updateProjectionMatrix();
+    this.sun.shadow.radius = 3;
+    for (const p of this.points) { this.scene.remove(p); p.shadow?.map?.dispose(); }
+    // שתי מנורות הנקודה החזקות מטילות צללים (באיכות צל גבוהה)
+    const strong = L.points.map((pt, i) => ({ i, v: pt.int * pt.dist })).sort((a, b) => b.v - a.v).slice(0, 2).map((x) => x.i);
+    this.points = L.points.map((pt, i) => {
       const l = new THREE.PointLight(pt.color, pt.int, pt.dist, 1.6);
       l.position.set(...pt.pos);
+      if (strong.includes(i) && this.shadowQ === 2 && !this.perfMode) {
+        l.castShadow = true;
+        l.shadow.mapSize.set(512, 512);
+        l.shadow.bias = -0.002;
+        l.shadow.normalBias = 0.03;
+        l.shadow.radius = 4;
+      }
       this.scene.add(l);
       return l;
     });
@@ -2835,9 +2867,12 @@ export class Engine {
   }
   // ----- Options (Esc) -----
   setSensitivity(v: number) { this.sens = Math.max(0.1, Math.min(3, v)); }
+  private shadowQ: 0 | 1 | 2 = 2;
   setShadowQuality(q: 0 | 1 | 2) {
+    this.shadowQ = q;
     this.renderer.shadowMap.enabled = q > 0;
-    const size = q === 2 ? 2048 : 1024;
+    for (const p of this.points) p.castShadow = p.castShadow && q === 2;
+    const size = q === 2 ? 4096 : 1024;
     if (this.sun.shadow.mapSize.x !== size) { this.sun.shadow.mapSize.set(size, size); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
     this.scene.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.Material | undefined; if (m) m.needsUpdate = true; });
   }
