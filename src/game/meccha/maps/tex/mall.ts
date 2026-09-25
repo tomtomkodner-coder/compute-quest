@@ -369,3 +369,240 @@ export const menu = () =>
     g.lineWidth = 4;
     g.strokeRect(8, 8, w - 16, h - 16);
   });
+
+// ---------------------------------------------------------------- official "Shopping Mall" additions
+
+/** periodic value noise (period p cells); returns f(x,y) with x,y in cell units */
+function vnoise(seed: number, p: number) {
+  const r = rng(seed);
+  const g = new Float32Array(p * p);
+  for (let i = 0; i < p * p; i++) g[i] = r();
+  return (x: number, y: number) => {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const fx = x - xi, fy = y - yi;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const x0 = ((xi % p) + p) % p, y0 = ((yi % p) + p) % p, x1 = (x0 + 1) % p, y1 = (y0 + 1) % p;
+    const a = g[y0 * p + x0], b = g[y0 * p + x1], c = g[y1 * p + x0], d = g[y1 * p + x1];
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  };
+}
+
+/** camo-like paint-splash mask layers drawn at 256 and scaled up (soft blotchy edges, white holes inside) */
+function splashLayer(g: CanvasRenderingContext2D, w: number, h: number, seed: number, cols: string[], cover = 0.5) {
+  const S = 256;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = S;
+  const cg = cv.getContext("2d", { willReadFrequently: true })!;
+  const img = cg.createImageData(S, S);
+  const fields = cols.map((_, i) => [vnoise(seed * 7 + i * 13, 4), vnoise(seed * 7 + i * 13 + 1, 8), vnoise(seed * 7 + i * 13 + 2, 16), vnoise(seed * 7 + i * 13 + 3, 32)]);
+  const rgb = cols.map((c) => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+  const thr = 1 - cover;
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const u = x / S, v = y / S;
+      let best = -1, bv = 0;
+      for (let i = 0; i < cols.length; i++) {
+        const f = fields[i];
+        const n = f[0](u * 4, v * 4) * 0.55 + f[1](u * 8, v * 8) * 0.25 + f[2](u * 16, v * 16) * 0.13 + f[3](u * 32, v * 32) * 0.07;
+        const val = n - 0.5 - thr * 0.3 - i * 0.01;
+        if (val > bv) { bv = val; best = i; }
+      }
+      const o = (y * S + x) * 4;
+      if (best >= 0) {
+        const c = rgb[best];
+        img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2];
+        img.data[o + 3] = Math.min(255, bv * 2200);
+      }
+    }
+  cg.putImageData(img, 0, 0);
+  g.imageSmoothingEnabled = true;
+  g.drawImage(cv, 0, 0, w, h);
+}
+
+/** glossy porcelain floor tiles (n x n per texture) with big paint splashes (atrium floor art) */
+export const splashFloor = (seed = 1, cols = ["#f39ab4", "#35c3cf", "#f6cf3f"], cover = 0.55, n = 8) =>
+  makeTex(512, 512, (g, w, h) => {
+    const r = rng(seed + 50);
+    const s = w / n;
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const t = (r() - 0.5) * 10;
+        g.fillStyle = `rgb(${232 + t},${229 + t},${224 + t})`;
+        g.fillRect(x * s, y * s, s, s);
+        for (let i = 0; i < 6; i++) {
+          g.fillStyle = `rgba(160,150,140,${r() * 0.05})`;
+          g.beginPath(); g.ellipse(x * s + r() * s, y * s + r() * s, 4 + r() * 16, 2 + r() * 8, r() * 3, 0, Math.PI * 2); g.fill();
+        }
+      }
+    splashLayer(g, w, h, seed, cols, cover);
+    g.fillStyle = "rgba(90,85,80,0.35)";
+    for (let i = 0; i <= n; i++) { g.fillRect(i * s - 1, 0, 2, h); g.fillRect(0, i * s - 1, w, 2); }
+  });
+
+/** painted concrete / plaster with paint splashes (planters, pillars) */
+export const splashWall = (base = "#8e8a84", seed = 2, cols = ["#3fc4c9", "#f1eadb", "#f3cf49"], cover = 0.5) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 1500; i++) { g.fillStyle = `rgba(${r() < 0.5 ? "0,0,0" : "255,255,255"},${r() * 0.06})`; g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2); }
+    splashLayer(g, w, h, seed, cols, cover);
+  });
+
+/** vertical colour gradient with splashes (the atrium's painted pillars: pink bottom -> yellow) */
+export const splashPillar = (seed = 4) =>
+  makeTex(256, 512, (g, w, h) => {
+    const grd = g.createLinearGradient(0, h, 0, 0);
+    grd.addColorStop(0, "#f2a33a");
+    grd.addColorStop(0.35, "#f47f8e");
+    grd.addColorStop(0.7, "#f2eee6");
+    grd.addColorStop(1, "#f7f4ee");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+    splashLayer(g, w, h, seed, ["#ef6f8f", "#43bfae", "#f5cd3c"], 0.62);
+  });
+
+/** brushed stainless steel (horizontal streaks) */
+export const brushed = (base = "#b9bcc0", seed = 6) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 700; i++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? "0,0,0" : "255,255,255"},${r() * 0.07})`;
+      g.fillRect(r() * w - 40, r() * h, 40 + r() * 160, 1);
+    }
+  });
+
+/** escalator step tread: dark aluminium grooves with a yellow safety edge */
+export const escStep = () =>
+  makeTex(128, 128, (g, w, h) => {
+    g.fillStyle = "#3a3c40";
+    g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 6) { g.fillStyle = "#6c7076"; g.fillRect(x, 0, 3, h); }
+    g.fillStyle = "#e8c21e";
+    g.fillRect(0, 0, w, 10);
+    g.fillRect(0, 0, 8, h);
+    g.fillRect(w - 8, 0, 8, h);
+  });
+
+/** fast food menu board with burger / fries / drink pictures */
+export const fastMenu = (title: string, bg: string, accent: string, seed = 1) =>
+  makeTex(512, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = accent;
+    g.fillRect(0, 0, w, 46);
+    g.fillStyle = "#ffffff";
+    g.font = "900 34px 'Arial Black', sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(title, w / 2, 24);
+    for (let i = 0; i < 4; i++) {
+      const cx = 64 + i * 128, cy = 128;
+      g.fillStyle = "rgba(255,255,255,0.12)";
+      g.beginPath(); g.arc(cx, cy, 50, 0, 7); g.fill();
+      const kind = (i + seed) % 4;
+      if (kind === 0) {
+        g.fillStyle = "#d8913a"; g.beginPath(); g.ellipse(cx, cy - 10, 40, 22, 0, PI, 0); g.fill();
+        g.fillStyle = "#5a2e14"; g.fillRect(cx - 40, cy - 8, 80, 12);
+        g.fillStyle = "#6fbf3a"; g.fillRect(cx - 42, cy - 12, 84, 5);
+        g.fillStyle = "#f6c533"; g.fillRect(cx - 38, cy + 3, 76, 5);
+        g.fillStyle = "#d8913a"; g.fillRect(cx - 38, cy + 8, 76, 12);
+      } else if (kind === 1) {
+        g.fillStyle = "#f6c533";
+        for (let k = 0; k < 9; k++) g.fillRect(cx - 24 + k * 6, cy - 34 + r() * 10, 5, 40);
+        g.fillStyle = "#e0282e"; g.beginPath(); g.moveTo(cx - 30, cy - 4); g.lineTo(cx + 30, cy - 4); g.lineTo(cx + 22, cy + 36); g.lineTo(cx - 22, cy + 36); g.fill();
+      } else if (kind === 2) {
+        g.fillStyle = "#ffffff"; g.beginPath(); g.moveTo(cx - 24, cy - 36); g.lineTo(cx + 24, cy - 36); g.lineTo(cx + 18, cy + 36); g.lineTo(cx - 18, cy + 36); g.fill();
+        g.fillStyle = accent; g.fillRect(cx - 22, cy - 10, 44, 20);
+        g.fillStyle = "#333"; g.fillRect(cx + 4, cy - 56, 4, 22);
+      } else {
+        g.fillStyle = "#f0d9a0"; g.beginPath(); g.moveTo(cx - 36, cy + 20); g.lineTo(cx, cy - 36); g.lineTo(cx + 36, cy + 20); g.fill();
+        g.fillStyle = "#ffffff"; g.beginPath(); g.arc(cx, cy - 32, 14, 0, 7); g.fill();
+      }
+      g.fillStyle = "#ffffff";
+      g.font = "bold 22px 'Trebuchet MS', sans-serif";
+      g.fillText(["COMBO", "FRIES", "SODA", "CONE"][kind] + " " + (2 + i + r()).toFixed(2), cx, 214);
+    }
+  });
+
+/** piano keyboard strip (U along keys) */
+export const pianoKeys = () =>
+  makeTex(512, 64, (g, w, h) => {
+    g.fillStyle = "#f7f5ef";
+    g.fillRect(0, 0, w, h);
+    const n = 36, s = w / n;
+    g.fillStyle = "#b8b4aa";
+    for (let i = 0; i <= n; i++) g.fillRect(i * s, 0, 1, h);
+    g.fillStyle = "#151515";
+    for (let i = 0; i < n; i++) { const m = i % 7; if (m === 0 || m === 1 || m === 3 || m === 4 || m === 5) g.fillRect((i + 0.68) * s, 0, s * 0.62, h * 0.6); }
+  });
+
+/** arcade carpet: dark purple with neon shapes */
+export const arcadeCarpet = () =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(77);
+    g.fillStyle = "#1c1533";
+    g.fillRect(0, 0, w, h);
+    const cols = ["#ff3fa4", "#39e0ff", "#ffe23f", "#7cff5a", "#a86bff"];
+    for (let i = 0; i < 44; i++) {
+      g.strokeStyle = cols[Math.floor(r() * cols.length)];
+      g.lineWidth = 3;
+      const x = r() * w, y = r() * h, s = 6 + r() * 12;
+      g.beginPath();
+      if (i % 3 === 0) g.arc(x, y, s, 0, 7);
+      else if (i % 3 === 1) { g.moveTo(x - s, y + s); g.lineTo(x, y - s); g.lineTo(x + s, y + s); g.closePath(); }
+      else { g.moveTo(x - s, y); g.lineTo(x - s / 3, y - s / 2); g.lineTo(x + s / 3, y + s / 2); g.lineTo(x + s, y); }
+      g.stroke();
+    }
+    for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.2})`; g.fillRect(r() * w, r() * h, 1, 1); }
+  });
+
+/** arcade game screens atlas (2x2): racing, space shooter, fighting, puzzle */
+export const gameScreens = () =>
+  makeTex(256, 256, (g, w) => {
+    const s = w / 2;
+    const r = rng(9);
+    // racing
+    g.fillStyle = "#4bb0ff"; g.fillRect(0, 0, s, s * 0.45);
+    g.fillStyle = "#3e9b3a"; g.fillRect(0, s * 0.45, s, s * 0.55);
+    g.fillStyle = "#555"; g.beginPath(); g.moveTo(s * 0.45, s * 0.45); g.lineTo(s * 0.55, s * 0.45); g.lineTo(s * 0.95, s); g.lineTo(s * 0.05, s); g.fill();
+    g.fillStyle = "#fff"; for (let i = 0; i < 4; i++) g.fillRect(s * 0.49, s * (0.5 + i * 0.13), s * 0.02, s * 0.06);
+    g.fillStyle = "#e0282e"; g.fillRect(s * 0.4, s * 0.78, s * 0.2, s * 0.12);
+    // space shooter
+    g.fillStyle = "#0a0a24"; g.fillRect(s, 0, s, s);
+    g.fillStyle = "#fff"; for (let i = 0; i < 50; i++) g.fillRect(s + r() * s, r() * s, 2, 2);
+    g.fillStyle = "#7cff5a"; for (let i = 0; i < 5; i++) { g.fillRect(s + 12 + i * 22, 20, 14, 10); g.fillRect(s + 12 + i * 22, 44, 14, 10); }
+    g.fillStyle = "#39e0ff"; g.beginPath(); g.moveTo(s * 1.5, s * 0.78); g.lineTo(s * 1.42, s * 0.92); g.lineTo(s * 1.58, s * 0.92); g.fill();
+    // fighting
+    const grd = g.createLinearGradient(0, s, 0, 2 * s); grd.addColorStop(0, "#ff7e3f"); grd.addColorStop(1, "#7a1f5c");
+    g.fillStyle = grd; g.fillRect(0, s, s, s);
+    g.fillStyle = "#ffe23f"; g.fillRect(8, s + 8, s * 0.4, 8); g.fillRect(s * 0.55, s + 8, s * 0.4, 8);
+    g.fillStyle = "#222"; g.fillRect(s * 0.25, s * 1.45, 18, 50); g.fillRect(s * 0.65, s * 1.45, 18, 50);
+    g.beginPath(); g.arc(s * 0.25 + 9, s * 1.4, 10, 0, 7); g.arc(s * 0.65 + 9, s * 1.4, 10, 0, 7); g.fill();
+    // puzzle
+    g.fillStyle = "#15152b"; g.fillRect(s, s, s, s);
+    const pc = ["#ff3fa4", "#39e0ff", "#ffe23f", "#7cff5a", "#a86bff", "#ff7e3f"];
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 6; x++) if (y > 2 || r() < 0.3) { g.fillStyle = pc[Math.floor(r() * pc.length)]; g.fillRect(s + 22 + x * 14, s + 12 + y * 14, 13, 13); }
+  });
+
+/** checkered black/white marquee lights strip */
+export const bulbs = (bg = "#1a1a1a", bulb = "#fff3b0") =>
+  makeTex(256, 32, (g, w, h) => {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = bulb;
+    for (let x = 8; x < w; x += 16) { g.beginPath(); g.arc(x, h / 2, 5, 0, 7); g.fill(); }
+  });
+
+/** slatwall panel (horizontal grooves) */
+export const slatwall = (base = "#e9e4dc") =>
+  makeTex(256, 256, (g, w, h) => {
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 32) { g.fillStyle = "rgba(0,0,0,0.28)"; g.fillRect(0, y, w, 5); g.fillStyle = "rgba(255,255,255,0.35)"; g.fillRect(0, y + 5, w, 2); }
+  });
+
+const PI = Math.PI;

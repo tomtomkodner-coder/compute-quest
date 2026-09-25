@@ -21,7 +21,7 @@ export function normalMapFrom(t: PaintTex): THREE.CanvasTexture {
   const cv = document.createElement("canvas");
   cv.width = w;
   cv.height = h;
-  const g = cv.getContext("2d")!;
+  const g = cv.getContext("2d", { willReadFrequently: true })!;
   const out = g.createImageData(w, h);
   const at = (x: number, y: number) => lum[((y + h) % h) * w + ((x + w) % w)];
   const k = 2.2;
@@ -299,7 +299,7 @@ export const paintable = (size = 128, color = "#f2f2f2") =>
 export function labelTexture(text: string, color: string) {
   const c = document.createElement("canvas");
   c.width = c.height = 128;
-  const g = c.getContext("2d")!;
+  const g = c.getContext("2d", { willReadFrequently: true })!;
   g.font = "bold 100px sans-serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
@@ -419,7 +419,7 @@ export const bars = () =>
 export const splat = () => {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
-  const g = c.getContext("2d")!;
+  const g = c.getContext("2d", { willReadFrequently: true })!;
   const r = rng(Math.floor(Math.random() * 1e6));
   g.fillStyle = "#fff";
   g.beginPath();

@@ -55,7 +55,7 @@ function pixels(g: CanvasRenderingContext2D, w: number, h: number, f: (u: number
 function field(g: CanvasRenderingContext2D, w: number, h: number, res: number, f: (u: number, v: number, out: number[]) => void) {
   const c = document.createElement("canvas");
   c.width = c.height = res + 2;
-  const cg = c.getContext("2d")!;
+  const cg = c.getContext("2d", { willReadFrequently: true })!;
   const img = cg.createImageData(res + 2, res + 2);
   const o = [0, 0, 0, 255];
   for (let y = 0; y < res + 2; y++)
@@ -262,7 +262,7 @@ export const paving = (seed = 8) =>
     }
     const lay = document.createElement("canvas");
     lay.width = w; lay.height = h;
-    const lg = lay.getContext("2d")!;
+    const lg = lay.getContext("2d", { willReadFrequently: true })!;
     field(lg, w, h, 96, (u, v, o) => {
       const t = n(u, v);
       const sd = Math.max(0, Math.min(1, (t - 0.45) * 3));

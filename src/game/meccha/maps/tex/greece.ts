@@ -278,3 +278,92 @@ export const lunette = () =>
     g.fillStyle = "#f3e7c8"; g.beginPath(); g.arc(w / 2, h * 0.55, 10, 0, Math.PI * 2); g.fill();
     g.fillStyle = "#8e2a20"; g.fillRect(w / 2 - 14, h * 0.7, 28, h * 0.3);
   });
+
+/** alpha leaf card: a sprig of glossy ficus / olive leaves on a transparent background (tinted per instance) */
+export const leafCard = (seed = 21) =>
+  makeTex(128, 128, (g, w, h) => {
+    const r = rng(seed);
+    g.clearRect(0, 0, w, h);
+    g.strokeStyle = "#5a4a2e"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(w * 0.5, h); g.quadraticCurveTo(w * 0.45, h * 0.5, w * 0.55, h * 0.08); g.stroke();
+    for (let i = 0; i < 11; i++) {
+      const t = 0.1 + (i / 11) * 0.85;
+      const sx = w * (0.5 - 0.02 * Math.sin(t * 3)), sy = h * (1 - t * 0.92);
+      const side = i % 2 ? 1 : -1;
+      const a = side * (0.6 + r() * 0.5) - Math.PI / 2;
+      const L = 22 + r() * 14;
+      const cx = sx + Math.cos(a) * L * 0.55, cy = sy + Math.sin(a) * L * 0.55;
+      const shade = 70 + r() * 60;
+      g.fillStyle = `rgb(${shade * 0.55},${shade + 40},${shade * 0.45})`;
+      g.beginPath(); g.ellipse(cx, cy, L * 0.52, L * 0.2, a, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = "rgba(255,255,230,0.35)"; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(sx, sy); g.lineTo(cx + Math.cos(a) * L * 0.4, cy + Math.sin(a) * L * 0.4); g.stroke();
+      g.fillStyle = "rgba(255,255,255,0.18)";
+      g.beginPath(); g.ellipse(cx - Math.sin(a) * 2, cy + Math.cos(a) * 2 - 2, L * 0.3, L * 0.07, a, 0, Math.PI * 2); g.fill();
+    }
+  });
+
+/** alpha bougainvillea card: magenta bract clusters with a few leaves */
+export const bougCard = (seed = 22) =>
+  makeTex(128, 128, (g, w, h) => {
+    const r = rng(seed);
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 16; i++) {
+      const x = 16 + r() * (w - 32), y = 16 + r() * (h - 32);
+      g.fillStyle = ["#3e6b2c", "#4f7f35", "#2f5623"][Math.floor(r() * 3)];
+      g.beginPath(); g.ellipse(x, y, 9 + r() * 5, 4 + r() * 2, r() * 3, 0, Math.PI * 2); g.fill();
+    }
+    for (let c = 0; c < 7; c++) {
+      const cx = 22 + r() * (w - 44), cy = 22 + r() * (h - 44);
+      for (let i = 0; i < 7; i++) {
+        const a = r() * Math.PI * 2, d = r() * 12;
+        const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
+        g.fillStyle = ["#d6247f", "#e8389a", "#b81a6b", "#f25cae", "#c2206f"][Math.floor(r() * 5)];
+        for (let k = 0; k < 3; k++) { const b = (k / 3) * Math.PI * 2 + r(); g.beginPath(); g.ellipse(x + Math.cos(b) * 4, y + Math.sin(b) * 4, 6, 4, b, 0, Math.PI * 2); g.fill(); }
+        g.fillStyle = "rgba(255,240,250,0.8)"; g.fillRect(x - 1, y - 1, 2, 2);
+      }
+    }
+  });
+
+/** cobalt glazed ceramic with drips, crazing and a paler worn rim */
+export const glaze = (seed = 23) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, "#2a58c8"); gr.addColorStop(0.5, "#1f47ad"); gr.addColorStop(1, "#1a3d98");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 70; i++) {
+      const x = r() * w, len = 20 + r() * 90, y = r() * h * 0.6;
+      g.fillStyle = `rgba(${r() < 0.5 ? "10,25,90" : "90,140,240"},${0.12 + r() * 0.15})`;
+      g.fillRect(x, y, 2 + r() * 5, len);
+    }
+    blotches(g, w, h, r, 40, "#6f9ae8", 0.12, 20);
+    blotches(g, w, h, r, 12, "#e8e4da", 0.18, 12); // chips
+    speckle(g, w, h, r, 1200, 0.07);
+  });
+
+/** warm lamplit interior seen through an open doorway (used as emissive) */
+export const doorGlow = () =>
+  makeTex(128, 256, (g, w, h) => {
+    const gr = g.createRadialGradient(w * 0.5, h * 0.25, 10, w * 0.5, h * 0.45, h * 0.75);
+    gr.addColorStop(0, "#fff0c8"); gr.addColorStop(0.35, "#ffbf6a"); gr.addColorStop(0.8, "#b8612a"); gr.addColorStop(1, "#4a2412");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.fillStyle = "rgba(60,30,12,0.55)";
+    g.fillRect(0, h * 0.78, w, h * 0.22); // floor in shade
+    g.fillRect(w * 0.08, h * 0.5, w * 0.3, h * 0.3); // chest
+    g.fillRect(w * 0.62, h * 0.56, w * 0.26, h * 0.04); g.fillRect(w * 0.66, h * 0.6, 4, h * 0.2); g.fillRect(w * 0.82, h * 0.6, 4, h * 0.2); // table
+    g.fillStyle = "rgba(255,250,230,0.9)"; g.beginPath(); g.arc(w * 0.5, h * 0.12, 6, 0, Math.PI * 2); g.fill();
+  });
+
+/** bright Aegean sea: azure with ripple lines */
+export const seaBright = (seed = 24) =>
+  makeTex(256, 256, (g, w, h) => {
+    const r = rng(seed);
+    g.fillStyle = "#2c78bd"; g.fillRect(0, 0, w, h);
+    blotches(g, w, h, r, 30, "#1c5d9e", 0.2, 40);
+    for (let i = 0; i < 500; i++) {
+      const x = r() * w, y = r() * h, l = 6 + r() * 18;
+      g.strokeStyle = r() < 0.5 ? "rgba(230,245,255,0.22)" : "rgba(5,30,70,0.25)"; g.lineWidth = 1 + r();
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + l / 2, y - 2, x + l, y); g.stroke();
+    }
+  });
