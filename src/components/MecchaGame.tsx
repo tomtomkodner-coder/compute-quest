@@ -17,13 +17,14 @@ function useLang() {
 function LangToggle({ dark }: { dark?: boolean }) {
   const l = useLang();
   const b = (v: Lang, n: string) => (
-    <button key={v} onClick={() => setLang(v)} className={`px-2.5 py-1 rounded-lg text-xs font-black ${l === v ? (dark ? "bg-white text-black" : "bg-black text-white") : dark ? "text-white/80" : "text-black/70"}`}>{n}</button>
+    <button key={v} onClick={() => setLang(v)} className={`px-2.5 py-1 rounded-lg text-xs font-bold ${l === v ? (dark ? "bg-white text-black" : "bg-black text-white") : dark ? "text-white/80" : "text-black/70"}`}>{n}</button>
   );
   return <div className={`inline-flex gap-1 rounded-xl p-1 ${dark ? "bg-black/40" : "bg-black/10"}`} aria-label="Language">{b("en", "English")}{b("he", "עברית")}</div>;
 }
 
 // מחרוזות הממשק לקוחות מהגרסה האנגלית של המשחק המקורי (בלי תרגומים מומצאים)
-const FONT = `"M PLUS Rounded 1c", "Nunito", system-ui, sans-serif`;
+// הפונט של המשחק: ממשק Unreal Engine באנגלית = Roboto (יפנית: Noto Sans JP)
+const FONT = `"Roboto", "Noto Sans JP", "Noto Sans Hebrew", system-ui, sans-serif`;
 const SERIF = `"Noto Serif", "Times New Roman", serif`;
 const OUTLINE = "0 2px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 6px rgba(0,0,0,.6)";
 const PLAYER_COLORS = ["#ff006e", "#3a86ff", "#ffbe0b", "#8338ec", "#fb5607", "#06d6a0", "#ef476f", "#118ab2"];
@@ -121,7 +122,7 @@ export function MecchaGame() {
     );
 
   // מסך הפתיחה בסגנון המשחק במחשב: קיר לבנים (כמו בתמונת המפתח של המשחק), לוגו צבעוני, תפריט טקסט בצד שמאל
-  const item = "group relative w-fit text-left text-[30px] leading-none font-black text-white tracking-tight py-1 transition hover:translate-x-2";
+  const item = "group relative w-fit text-left text-[30px] leading-none font-bold text-white tracking-tight py-1 transition hover:translate-x-2";
   const under = (c: string) => <span className="absolute left-0 -bottom-0.5 h-[6px] w-0 group-hover:w-full transition-all rounded-full" style={{ background: c }} />;
   const LOGO = ["#ff3d7f", "#ffb700", "#3ec7ff", "#7cf23a", "#ff6a00", "#b04dff"];
   const logo = (w: string, o: number) => w.split("").map((ch, i) => (
@@ -333,7 +334,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           </div>
         </div>
       )}
-      {!hud && !error && <div className="absolute inset-0 grid place-items-center text-2xl font-black" style={{ textShadow: OUTLINE }}>{t("Loading…")}</div>}
+      {!hud && !error && <div className="absolute inset-0 grid place-items-center text-2xl font-bold" style={{ textShadow: OUTLINE }}>{t("Loading…")}</div>}
 
       {hud && (
         <>
@@ -428,10 +429,10 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
                   <KeyBox k="E" /> {t("Configure Map")}
                 </div>
               ) : null}
-              {hud.onPad && <div className="text-xl font-black text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>{t("You will be a HUNTER")}</div>}
+              {hud.onPad && <div className="text-xl font-bold text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>{t("You will be a HUNTER")}</div>}
               {touch && <div className="flex gap-2 pointer-events-auto">
-                <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-black border-2 border-black">{t("Settings")}</button>
-                <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-black border-2 border-black">{t("Character")}</button>
+                <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-bold border-2 border-black">{t("Settings")}</button>
+                <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-bold border-2 border-black">{t("Character")}</button>
               </div>}
             </div>
           )}
@@ -492,7 +493,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
             {chatOpen && <ChatInput onSend={(m) => e?.sendChat(m)} onClose={() => setChatOpen(false)} />}
           </div>
 
-          {toast && <div className="absolute top-28 left-1/2 -translate-x-1/2 z-30 rounded-2xl bg-black/70 px-4 py-2 text-lg font-black">{toast}</div>}
+          {toast && <div className="absolute top-28 left-1/2 -translate-x-1/2 z-30 rounded-2xl bg-black/70 px-4 py-2 text-lg font-bold">{toast}</div>}
 
           {touch && <TouchControls hud={hud} engine={e} onPose={() => setPoseMenu((v) => !v)} onChat={() => setChatOpen(true)} />}
         </>
@@ -551,7 +552,7 @@ function TopHud({ hud }: { hud: HudState }) {
 }
 
 function KeyBox({ k, on, color }: { k: string; on?: boolean; color?: string }) {
-  return <span className="inline-grid place-items-center min-w-[16px] h-[16px] px-[3px] rounded-[3px] text-[10px] font-black leading-none text-black" style={{ background: color ?? (on ? "#27c93f" : "#fff") }}>{k}</span>;
+  return <span className="inline-grid place-items-center min-w-[16px] h-[16px] px-[3px] rounded-[3px] text-[10px] font-bold leading-none text-black" style={{ background: color ?? (on ? "#27c93f" : "#fff") }}>{k}</span>;
 }
 
 /** אייקוני הרשימה בימין — ציור פשוט בסגנון המשחק */
@@ -600,7 +601,7 @@ function ModeText({ mode }: { mode: Settings["mode"] }) {
 function BottomChips({ hud, hider }: { hud: HudState; hider: boolean }) {
   const chip = (k: string, label: string, color: string) => (
     <div className="flex flex-col items-center gap-[2px]">
-      <span className="rounded-[3px] px-1.5 h-[14px] grid place-items-center text-[8px] font-black text-black" style={{ background: color }}>{k}</span>
+      <span className="rounded-[3px] px-1.5 h-[14px] grid place-items-center text-[8px] font-bold text-black" style={{ background: color }}>{k}</span>
       <span className="text-[9px]">{t(label)}</span>
     </div>
   );
@@ -616,7 +617,7 @@ function MissedTab({ hud, open, setOpen }: { hud: HudState; open: boolean; setOp
   return (
     <div className="absolute left-0 top-[40%] z-20" style={{ textShadow: "0 1px 2px rgba(0,0,0,.9)" }}>
       <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 bg-black/30 rounded-r px-2 py-1 text-[12px]">
-        <span className="rounded-sm bg-white text-black text-[8px] font-black px-1 h-3 grid place-items-center">Tab</span>{t("Missed-Spot Ranking")}
+        <span className="rounded-sm bg-white text-black text-[8px] font-bold px-1 h-3 grid place-items-center">Tab</span>{t("Missed-Spot Ranking")}
       </button>
       {open && (
         <div className="bg-black/45 rounded-r px-2 py-1.5 min-w-[170px] text-[11px]">
@@ -635,7 +636,7 @@ function MissedTab({ hud, open, setOpen }: { hud: HudState; open: boolean; setOp
 }
 
 function Key({ k }: { k: string }) {
-  return <span className="inline-block min-w-[20px] px-1 rounded-md bg-white text-black text-center border-b-[3px] border-black/60 font-black text-[11px] leading-[18px]" style={{ textShadow: "none" }}>{k}</span>;
+  return <span className="inline-block min-w-[20px] px-1 rounded-md bg-white text-black text-center border-b-[3px] border-black/60 font-bold text-[11px] leading-[18px]" style={{ textShadow: "none" }}>{k}</span>;
 }
 
 function Banner({ children }: { children: React.ReactNode }) {
@@ -683,12 +684,12 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
   const set = (p: Partial<Settings>) => engine?.setSettings(p);
   const solo = hud.net === "local";
   const col = "rounded border border-white/15 bg-black/35 p-3 min-h-0 overflow-auto";
-  const h = "text-sm font-black mb-2";
+  const h = "text-sm font-bold mb-2";
   return (
     <div className="absolute inset-0 z-40 bg-black/50 p-2 sm:p-4 grid place-items-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
       <div dir={isRtl() ? "rtl" : "ltr"} className="relative w-full max-w-5xl h-full max-h-[640px] rounded-md bg-[#121212]/92 text-white border border-white/15 shadow-2xl backdrop-blur-sm p-3 flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black">{t("Configure Map")}</h2>
+          <h2 className="text-xl font-bold">{t("Configure Map")}</h2>
           <button onClick={onClose} className="rounded-full bg-black text-white p-1" aria-label="Close"><X className="w-4 h-4" /></button>
         </div>
         {dis && <p className="text-xs font-bold text-white/60 -mt-1">{t("Only the host can change the settings.")}</p>}
@@ -697,7 +698,7 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
           <div className={col}>
             <div className={h}>{t("Map")}</div>
             <button disabled={dis} onClick={() => set({ map: "random" })}
-              className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-black ${s.map === "random" ? "border-[#ffb700] bg-[#ffb700]/25" : "border-white/10 hover:bg-white/10"}`}>🎲 {t("Random")}</button>
+              className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 text-sm font-bold ${s.map === "random" ? "border-[#ffb700] bg-[#ffb700]/25" : "border-white/10 hover:bg-white/10"}`}>🎲 {t("Random")}</button>
             {MAP_LIST.map((m) => (
               <div key={m.id} className={`flex items-center gap-1.5 rounded-xl border-2 px-2 py-1 mb-1 ${s.map === m.id ? "border-[#3ec7ff] bg-[#3ec7ff]/25" : "border-white/10 hover:bg-white/10"}`}>
                 <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-start text-sm font-bold truncate">{t(m.name)}</button>
@@ -714,7 +715,7 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
             {MODES.map((m) => (
               <button key={m.id} disabled={dis} onClick={() => set({ mode: m.id })}
                 className={`w-full text-start rounded-xl border-2 px-2 py-1.5 mb-1 ${s.mode === m.id ? "border-[#7cf23a] bg-[#7cf23a]/20" : "border-white/10 hover:bg-white/10"}`}>
-                <div className="text-sm font-black">{t(m.name)}</div>
+                <div className="text-sm font-bold">{t(m.name)}</div>
                 <div className="text-[11px] font-bold text-white/60 leading-tight">{t(m.desc)}</div>
               </button>
             ))}
@@ -740,7 +741,7 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
             <Opt label="Hunter TPS" value={s.hunterTps} disabled={dis} options={onOff} onChange={(v) => set({ hunterTps: v })} />
             {solo && (
               <>
-                <div className="text-[11px] font-black mt-3 text-white/60">{t("Practice (solo only)")}</div>
+                <div className="text-[11px] font-bold mt-3 text-white/60">{t("Practice (solo only)")}</div>
                 <Opt label="Bots" value={s.bots} disabled={dis} options={nums(1, 8)} onChange={(v) => set({ bots: v })} />
                 <Opt label="Bot Level" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />
               </>
@@ -765,24 +766,24 @@ function CharPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | n
   return (
     <Panel title={hud.phase === "countdown" ? t("Starting in {n}", { n: hud.time }) : t("Character")} onClose={onClose}>
       {hud.phase === "countdown" && <p className="text-sm font-bold mb-2">{t("Map:")} <b>{mapName}</b></p>}
-      <p className="text-sm font-black mb-1.5">{t("Size")}</p>
+      <p className="text-sm font-bold mb-1.5">{t("Size")}</p>
       <div className="grid grid-cols-2 gap-2 mb-3">
         {SIZE_LIST.map((z) => {
           const off = z.id === "petit" && !hud.settings.allowPetit;
           return (
             <button key={z.id} disabled={off} onClick={() => engine?.setMySize(z.id)}
-              className={`rounded-xl border-[3px] py-2 text-sm font-black disabled:opacity-30 ${hud.size === z.id ? "border-[#3ec7ff] bg-[#3ec7ff]/25" : "border-white/15 hover:bg-white/10"}`}>{t(z.name)}{z.id === "petit" ? " ×0.5" : ""}</button>
+              className={`rounded-xl border-[3px] py-2 text-sm font-bold disabled:opacity-30 ${hud.size === z.id ? "border-[#3ec7ff] bg-[#3ec7ff]/25" : "border-white/15 hover:bg-white/10"}`}>{t(z.name)}{z.id === "petit" ? " ×0.5" : ""}</button>
           );
         })}
       </div>
-      <p className="text-sm font-black mb-1.5">{t("Body Type")}</p>
+      <p className="text-sm font-bold mb-1.5">{t("Body Type")}</p>
       <div className="grid grid-cols-3 gap-2">
         {BODY_LIST.map((b) => (
           <button key={b.id} onClick={() => engine?.setMyBody(b.id)}
-            className={`rounded-xl border-[3px] py-2 font-black ${hud.bodyType === b.id ? "border-[#ffb700] bg-[#ffb700]/25" : "border-white/15 hover:bg-white/10"}`}>{t(b.name)}</button>
+            className={`rounded-xl border-[3px] py-2 font-bold ${hud.bodyType === b.id ? "border-[#ffb700] bg-[#ffb700]/25" : "border-white/15 hover:bg-white/10"}`}>{t(b.name)}</button>
         ))}
       </div>
-      <button onClick={onClose} className="mt-4 w-full rounded-2xl bg-black text-white py-2.5 font-black">{t("OK")}</button>
+      <button onClick={onClose} className="mt-4 w-full rounded-2xl bg-black text-white py-2.5 font-bold">{t("OK")}</button>
     </Panel>
   );
 }
@@ -822,13 +823,13 @@ function CheckPanel({ hud, onLike }: { hud: HudState; onLike: () => void }) {
   return (
     <>
       <div className="absolute top-[92px] left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
-        <div className="text-3xl font-black text-[#ffd23f]" style={{ textShadow: OUTLINE }}>{winText}</div>
+        <div className="text-3xl font-bold text-[#ffd23f]" style={{ textShadow: OUTLINE }}>{winText}</div>
         <div className="text-xs font-bold" style={{ textShadow: OUTLINE }}>
           <span className="text-[#ff5a5a]">■ {t("Red")}</span> {t("= not found")} · <span className="text-[#5a8dff]">■ {t("Blue")}</span> {t("= found")}
         </div>
       </div>
       <div className="absolute right-2 top-24 z-20 w-56 rounded-2xl bg-black/55 p-2 text-xs font-bold grid gap-0.5">
-        <div className="text-center font-black mb-0.5">{t(hud.settings.mode === "double" ? "Finds" : hud.settings.missed ? "Missed Points" : "Results")}</div>
+        <div className="text-center font-bold mb-0.5">{t(hud.settings.mode === "double" ? "Finds" : hud.settings.missed ? "Missed Points" : "Results")}</div>
         {res.map((r, i) => (
           <div key={r.id} className="flex items-center gap-1.5">
             <span className="w-4 opacity-70">{i + 1}</span>
@@ -841,7 +842,7 @@ function CheckPanel({ hud, onLike }: { hud: HudState; onLike: () => void }) {
       </div>
       <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5">
         {hud.likeTarget && !hud.likedThisRound && (
-          <button onClick={onLike} className="rounded-2xl bg-black/60 px-4 py-2 text-lg font-black"><Key k="G" /> 👍 {hud.likeTarget}</button>
+          <button onClick={onLike} className="rounded-2xl bg-black/60 px-4 py-2 text-lg font-bold"><Key k="G" /> 👍 {hud.likeTarget}</button>
         )}
         {hud.likedThisRound && <div className="text-sm font-bold" style={{ textShadow: OUTLINE }}>👍 {t("Sent")}</div>}
         <div className="text-xs font-bold" style={{ textShadow: OUTLINE }}>
@@ -892,7 +893,7 @@ function PoseWheel({ icons, current, hover, onPick, onClose, touch }: { icons: R
         })}
         {/* לוחצים על המרכז כדי לעבור עמוד */}
         <button onClick={() => { setPage((page + 1) % POSE_PAGES.length); setHl(null); hover.current = null; }}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-black/60 border-4 border-white/70 font-black text-lg" aria-label="Next page">
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-black/60 border-4 border-white/70 font-bold text-lg" aria-label="Next page">
           {page + 1}/{POSE_PAGES.length}
         </button>
       </div>
@@ -1099,7 +1100,7 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
 function TouchControls({ hud, engine, onPose, onChat }: { hud: HudState; engine: Engine | null; onPose: () => void; onChat: () => void }) {
   const hider = hud.alive && hud.myRole === "hider" && hud.phase !== "check";
   const hunter = hud.myRole === "hunter" && hud.phase === "hunt" && hud.alive;
-  const b = "w-14 h-14 rounded-full bg-white/80 text-black border-[3px] border-black font-black text-xs active:scale-90";
+  const b = "w-14 h-14 rounded-full bg-white/80 text-black border-[3px] border-black font-bold text-xs active:scale-90";
   return (
     <>
       {!hud.paintMode && <Joystick onChange={(x, y) => engine?.setJoystick(x, y)} />}
