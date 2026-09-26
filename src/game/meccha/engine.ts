@@ -445,7 +445,7 @@ export class Engine {
       this.composer.addPass(new RenderPass(this.scene, this.camera));
       if (!coarse) {
         this.gtao = new GTAOPass(this.scene, this.camera, 1, 1);
-        this.gtao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.5, thickness: 1.2, scale: 1.1, samples: 12 });
+        this.gtao.updateGtaoMaterial({ radius: 0.75, distanceExponent: 1.4, thickness: 1.4, scale: 1.25, samples: 12 }); // צל מגע חזק יותר בפינות ומתחת לרהיטים
         this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
         this.gtao.blendIntensity = 0.85;
         this.composer.addPass(this.gtao);
@@ -545,23 +545,40 @@ export class Engine {
     const cx = (B.minX + B.maxX) / 2, cz = (B.minZ + B.maxZ) / 2;
     const hx = (B.maxX - B.minX) / 2 + 3, hz = (B.maxZ - B.minZ) / 2 + 3;
     this.sun.visible = true;
+    // מפות סגורות: אור עליון חזק יותר ותאורת סביבה נמוכה יותר = צללים ברורים מתחת לכל חפץ ודמות (כמו במשחק)
+    const indoor = !L.hdriBackground;
+    const dark = ["sewer", "backrooms", "deathburger", "kyoto", "lobby"].includes(id);
+    if (indoor && !dark) this.hemi.intensity = L.hemi[2] * 0.55;
     if (L.sun) {
       this.sun.color.set(L.sun.color);
-      this.sun.intensity = L.sun.int;
-      this.sun.position.set(cx + L.sun.pos[0], L.sun.pos[1], cz + L.sun.pos[2]);
+      this.sun.intensity = indoor && !dark ? Math.max(L.sun.int * 1.4, 2.6) : L.sun.int;
+      // בפנים: זווית ~58° — הצל נופל לצד החפץ ונראה (אנכי לגמרי = הצל מוסתר מתחתיו); תקרות לא חוסמות (ראו cutDepthMat)
+      let pos = L.sun.pos;
+      if (indoor) { const hl = Math.hypot(L.sun.pos[0], L.sun.pos[2]) || 1; pos = [(L.sun.pos[0] || 0.6) / hl * 20, 32, (L.sun.pos[2] || 0.8) / hl * 20]; }
+      this.sun.position.set(cx + pos[0], pos[1], cz + pos[2]);
     } else {
       this.sun.color.set("#fff3e0");
       this.sun.intensity = 0.55;
-      this.sun.position.set(cx + 3, 40, cz + 5);
+      this.sun.position.set(cx + 11, 32, cz + 17);
     }
     // תקרות וגגות לא מטילים צל (אחרת אור המפתח העליון נחסם והכל חשוך)
     const bb = new THREE.Box3();
     this.world.group.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (!m.isMesh || !m.castShadow) return;
+      if (!m.isMesh) return;
+      // חפצים חוזרים (כיסאות, שולחנות, קופסאות...) נבנים כ־InstancedMesh ולעתים בלי צל — מדליקים להם צל (לא לאריחים/חפצים שטוחים)
+      if (!m.castShadow && (m as THREE.InstancedMesh).isInstancedMesh && !(m.material as THREE.Material).transparent) {
+        m.geometry.computeBoundingBox();
+        const gb = m.geometry.boundingBox!;
+        if (gb.max.y - gb.min.y > 0.12 && Math.max(gb.max.x - gb.min.x, gb.max.z - gb.min.z) < 4) m.castShadow = true;
+      }
+      if (!m.castShadow) return;
+      if ((m as THREE.InstancedMesh).isInstancedMesh) return;
       bb.setFromObject(m);
       const sx = bb.max.x - bb.min.x, sz = bb.max.z - bb.min.z, sy = bb.max.y - bb.min.y;
       if (sy < 0.6 && bb.min.y > 2.3 && sx * sz > 30) m.castShadow = false;
+      // מבנה ממוזג גדול (קירות+תקרה באותו mesh): מטיל צל רק מתחת לגובה התקרה, כך שרהיטים, חפצים ודמויות מטילים צללים ברורים
+      else if (indoor && sy > 3 && sx * sz > 30) m.customDepthMaterial = this.cutDepthMat(bb.min.y + 2.4);
     });
     this.sun.target.position.set(cx, 0, cz);
     this.sun.target.updateMatrixWorld();
@@ -573,7 +590,7 @@ export class Engine {
     // שתי מנורות הנקודה החזקות מטילות צללים (באיכות צל גבוהה)
     const strong = L.points.map((pt, i) => ({ i, v: pt.int * pt.dist })).sort((a, b) => b.v - a.v).slice(0, 2).map((x) => x.i);
     this.points = L.points.map((pt, i) => {
-      const l = new THREE.PointLight(pt.color, pt.int, pt.dist, 1.6);
+      const l = new THREE.PointLight(pt.color, pt.int * (indoor && !dark ? 0.55 : 1), pt.dist, 1.6);
       l.position.set(...pt.pos);
       if (false && strong.includes(i) && this.shadowQ === 2 && !this.perfMode) { // צללי מנורות: כבד מדי (6 רינדורים לכל מנורה בכל פריים)
         l.castShadow = true;
@@ -586,7 +603,7 @@ export class Engine {
       return l;
     });
     this.renderer.toneMappingExposure = L.exposure ?? 1;
-    this.scene.environmentIntensity = L.env ?? 0.45;
+    this.scene.environmentIntensity = (L.env ?? 0.45) * (indoor && !dark ? 0.7 : 1);
     this.scene.environmentRotation.set(0, L.envRotation ?? 0, 0);
     this.scene.backgroundRotation.set(0, L.envRotation ?? 0, 0);
     this.scene.environment = this.envCache.get(L.hdri ?? "") ?? this.roomEnv;
@@ -1593,6 +1610,23 @@ export class Engine {
   private blurPass: AfterimagePass | null = null;
   /** הגדרות גרפיקה (כמו בלשונית Graphics במשחק): 0..4 = Off/Low/Medium/High/Highest */
   gfx = { res: 0, shadow: 4, texture: 4, gi: 4, effects: 4, aa: 3, shading: 4, reflection: 4, motionBlur: 0, fpsLimit: 60, fov: 70 };
+  private cutDepthCache = new Map<number, THREE.MeshDepthMaterial>();
+  /** חומר עומק לצל שמתעלם מכל מה שמעל הגובה הנתון (תקרות וקומות עליונות של מבנים ממוזגים) */
+  private cutDepthMat(y: number) {
+    const k = Math.round(y * 10) / 10;
+    let m = this.cutDepthCache.get(k);
+    if (m) return m;
+    m = new THREE.MeshDepthMaterial();
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uCut = { value: k };
+      sh.vertexShader = "varying float vWY;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvWY = (modelMatrix * vec4(transformed, 1.0)).y;");
+      sh.fragmentShader = "uniform float uCut;\nvarying float vWY;\n" + sh.fragmentShader.replace("void main() {", "void main() {\n  if (vWY > uCut) discard;");
+    };
+    m.customProgramCacheKey = () => "cut" + k;
+    this.cutDepthCache.set(k, m);
+    return m;
+  }
+
   setGraphics(g: Partial<Engine["gfx"]>) {
     Object.assign(this.gfx, g);
     const G = this.gfx;
@@ -1602,7 +1636,7 @@ export class Engine {
     if (size && this.sun.shadow.mapSize.x !== size) { this.sun.shadow.mapSize.set(size, size); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
     this.sun.shadow.radius = G.shading >= 3 ? 3 : 1;
     // תאורה גלובלית (AO)
-    if (this.gtao) { this.gtao.enabled = G.gi > 0 && !this.perfMode; this.gtao.blendIntensity = [0, 0.5, 0.7, 0.85, 1][G.gi]; }
+    if (this.gtao) { this.gtao.enabled = G.gi > 0 && !this.perfMode; this.gtao.blendIntensity = [0, 0.6, 0.8, 1, 1.15][G.gi]; }
     // טקסטורות: סינון אנאיזוטרופי
     const an = [1, 2, 4, 8, 16][G.texture];
     this.world?.group.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.map && m.map.anisotropy !== an) { m.map.anisotropy = an; m.map.needsUpdate = true; } });
