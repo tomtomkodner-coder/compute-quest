@@ -9,14 +9,14 @@ export const LANG_NAMES: Record<Lang, string> = {
 };
 
 let lang: Lang = (() => {
-  try { const v = localStorage.getItem("meccha_lang") as Lang; return LANG_CODES.includes(v) ? v : "en"; } catch { return "en"; }
+  try { const v = localStorage.getItem("meccha_lang2") as Lang; return LANG_CODES.includes(v) ? v : "en"; } catch { return "en"; }
 })();
 const subs = new Set<() => void>();
 
 export function getLang() { return lang; }
 export function setLang(l: Lang) {
   lang = l;
-  try { localStorage.setItem("meccha_lang", l); } catch { /* ignore */ }
+  try { localStorage.setItem("meccha_lang2", l); } catch { /* ignore */ }
   subs.forEach((f) => f());
 }
 export function onLang(f: () => void) { subs.add(f); return () => { subs.delete(f); }; }

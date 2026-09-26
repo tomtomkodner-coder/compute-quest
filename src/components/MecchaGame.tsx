@@ -88,6 +88,8 @@ export function MecchaGame() {
   const [ready] = useState(() => typeof window === "undefined" ? Promise.resolve() : Promise.all([
     import("@/game/meccha/engine"), import("@/game/meccha/net"), import("@/game/meccha/poseicons"),
     import("@/game/meccha/character").then((m) => m.loadCharacterModels()), import("@/game/meccha/paintings").then((m) => m.loadPaintings()),
+    // כתב יד עברי לדפים/לוחות במפות (מצוירים על Canvas — הפונט חייב להיות טעון לפני בניית המפה)
+    Promise.race([document.fonts.load('40px "Gveret Levin"').catch(() => null), new Promise((r) => setTimeout(r, 2500))]),
   ]));
   const [form, setForm] = useState<ServerForm>({ name: "", server: "", password: "", region: "Not Specified", tags: ["Everyone Welcome"] });
   const [showPublic, setShowPublic] = useState(false);
@@ -136,7 +138,7 @@ export function MecchaGame() {
   const back = () => setScreen("menu");
   const myName = (form.name || name).trim().slice(0, 30) || "Player";
   const wrap = (el: React.ReactNode) => (
-    <div dir="ltr" style={{ fontFamily: FONT }} onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>{el}</div>
+    <div dir="ltr" style={{ fontFamily: FONT }} onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>{el}<RotateHint /></div>
   );
   if (screen === "splash") return wrap(<Splash ready={ready} onDone={() => setScreen("menu")} />);
   if (screen === "settings") return wrap(<SettingsScreen engine={null} inGame={false} muted={muted} onToggleMute={toggleMute} onClose={back} />);
@@ -192,7 +194,9 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   const poseHover = useRef<PoseId | null>(null);
 
   useEffect(() => {
-    setTouch(window.matchMedia("(pointer: coarse)").matches);
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    setTouch(coarse);
+    if (coarse) goFullscreen(); // טלפון: נכנסים למשחק במסך מלא לרוחב
     let alive = true;
     let eng: Engine | null = null;
     (async () => {
@@ -274,6 +278,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   return (
     <div className="fixed inset-0 bg-black select-none overflow-hidden text-white" dir="ltr" style={{ fontFamily: FONT }}
       onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>
+      <RotateHint />
       <div ref={mountRef} className="absolute inset-0" />
 
       {error && (
@@ -1050,6 +1055,9 @@ function TouchControls({ hud, engine, onPose, onChat }: { hud: HudState; engine:
   const hider = hud.alive && hud.myRole === "hider" && hud.phase !== "check";
   const hunter = hud.myRole === "hunter" && hud.phase === "hunt" && hud.alive;
   const b = "w-14 h-14 rounded-full bg-white/80 text-black border-[3px] border-black font-bold text-xs active:scale-90";
+  const [run, setRun] = useState(false);
+  // לחיצה ארוכה = מקש מוחזק (קפיצה → טיפוס על קירות כל עוד מחזיקים, כמו Space במחשב)
+  const key = (code: string, down: boolean) => window.dispatchEvent(new KeyboardEvent(down ? "keydown" : "keyup", { code }));
   return (
     <>
       {!hud.paintMode && <Joystick onChange={(x, y) => engine?.setJoystick(x, y)} />}
@@ -1060,7 +1068,9 @@ function TouchControls({ hud, engine, onPose, onChat }: { hud: HudState; engine:
         {hider && !hud.paintMode && <button className={b} onClick={() => engine?.placeClone()}>{t("Clone")}</button>}
         {hider && !hud.paintMode && <button className={b} onClick={() => engine?.whistle()}>♪</button>}
         {hud.attached && <button className={b} onClick={() => engine?.detach()}>{t("Leave")}</button>}
-        {!hud.paintMode && <button className={`${b} !bg-[#8ef56b]`} onClick={() => engine?.jump()}>{t("Jump")}</button>}
+        {!hud.paintMode && <button className={`${b} ${run ? "!bg-[#ffd84d]" : ""}`} onClick={() => { key("ShiftLeft", !run); setRun(!run); }}>{t("Run")}</button>}
+        {!hud.paintMode && <button className={`${b} !bg-[#8ef56b] touch-none`} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); key("Space", true); }}
+          onPointerUp={() => key("Space", false)} onPointerCancel={() => key("Space", false)}>{t(hud.attached ? "Climb" : "Jump")}</button>}
         {hud.phase === "check" && <button className={b} onClick={() => engine?.giveLike()}>👍</button>}
         {(hud.phase === "hide" || hud.phase === "check") && <button className={b} onClick={() => engine?.voteSkip()}>{t("Skip")}</button>}
         {hud.spectating !== null && <button className={b} onClick={() => engine?.cycleSpectate()}>{t("Next")}</button>}
@@ -1095,6 +1105,38 @@ function Joystick({ onChange }: { onChange: (x: number, y: number) => void }) {
       onPointerMove={(ev) => { if (id.current === ev.pointerId) move(ev); }}
       onPointerUp={end} onPointerCancel={end}>
       <div className="absolute w-14 h-14 rounded-full bg-white/70 border-2 border-black left-1/2 top-1/2" style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }} />
+    </div>
+  );
+}
+
+/** טלפון: מסך מלא + נעילה לרוחב (כשהדפדפן מאפשר) */
+function goFullscreen() {
+  try {
+    const d = document.documentElement;
+    const p = d.requestFullscreen?.();
+    p?.then(() => (window.screen.orientation as unknown as { lock?: (o: string) => Promise<void> })?.lock?.("landscape").catch(() => {})).catch(() => {});
+  } catch { /* לא נתמך */ }
+}
+/** טלפון במצב לאורך: המשחק (כמו המקורי) הוא למסך רחב — מבקשים לסובב */
+function RotateHint() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const f = () => setShow(window.matchMedia("(pointer: coarse)").matches && window.innerHeight > window.innerWidth * 1.1);
+    f();
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, []);
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-[200] grid place-items-center bg-black/92 text-white text-center p-8" onClick={goFullscreen}>
+      <div>
+        <svg viewBox="0 0 64 64" className="mx-auto w-24 h-24 animate-pulse" aria-hidden>
+          <rect x="22" y="8" width="20" height="36" rx="3" fill="none" stroke="#8ef56b" strokeWidth="3" transform="rotate(-90 32 32)" />
+          <path d="M14 46 A22 22 0 0 0 46 52" fill="none" stroke="#fff" strokeWidth="3" /><path d="M46 52 l-7 -1 m7 1 l-2 -7" stroke="#fff" strokeWidth="3" fill="none" />
+        </svg>
+        <div className="mt-4 text-xl font-bold">{t("Rotate your device to landscape")}</div>
+        <div className="mt-2 text-sm text-white/70">{t("Tap for full screen")}</div>
+      </div>
     </div>
   );
 }

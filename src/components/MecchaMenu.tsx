@@ -22,8 +22,11 @@ function useLangTick() {
 function Stage({ bg, dim = 0, children }: { bg: string; dim?: number; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 overflow-hidden bg-black select-none">
+      {/* רקע ממלא (לטלפונים/מסכים שאינם 16:9) — והמסך עצמו תמיד נכנס כולו, כך שאף כפתור לא נחתך */}
+      <div className="absolute inset-0 scale-110" style={{ backgroundImage: `url(${bg})`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(18px) brightness(.55)" }} />
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-        style={{ width: "max(100vw, 177.78vh)", height: "max(56.25vw, 100vh)", ["--u" as string]: "calc(max(56.25vw, 100vh) / 1080)", backgroundImage: `url(${bg})`, backgroundSize: "100% 100%" }}>
+        style={{ width: "min(100vw, 177.78vh)", height: "min(56.25vw, 100vh)", ["--u" as string]: "calc(min(56.25vw, 100vh) / 1080)", backgroundImage: `url(${bg})`, backgroundSize: "100% 100%", animation: "mcIn .28s ease-out" }}>
+        <style>{"@keyframes mcIn{from{opacity:0;scale:1.02}to{opacity:1;scale:1}}"}</style>
         {dim > 0 && <div className="absolute inset-0" style={{ background: `rgba(0,0,0,${dim})` }} />}
         {children}
       </div>
@@ -74,7 +77,7 @@ export function Splash({ ready, onDone }: { ready: Promise<unknown>; onDone: () 
 // ---------- כפתור בסגנון המשחק: קופסה כהה עם מסגרת ירוקה ----------
 function GBtn({ x, y, w, h, fs = 32, children, onClick, active, dim }: { x: number; y: number; w: number; h: number; fs?: number; children: React.ReactNode; onClick?: () => void; active?: boolean; dim?: boolean }) {
   return (
-    <button onClick={onClick} className={`group absolute grid place-items-center font-bold transition-colors ${dim ? "opacity-45 cursor-default" : ""}`}
+    <button onClick={onClick} className={`group absolute grid place-items-center font-bold transition-[transform,filter] duration-150 ${dim ? "opacity-45 cursor-default" : "hover:scale-[1.04] hover:brightness-125 active:scale-95"}`}
       style={{ left: U(x), top: U(y), width: U(w), height: U(h), fontSize: U(fs), borderWidth: U(3), borderColor: GREEN, background: "linear-gradient(#2c2c2c,#121212)", color: active ? "#5dff5d" : "#fff", boxShadow: `inset 0 0 ${U(6)} rgba(0,0,0,.6)` }}>
       <span className="group-hover:text-[#5dff5d]">{children}</span>
     </button>

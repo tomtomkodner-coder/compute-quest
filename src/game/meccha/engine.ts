@@ -24,7 +24,7 @@ const STEP_ORIGIN = new THREE.Vector3();
 import { buildShotgun } from "./gun";
 import { THUMBS } from "./thumbs";
 import type { Net, Presence } from "./net";
-import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic, setWaterAmbience, playDrip } from "@/lib/sound";
+import { sfxClick, sfxCorrect, sfxWrong, sfxWin, sfxTick, startMusic, stopMusic, setWaterAmbience, playDrip, playTone } from "@/lib/sound";
 
 // ================= טיפוסים =================
 
@@ -189,6 +189,10 @@ interface Player {
   moveT: number;
   samples: { mesh: THREE.Mesh; index: number }[];
   dying: number;
+  /** squash & stretch: קפיצה (מתיחה) ונחיתה (מעיכה) */
+  sq: number;
+  lastY: number;
+  vyEst: number;
   seed: number;
   paintedKey: string;
   labelKey: string;
@@ -586,6 +590,14 @@ export class Engine {
     Object.assign(this.sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: 140 });
     this.sun.shadow.camera.updateProjectionMatrix();
     this.sun.shadow.radius = 3;
+    // אור מפתח עוקב: במפות סגורות הצל מגיע מהמנורה הקרובה לשחקן — עוברים למנורה אחרת והצללים משנים כיוון
+    this.keyLamps = indoor ? L.points.map((pt, i) => ({ p: new THREE.Vector3(...pt.pos), i })).filter((o) => o.p.y > 1.4) : [];
+    this.keyBase = this.sun.intensity;
+    this.keyDir.copy(this.sun.position).sub(this.sun.target.position).normalize();
+    if (this.keyLamps.length) {
+      Object.assign(this.sun.shadow.camera, { left: -17, right: 17, top: 17, bottom: -17, near: 1, far: 90 });
+      this.sun.shadow.camera.updateProjectionMatrix();
+    }
     for (const p of this.points) { this.scene.remove(p); p.shadow?.map?.dispose(); }
     // שתי מנורות הנקודה החזקות מטילות צללים (באיכות צל גבוהה)
     const strong = L.points.map((pt, i) => ({ i, v: pt.int * pt.dist })).sort((a, b) => b.v - a.v).slice(0, 2).map((x) => x.i);
@@ -602,6 +614,7 @@ export class Engine {
       this.scene.add(l);
       return l;
     });
+    this.pointBase = this.points.map((l) => l.intensity);
     this.renderer.toneMappingExposure = L.exposure ?? 1;
     this.scene.environmentIntensity = (L.env ?? 0.45) * (indoor && !dark ? 0.7 : 1);
     this.scene.environmentRotation.set(0, L.envRotation ?? 0, 0);
@@ -654,6 +667,14 @@ export class Engine {
   // ---------- תמונות המפות בלובי ----------
 
   // ---------- אווירה: מים זורמים + רחש מים, מנורות מהבהבות, השתקפויות אמיתיות של המפה ----------
+  private keyLamps: { p: THREE.Vector3; i: number }[] = [];
+  private keyBase = 1;
+  private keyDir = new THREE.Vector3(0, 1, 0);
+  private pointBase: number[] = [];
+  private spinners: { o: THREE.Object3D; axis: THREE.Vector3; speed: number }[] = [];
+  private pushBalls: { im: THREE.InstancedMesh; i: number; p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3; v: THREE.Vector3; r: number; y0: number }[] = [];
+  private pushMeshes = new Set<THREE.InstancedMesh>();
+  private boingT = 0;
   private flowMats: { m: THREE.MeshStandardMaterial; f: [number, number] }[] = [];
   private waterBoxes: THREE.Box3[] = [];
   private flickers: { l: THREE.PointLight; base: number; ph: number; hard: boolean }[] = [];
@@ -695,8 +716,158 @@ export class Engine {
       const r = h - Math.floor(h);
       if (this.worldId !== "lobby" && r < (dark ? 0.45 : 0.18)) this.flickers.push({ l, base: l.intensity, ph: r * 100, hard: dark && r < 0.2 });
     });
+    // אנימציות (מאווררים, גלגל ענק...) וחפצים שזזים כשעוברים עליהם (בלונים, כדורים)
+    this.spinners = [];
+    this.pushBalls = [];
+    this.pushMeshes.clear();
+    const m4 = new THREE.Matrix4();
+    this.world.group.traverse((o) => {
+      const sp = o.userData.spin as { axis: [number, number, number]; speed: number } | undefined;
+      if (sp) this.spinners.push({ o, axis: new THREE.Vector3(...sp.axis).normalize(), speed: sp.speed });
+      const im = o as THREE.InstancedMesh;
+      if (im.isInstancedMesh && (o.userData.pushable || im.geometry.userData.pushable)) {
+        im.frustumCulled = false;
+        im.geometry.computeBoundingSphere();
+        const gr = im.geometry.boundingSphere!.radius;
+        this.pushMeshes.add(im);
+        for (let i = 0; i < im.count; i++) {
+          im.getMatrixAt(i, m4);
+          const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+          m4.decompose(p, q, sc);
+          this.pushBalls.push({ im, i, p, q, s: sc, v: new THREE.Vector3(), r: Math.max(sc.x, sc.y, sc.z) * gr * 0.95, y0: p.y });
+        }
+      }
+    });
+    this.applyGrime(this.gfx.shading >= 2);
     this.probeDue = 2;
     this.setWaterLevel(0);
+  }
+
+  /** "חיים" לכל משטח: לכלוך, כתמים, אבק ליד הרצפה, שונות בגוון ובחספוס — בלי טקסטורות נוספות (בשיידר) */
+  private applyGrime(on: boolean) {
+    const seen = new Set<THREE.Material>();
+    this.world.group.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (!(o as THREE.Mesh).isMesh || !m || seen.has(m) || !m.isMeshStandardMaterial) return;
+      seen.add(m);
+      if (m.transparent || m.userData.flow || m.userData.noGrime || (m.emissiveIntensity > 0.3 && m.emissive.getHex() !== 0)) return;
+      if (!m.userData.grimeHooked) {
+        m.userData.grimeHooked = true;
+        const prev = m.onBeforeCompile;
+        const prevKey = m.customProgramCacheKey.bind(m);
+        m.onBeforeCompile = (sh, r) => { prev.call(m, sh, r); Engine.grimeShader(sh); };
+        m.customProgramCacheKey = () => prevKey() + "|grime";
+      }
+      m.defines = m.defines ?? {};
+      const had = "GRIME" in m.defines;
+      if (on) m.defines.GRIME = ""; else delete m.defines.GRIME;
+      if (had !== on) m.needsUpdate = true;
+    });
+  }
+  private static grimeShader(sh: THREE.WebGLProgramParametersWithUniforms) {
+    sh.vertexShader = "varying vec3 vGrP;\nvarying vec3 vGrN;\n" + sh.vertexShader.replace("#include <project_vertex>", `#include <project_vertex>
+  #ifdef USE_INSTANCING
+    vGrP = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+  #else
+    vGrP = (modelMatrix * vec4(transformed, 1.0)).xyz;
+  #endif
+  vGrN = normalize(mat3(modelMatrix) * objectNormal);`);
+    sh.fragmentShader = `varying vec3 vGrP;
+varying vec3 vGrN;
+float grH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(grH(i), grH(i + vec3(1,0,0)), f.x), mix(grH(i + vec3(0,1,0)), grH(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(grH(i + vec3(0,0,1)), grH(i + vec3(1,0,1)), f.x), mix(grH(i + vec3(0,1,1)), grH(i + vec3(1,1,1)), f.x), f.y), f.z); }
+` + sh.fragmentShader
+      .replace("#include <map_fragment>", `#include <map_fragment>
+  #ifdef GRIME
+    float gA = grN(vGrP * 0.55), gB = grN(vGrP * 2.7 + 7.1), gC = grN(vGrP * 19.0);
+    float blotch = smoothstep(0.58, 0.9, gA * 0.65 + gB * 0.35);
+    float vert = 1.0 - abs(vGrN.y);
+    float foot = (1.0 - smoothstep(0.0, 0.35, vGrP.y)) * vert;
+    float corner = (1.0 - smoothstep(0.0, 0.12, vGrP.y)) * vert;
+    float speck = step(0.86, gC) * 0.5;
+    float dirt = blotch * 0.13 + foot * 0.16 * (0.6 + 0.4 * gB) + corner * 0.1 + speck * 0.05;
+    diffuseColor.rgb *= (1.0 + (gA - 0.5) * 0.08) * (1.0 - dirt);
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.0, 0.93, 0.82), blotch * 0.35 + foot * 0.4);
+  #endif`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+  #ifdef GRIME
+    roughnessFactor = clamp(roughnessFactor + (grN(vGrP * 1.3 + 3.3) - 0.5) * 0.14 + grN(vGrP * 0.55) * 0.05, 0.03, 1.0);
+  #endif`);
+  }
+
+  /** אור המפתח עוקב אחרי המנורה הקרובה, סיבוב אנימציות, ובלונים/כדורים שנדחפים ע"י שחקנים */
+  private updateDynamics(dt: number) {
+    if (this.keyLamps.length) {
+      const a = this.me?.ch.root.visible ? this.me.pos.clone() : this.cameraAnchor();
+      let best = this.keyLamps[0], bd = Infinity;
+      for (const k of this.keyLamps) {
+        const d = (k.p.x - a.x) ** 2 + (k.p.z - a.z) ** 2 + (k.p.y - a.y - 2.5) ** 2 * 0.3;
+        if (d < bd) { bd = d; best = k; }
+      }
+      const hx = best.p.x - a.x, hz = best.p.z - a.z, hl = Math.hypot(hx, hz);
+      const el = THREE.MathUtils.clamp(Math.atan2(Math.max(0.5, best.p.y - a.y), Math.max(hl, 0.01)), 0.8, 1.3);
+      const kl = Math.hypot(this.keyDir.x, this.keyDir.z) || 1;
+      const ux = hl > 0.35 ? hx / hl : this.keyDir.x / kl, uz = hl > 0.35 ? hz / hl : this.keyDir.z / kl;
+      const want = new THREE.Vector3(ux * Math.cos(el), Math.sin(el), uz * Math.cos(el));
+      this.keyDir.lerp(want, 1 - Math.exp(-dt * 2.5)).normalize();
+      const tx = 34 / this.sun.shadow.mapSize.x;
+      this.sun.target.position.set(Math.round(a.x / tx) * tx, Math.round(a.y / tx) * tx, Math.round(a.z / tx) * tx);
+      this.sun.target.updateMatrixWorld();
+      this.sun.position.copy(this.sun.target.position).addScaledVector(this.keyDir, 35);
+      const pl = this.points[best.i], base = this.pointBase[best.i];
+      this.sun.intensity = this.keyBase * (pl && base ? Math.min(1.1, pl.intensity / base) : 1);
+    }
+    for (const s of this.spinners) s.o.rotateOnAxis(s.axis, s.speed * dt);
+    if (!this.pushBalls.length) return;
+    const bodies: THREE.Vector3[] = [];
+    for (const p of this.players.values()) if (p.ch.root.visible) bodies.push(p.pos);
+    const B = this.world.bounds, obs = this.world.obstacles, balls = this.pushBalls;
+    this.boingT -= dt;
+    for (const b of balls) {
+      for (const pp of bodies) {
+        if (pp.y > b.p.y + b.r || pp.y + 1.7 < b.p.y - b.r) continue;
+        const dx = b.p.x - pp.x, dz = b.p.z - pp.z, d = Math.hypot(dx, dz), R = b.r + 0.32;
+        if (d >= R) continue;
+        const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0, push = R - d;
+        b.p.x += nx * push; b.p.z += nz * push;
+        b.v.x += nx * push * 16; b.v.z += nz * push * 16;
+        if (push > 0.05 && this.boingT <= 0 && !this.opts.muted) { this.boingT = 0.2; playTone(260 + Math.random() * 120, 0.09, "sine", 0.05); }
+      }
+    }
+    for (let i = 0; i < balls.length; i++) for (let j = i + 1; j < balls.length; j++) {
+      const a = balls[i], c = balls[j];
+      const dx = c.p.x - a.p.x, dz = c.p.z - a.p.z, R = a.r + c.r;
+      if (Math.abs(dx) > R || Math.abs(dz) > R || Math.abs(c.p.y - a.p.y) > R) continue;
+      const d = Math.hypot(dx, dz);
+      if (d >= R || d < 1e-4) continue;
+      const nx = dx / d, nz = dz / d, o = (R - d) / 2;
+      a.p.x -= nx * o; a.p.z -= nz * o; c.p.x += nx * o; c.p.z += nz * o;
+      const rel = (c.v.x - a.v.x) * nx + (c.v.z - a.v.z) * nz;
+      if (rel < 0) { a.v.x += nx * rel * 0.9; a.v.z += nz * rel * 0.9; c.v.x -= nx * rel * 0.9; c.v.z -= nz * rel * 0.9; }
+    }
+    const t = performance.now() / 1000, m4 = new THREE.Matrix4(), rq = new THREE.Quaternion(), ax = new THREE.Vector3();
+    for (const b of balls) {
+      const sp = Math.hypot(b.v.x, b.v.z);
+      if (sp < 0.004 && Math.abs(b.p.y - b.y0) < 1e-3) continue;
+      const blocked = (x: number, z: number) => {
+        for (const o of obs) {
+          if (!o.enabled || o.top < b.p.y - b.r * 0.5 + 0.05 || o.bottom > b.p.y + b.r) continue;
+          if (x + b.r > o.minX && x - b.r < o.maxX && z + b.r > o.minZ && z - b.r < o.maxZ) return true;
+        }
+        return x - b.r < B.minX || x + b.r > B.maxX || z - b.r < B.minZ || z + b.r > B.maxZ;
+      };
+      const nx = b.p.x + b.v.x * dt, nz = b.p.z + b.v.z * dt;
+      if (blocked(nx, b.p.z)) b.v.x *= -0.55; else b.p.x = nx;
+      if (blocked(b.p.x, nz)) b.v.z *= -0.55; else b.p.z = nz;
+      b.v.multiplyScalar(Math.exp(-dt * 1.3));
+      if (sp > 1e-3) { ax.set(b.v.z, 0, -b.v.x).normalize(); rq.setFromAxisAngle(ax, (sp * dt) / b.r); b.q.premultiply(rq); }
+      b.p.y = b.y0 + Math.min(0.07, sp * 0.05) * Math.abs(Math.sin(t * 9 + b.i));
+      m4.compose(b.p, b.q, b.s);
+      b.im.setMatrixAt(b.i, m4);
+      b.im.instanceMatrix.needsUpdate = true;
+    }
   }
   private setWaterLevel(v: number) { setWaterAmbience(this.opts.muted ? 0 : v); }
   private updateAmbient(dt: number) {
@@ -896,7 +1067,7 @@ export class Engine {
       pos: new THREE.Vector3(), tpos: new THREE.Vector3(), yaw: 0, tyaw: 0, vy: 0,
       pose: "stand", size: "normal", moving: false, camYaw: 0, camPitch: 0,
       ammo: 5, pts: 0, likes: 0, vote: "", moveT: 99, samples: [],
-      dying: 0, seed: Math.floor(Math.random() * 1e9), paintedKey: "", labelKey: "", radius: 0.3,
+      dying: 0, sq: 0, lastY: 0, vyEst: 0, seed: Math.floor(Math.random() * 1e9), paintedKey: "", labelKey: "", radius: 0.3,
       clones: [], cloneKey: "", display: false,
     };
     this.scene.add(ch.root);
@@ -1635,6 +1806,7 @@ export class Engine {
     this.renderer.shadowMap.enabled = G.shadow > 0;
     if (size && this.sun.shadow.mapSize.x !== size) { this.sun.shadow.mapSize.set(size, size); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
     this.sun.shadow.radius = G.shading >= 3 ? 3 : 1;
+    if (this.world) this.applyGrime(G.shading >= 2);
     // תאורה גלובלית (AO)
     if (this.gtao) { this.gtao.enabled = G.gi > 0 && !this.perfMode; this.gtao.blendIntensity = [0, 0.6, 0.8, 1, 1.15][G.gi]; }
     // טקסטורות: סינון אנאיזוטרופי
@@ -1663,6 +1835,7 @@ export class Engine {
     try {
       this.update(Math.min(0.05, real), real);
       this.updateAmbient(real);
+      this.updateDynamics(Math.min(0.05, real));
     } catch (e) {
       console.error(e);
     }
@@ -1741,6 +1914,17 @@ export class Engine {
     } else {
       const walking = p.moving && !p.display;
       if (walking) p.ch.walkPhase += dt * 11;
+      // squash & stretch: נמתחים בקפיצה/נפילה, נמעכים רגע בנחיתה (לא בזמן טיפוס ולא בפסל/תצוגה)
+      let vy = dt > 0 ? (p.pos.y - p.lastY) / dt : 0;
+      if (Math.abs(vy) > 25) vy = 0; // השתגרות/ספאון
+      if (p.vyEst < -3.5 && vy > -0.6 && !p.display) p.sq = 0.2;
+      p.vyEst = vy;
+      p.lastY = p.pos.y;
+      let sy = 1;
+      if (p.sq > 0) { p.sq = Math.max(0, p.sq - dt); sy = 1 - 0.13 * Math.sin((p.sq / 0.2) * Math.PI); }
+      else if (!p.display && (vy > 2.6 || vy < -2.6) && !(p.local && this.attached)) sy = 1 + Math.min(0.08, (Math.abs(vy) - 2.6) * 0.02);
+      const sxz = 1 / Math.sqrt(sy);
+      p.ch.body.scale.set(sxz, sy, sxz);
       applyPose(p.ch, p.armed ? "stand" : p.pose, walking ? 1 : 0);
       if (p.armed && p.bot && p.ai) p.ch.head.rotation.y = p.ai.headYaw;
       if (p.armed && !p.bot) p.ch.head.rotation.x = -p.camPitch * 0.5;

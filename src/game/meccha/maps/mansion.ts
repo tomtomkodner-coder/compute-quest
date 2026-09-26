@@ -220,7 +220,7 @@ export function buildMansion(): World {
   // ================= instanced registries (one draw call each) =================
   type Inst = { pos: V3; rotY?: number; rotZ?: number; rotX?: number; scale?: V3; color?: string };
   const instReg: { geo: THREE.BufferGeometry; mat: Mat; list: Inst[]; shadow: boolean }[] = [];
-  const reg = (geo: THREE.BufferGeometry, mat: Mat, shadow = false) => { const r = { geo, mat, list: [] as Inst[], shadow }; instReg.push(r); return r.list; };
+  const reg = (geo: THREE.BufferGeometry, mat: Mat, shadow = false, push = false) => { if (push) geo.userData.pushable = true; const r = { geo, mat, list: [] as Inst[], shadow }; instReg.push(r); return r.list; };
 
   // ================= materials =================
   const tx = <Q extends X.PaintTex>(key: string, f: () => Q) => k.tex("mn2_" + key, f);
@@ -338,6 +338,7 @@ export function buildMansion(): World {
   const ribbons = reg(new THREE.PlaneGeometry(1, 1), ribbonMat);
   const balloonMat = mkInstMat({ roughness: 0.18 });
   const balloons = reg(new THREE.SphereGeometry(1, 14, 10), balloonMat, true);
+  const floorBalloons = reg(new THREE.SphereGeometry(1, 14, 10), balloonMat, true, true); // נדחפים כשעוברים עליהם
   const roses = reg(new THREE.IcosahedronGeometry(1, 1), mkInstMat({ roughness: 0.7 }));
   const garlandLeaves = reg(new THREE.OctahedronGeometry(1, 0), k.mat(null, "#2c5a24", [1, 1], { roughness: 0.7 }));
   const crystals = reg(new THREE.OctahedronGeometry(1, 0), k.mat(null, "#fffaf0", [1, 1], { roughness: 0.02, metalness: 0.4, emissive: "#ffe2a8", emissiveIntensity: 0.9 }));
@@ -406,7 +407,7 @@ export function buildMansion(): World {
       balloons.push({ pos: [x + Math.cos(a) * Math.cos(e) * r, y + Math.sin(e) * r * 0.8, z + Math.sin(a) * Math.cos(e) * r], scale: [s, s * 1.12, s], color: pick(cols) });
     }
   }
-  function floorBalloon(x: number, z: number, s = 0.3) { balloons.push({ pos: [x, s * 0.95, z], scale: [s, s * 1.05, s * 1.25], rotY: rnd() * 3, rotX: Math.PI / 2 - 0.3, color: pick(["#ee3fa0", "#f4e020", "#20e0a0", "#50e030", "#f08070", "#30d0e0"]) }); k.collider(x - s, x + s, z - s, z + s, 0, s * 1.9, true); }
+  function floorBalloon(x: number, z: number, s = 0.3) { floorBalloons.push({ pos: [x, s * 0.95, z], scale: [s, s * 1.05, s * 1.25], rotY: rnd() * 3, rotX: Math.PI / 2 - 0.3, color: pick(["#ee3fa0", "#f4e020", "#20e0a0", "#50e030", "#f08070", "#30d0e0"]) }); }
   /** row of hanging ribbon streamers (along local x from x1 to x2, at z, from yTop down to yBot) */
   function ribbonRow(x1: number, x2: number, z: number, yTop: number, yBot: number, alongZ = false) {
     for (let x = x1; x < x2; x += 0.07 + rnd() * 0.05) {

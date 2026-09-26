@@ -147,9 +147,13 @@ class Spheres {
     const t = Spheres.tiers.findIndex(([mr]) => r >= mr);
     this.lists[t].push({ pos: [x, y, z], rotX: rx, rotY: ry, rotZ: rz, scale: [sx, sy, sz], color: col });
   }
+  constructor(public push = false) {}
   flush(k: Kit, m: Mat) {
     this.lists.forEach((l, i) => {
-      if (l.length) k.instances(new THREE.SphereGeometry(1, Spheres.tiers[i][1], Spheres.tiers[i][2]), m, l, { noShadow: i >= 2 });
+      if (!l.length) return;
+      const g = new THREE.SphereGeometry(1, Spheres.tiers[i][1], Spheres.tiers[i][2]);
+      if (this.push) g.userData.pushable = true; // בלונים/כדורים על הרצפה נדחפים כשעוברים עליהם
+      k.instances(g, m, l, { noShadow: i >= 2 });
     });
   }
 }
@@ -285,6 +289,8 @@ export function buildPenguin(): World {
   const glossy = new Spheres(); // balloons, eggs
   const foil = new Spheres();
   const beach = new Spheres();
+  const floorEggs = new Spheres(true);
+  const floorBeach = new Spheres(true);
   const bulbs = new Spheres();
   const candles: Inst[] = [];
   const dice: Inst[] = [];
@@ -359,9 +365,9 @@ export function buildPenguin(): World {
   /** egg-shaped balloon lying on the floor */
   const egg = (x: number, z: number, s = 1) => {
     const col = pick(["#1ec8d8", "#e53ab8", "#e8f02a", "#35d0e8", "#f048c0"]);
-    glossy.add(x, 0.26 * s, z, 0.22 * s, 0.27 * s, 0.22 * s, col, (rnd() - 0.5) * 0.6, 0, (rnd() - 0.5) * 0.6);
+    floorEggs.add(x, 0.26 * s, z, 0.22 * s, 0.27 * s, 0.22 * s, col, (rnd() - 0.5) * 0.6, 0, (rnd() - 0.5) * 0.6);
   };
-  const beachBall = (x: number, y: number, z: number, r = 0.3) => beach.add(x, y + r, z, r, r, r, "#ffffff", rnd() * 3, rnd() * 3, rnd() * 3);
+  const beachBall = (x: number, y: number, z: number, r = 0.3) => (y < 0.01 ? floorBeach : beach).add(x, y + r, z, r, r, r, "#ffffff", rnd() * 3, rnd() * 3, rnd() * 3);
   const bunch = (x: number, y: number, z: number, n = 5, h = 1.6) => {
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rnd();
@@ -927,7 +933,7 @@ export function buildPenguin(): World {
   // floor clutter: eggs, beach balls, dice, plushes
   for (const [x, z] of [[-4.6, 3.1], [-5.1, 3.6], [-4.2, 3.9], [4.8, -6.9], [5.6, -6.7], [-5.9, -6.6], [-4.8, -6.9], [5.4, 3.2], [4.7, 3.8], [-1.3, -7.0], [1.6, -6.9]] as [number, number][]) egg(x, z, 0.9 + rnd() * 0.4);
   for (const [x, z] of [[-6.0, 2.2], [-5.4, 2.6], [-6.1, 3.0]] as [number, number][]) beachBall(x, 0, z, 0.3);
-  beachBall(-5.85, 0.5, 2.6, 0.26);
+  beachBall(-5.1, 0, 3.4, 0.26);
   k.collider(-6.4, -5.1, 1.9, 3.3, 0, 0.6, true);
   plushie(3.7, 0, 2.6, 0.7, 2.2, PLUSH.violet, true, -1.35);
   plushie(-3.3, 0, -6.8, 0.6, 0.6, PLUSH.blue, true, 0, 0.5);
@@ -1191,6 +1197,8 @@ export function buildPenguin(): World {
   glossy.flush(k, mGlossy);
   foil.flush(k, mFoil);
   beach.flush(k, mBeach);
+  floorEggs.flush(k, mGlossy);
+  floorBeach.flush(k, mBeach);
   bulbs.flush(k, mBulb);
   if (candles.length) k.instances(new THREE.CylinderGeometry(0.03, 0.03, 1, 6), mCandle, candles);
   if (dice.length) k.instances(chamferGeo(1, 1, 1, 0.06), mDice, dice);

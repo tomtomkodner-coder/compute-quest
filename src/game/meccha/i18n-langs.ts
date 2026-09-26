@@ -2670,6 +2670,10 @@ const EXTRA: Record<string, Partial<Record<L | "he", string>>> = {
   "Shadow": { ja: "影", zh: "阴影", zht: "陰影", pt: "Sombra", es: "Sombra", fr: "Ombre", ko: "그림자", ar: "الظل", it: "Ombra", de: "Schatten", ru: "Тень", he: "צל" },
   "Shadow OFF": { ja: "影 オフ", zh: "阴影 关", zht: "陰影 關", pt: "Sombra DESL.", es: "Sombra NO", fr: "Ombre NON", ko: "그림자 끄기", ar: "الظل إيقاف", it: "Ombra NO", de: "Schatten AUS", ru: "Тень ВЫКЛ", he: "צל כבוי" },
   "Your Server": { ja: "あなたのサーバー", zh: "你的服务器", zht: "你的伺服器", pt: "Seu servidor", es: "Tu servidor", fr: "Votre serveur", ko: "내 서버", ar: "خادمك", it: "Il tuo server", de: "Dein Server", ru: "Ваш сервер", he: "השרת שלך" },
+  "Rotate your device to landscape": { ja: "端末を横向きにしてください", zh: "请将设备横屏", zht: "請將裝置橫放", pt: "Gire o aparelho para a horizontal", es: "Gira el dispositivo en horizontal", fr: "Tournez l'appareil en mode paysage", ko: "기기를 가로로 돌려주세요", ar: "قم بتدوير جهازك إلى الوضع الأفقي", it: "Ruota il dispositivo in orizzontale", de: "Gerät ins Querformat drehen", ru: "Поверните устройство горизонтально", he: "סובבו את המכשיר לרוחב" },
+  "Tap for full screen": { ja: "タップで全画面", zh: "点击全屏", zht: "點擊全螢幕", pt: "Toque para tela cheia", es: "Toca para pantalla completa", fr: "Touchez pour le plein écran", ko: "탭하여 전체 화면", ar: "اضغط لملء الشاشة", it: "Tocca per lo schermo intero", de: "Tippen für Vollbild", ru: "Нажмите для полноэкранного режима", he: "הקישו למסך מלא" },
+  "Run": { ja: "ダッシュ", zh: "奔跑", zht: "奔跑", pt: "Correr", es: "Correr", fr: "Courir", ko: "달리기", ar: "ركض", it: "Corri", de: "Rennen", ru: "Бег", he: "ריצה" },
+  "Climb": { ja: "よじ登る", zh: "攀爬", zht: "攀爬", pt: "Escalar", es: "Trepar", fr: "Grimper", ko: "오르기", ar: "تسلق", it: "Arrampica", de: "Klettern", ru: "Лезть", he: "טיפוס" },
   "{name}'s server": { ja: "{name}のサーバー", zh: "{name}的服务器", zht: "{name}的伺服器", pt: "Servidor de {name}", es: "Servidor de {name}", fr: "Serveur de {name}", ko: "{name}의 서버", ar: "خادم {name}", it: "Server di {name}", de: "Server von {name}", ru: "Сервер {name}", he: "השרת של {name}" },
 };
 export const HE_EXTRA: Record<string, string> = {};
