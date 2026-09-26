@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Engine } from "@/game/meccha/engine";
 import { KEY_ART, MENU_BG } from "@/game/meccha/menuart";
 import { THUMBS } from "@/game/meccha/thumbs";
-import { t, getLang, setLang, onLang } from "@/game/meccha/i18n";
+import { t, getLang, setLang, onLang, LANG_CODES, LANG_NAMES, type Lang } from "@/game/meccha/i18n";
 import { setVolume, setBgmVolume, setSeVolume, setMuted as setSoundMuted } from "@/lib/sound";
 
 const GREEN = "#3ddc4a";
@@ -83,9 +83,9 @@ function GBtn({ x, y, w, h, fs = 32, children, onClick, active, dim }: { x: numb
 
 const LANGS: [string, number, number, number, string | null][] = [
   // שם, x, y, רוחב, קוד שפה נתמך
-  ["日本語", 145, 946, 115, null], ["English", 273, 946, 134, "en"], ["簡体中文", 421, 946, 145, null], ["繁體中文", 580, 946, 145, null],
-  ["Português (Brasil)", 739, 946, 286, null], ["Español", 1039, 946, 138, null], ["Français", 1191, 946, 150, null],
-  ["한국어", 145, 1021, 102, null], ["عربي", 259, 1021, 76, null], ["Italiano", 348, 1021, 138, null], ["Deutsch", 500, 1021, 145, null], ["Россия", 658, 1021, 128, null],
+  ["日本語", 145, 946, 115, "ja"], ["English", 273, 946, 134, "en"], ["簡体中文", 421, 946, 145, "zh"], ["繁體中文", 580, 946, 145, "zht"],
+  ["Português (Brasil)", 739, 946, 286, "pt"], ["Español", 1039, 946, 138, "es"], ["Français", 1191, 946, 150, "fr"],
+  ["한국어", 145, 1021, 102, "ko"], ["عربي", 259, 1021, 76, "ar"], ["Italiano", 348, 1021, 138, "it"], ["Deutsch", 500, 1021, 145, "de"], ["Россия", 658, 1021, 128, "ru"],
   ["עברית", 800, 1021, 112, "he"],
 ];
 
@@ -100,7 +100,7 @@ export function MainMenu({ onCreate, onFind, onSettings, onQuit, onMaps, onCredi
       <GBtn x={147} y={743} w={293} h={62} onClick={onSettings}>{t("Settings")}</GBtn>
       <GBtn x={147} y={838} w={293} h={62} onClick={onQuit}>{t("Quit game")}</GBtn>
       {LANGS.map(([n, x, y, w, code]) => (
-        <GBtn key={n} x={x} y={y} w={w} h={55} fs={29} active={code === lang} dim={!code} onClick={code ? () => setLang(code as "en" | "he") : undefined}>{n}</GBtn>
+        <GBtn key={n} x={x} y={y} w={w} h={55} fs={29} active={code === lang} dim={!code} onClick={code ? () => setLang(code as Lang) : undefined}>{n}</GBtn>
       ))}
       {/* MAPS */}
       <button onClick={onMaps} className="absolute grid place-items-center hover:brightness-125" style={{ left: U(1493), top: U(783), width: U(148), height: U(133), background: "#111", borderRadius: U(4) }}>
@@ -363,7 +363,7 @@ export function SettingsScreen({ engine, inGame, muted, onToggleMute, onClose, o
           <>
             <SSlider label="Mouse Sensitivity" value={sens} min={0.2} max={3} step={0.05} text={sens.toFixed(2)} onChange={(v) => { setSens(v); save("meccha_sens", v); engine?.setSensitivity(v); }} />
             <SSlider label="Field of View" value={g.fov} min={50} max={110} step={1} text={g.fov.toFixed(1)} onChange={(v) => upd({ fov: v })} />
-            <SChoice label="Language" value={getLang() === "he" ? 1 : 0} options={["English", "עברית"]} onChange={(i) => setLang(i ? "he" : "en")} />
+            <SChoice label="Language" value={LANG_CODES.indexOf(getLang())} options={LANG_CODES.map((c) => LANG_NAMES[c])} onChange={(i) => setLang(LANG_CODES[i])} />
           </>
         )}
         {tab === "User Management" && (

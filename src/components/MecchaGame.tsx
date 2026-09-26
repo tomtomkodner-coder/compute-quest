@@ -26,7 +26,7 @@ function LangToggle({ dark }: { dark?: boolean }) {
 
 // מחרוזות הממשק לקוחות מהגרסה האנגלית של המשחק המקורי (בלי תרגומים מומצאים)
 // הפונט של המשחק (לפי צילומי המסך של התפריטים): עגול — M PLUS Rounded 1c
-const FONT = `"M PLUS Rounded 1c", "Noto Sans JP", system-ui, sans-serif`;
+const FONT = `"M PLUS Rounded 1c", "Noto Sans SC", "Noto Sans TC", "Noto Sans KR", "Noto Sans Arabic", "Noto Sans Hebrew", system-ui, sans-serif`;
 const SERIF = `"Noto Serif", "Times New Roman", serif`;
 const OUTLINE = "0 2px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 0 6px rgba(0,0,0,.6)";
 const PLAYER_COLORS = ["#ff006e", "#3a86ff", "#ffbe0b", "#8338ec", "#fb5607", "#06d6a0", "#ef476f", "#118ab2"];
@@ -144,7 +144,7 @@ export function MecchaGame() {
   if (screen === "credits") return wrap(<CreditsScreen onBack={back} />);
   if (screen === "create" || screen === "find") {
     const pub = roomNet && (screen === "create" || showPublic) ? [{ id: "room", name: t("This page's server"), players: `${Math.max(1, roomNet.peers().length)}/24`, tags: ["Everyone Welcome", "Basic Mode Main"], join: () => { setName(myName); go({ kind: "room" }); } }] : [];
-    const mine = screen === "create" ? [{ id: "mine", name: form.server || `${myName}'s server`, players: "1/24", tags: [form.region, ...form.tags].filter((x) => x !== "Not Specified"), join: () => create() }] : [];
+    const mine = screen === "create" ? [{ id: "mine", name: form.server || t("{name}'s server", { name: myName }), players: "1/24", tags: [form.region, ...form.tags].filter((x) => x !== "Not Specified"), join: () => create() }] : [];
     function create() {
       setName(myName);
       const key = serverKey(form.server || `${myName} server`) || Math.random().toString(36).slice(2, 8);

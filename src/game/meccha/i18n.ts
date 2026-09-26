@@ -1,8 +1,15 @@
-// שפת הממשק: אנגלית (כמו במשחק המקורי) או עברית. המפתח הוא הטקסט האנגלי.
-export type Lang = "en" | "he";
+// שפת הממשק: כל השפות של המשחק המקורי + עברית. המפתח הוא הטקסט האנגלי.
+import { DICTS, HE_EXTRA } from "./i18n-langs";
+
+export type Lang = "en" | "he" | "ja" | "zh" | "zht" | "pt" | "es" | "fr" | "ko" | "ar" | "it" | "de" | "ru";
+export const LANG_CODES: Lang[] = ["ja", "en", "zh", "zht", "pt", "es", "fr", "ko", "ar", "it", "de", "ru", "he"];
+export const LANG_NAMES: Record<Lang, string> = {
+  ja: "日本語", en: "English", zh: "簡体中文", zht: "繁體中文", pt: "Português (Brasil)", es: "Español", fr: "Français",
+  ko: "한국어", ar: "عربي", it: "Italiano", de: "Deutsch", ru: "Россия", he: "עברית",
+};
 
 let lang: Lang = (() => {
-  try { return (localStorage.getItem("meccha_lang") as Lang) === "he" ? "he" : "en"; } catch { return "en"; }
+  try { const v = localStorage.getItem("meccha_lang") as Lang; return LANG_CODES.includes(v) ? v : "en"; } catch { return "en"; }
 })();
 const subs = new Set<() => void>();
 
@@ -13,11 +20,14 @@ export function setLang(l: Lang) {
   subs.forEach((f) => f());
 }
 export function onLang(f: () => void) { subs.add(f); return () => { subs.delete(f); }; }
-export const isRtl = () => lang === "he";
+export const isRtl = () => lang === "he" || lang === "ar";
+
+const HE_FALLBACK = (s: string) => (lang === "he" ? HE_EXTRA[s] : undefined) ?? s;
 
 /** מתרגם; {n} וכו' מוחלפים בערכים */
 export function t(s: string, vars?: Record<string, string | number>) {
-  let out = lang === "he" ? HE[s] ?? s : s;
+  const d = lang === "he" ? HE : lang === "en" ? null : DICTS[lang];
+  let out = d ? d[s] ?? HE_FALLBACK(s) : s;
   if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
   return out;
 }

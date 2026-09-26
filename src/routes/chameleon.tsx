@@ -12,7 +12,7 @@ export const Route = createFileRoute("/chameleon")({
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Noto+Serif:wght@400;500&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Noto+Serif:wght@400;500&family=Noto+Sans+SC:wght@500;700&family=Noto+Sans+TC:wght@500;700&family=Noto+Sans+KR:wght@500;700&family=Noto+Sans+Arabic:wght@500;700&family=Noto+Sans+Hebrew:wght@500;700&display=swap" },
     ],
   }),
   component: MecchaGame,
