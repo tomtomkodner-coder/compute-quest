@@ -254,3 +254,57 @@ export async function createP2PNet(code: string, host: boolean, opts: ServerOpts
     },
   };
 }
+
+// ---------- שרתים עם שם בתוך חדר ה־Artifact ----------
+// ב־claude.ai אין חיבור WebRTC החוצה (PeerJS נחסם) — לכן "Create/Find Server" רצים מעל החדר החי של הדף:
+// כל שרת = ערוץ נפרד (מפתח) בתוך החדר; המארח מפרסם את פרטי השרת בנוכחות (presence) וכך הוא מופיע ב־Find Server.
+
+export interface SrvInfo { name: string; tags: string[]; pw: string; max: number }
+export interface RoomServer { key: string; name: string; tags: string[]; players: number; max: number; locked: boolean; pw: string }
+
+/** גיבוב קצר לסיסמה (לא נשלחת כטקסט) */
+export function pwHash(s: string) {
+  if (!s) return "";
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+
+/** רשימת השרתים הפעילים בחדר (לפי הנוכחות של השחקנים שבתוכם) */
+export function listRoomServers(base: Net): RoomServer[] {
+  const map = new Map<string, RoomServer>();
+  for (const pr of base.peers()) {
+    const key = typeof pr.p.srv === "string" ? pr.p.srv : "";
+    if (!key || pr.me || !pr.p.st) continue;
+    let s = map.get(key);
+    if (!s) { s = { key, name: key, tags: [], players: 0, max: 24, locked: false, pw: "" }; map.set(key, s); }
+    s.players++;
+    const info = pr.p.si as SrvInfo | undefined;
+    if (info && typeof info.name === "string") {
+      s.name = info.name.slice(0, 30);
+      s.tags = Array.isArray(info.tags) ? info.tags.slice(0, 8).map(String) : [];
+      s.max = Number(info.max) || 24;
+      s.pw = String(info.pw || "");
+      s.locked = !!info.pw;
+    }
+  }
+  return [...map.values()].sort((a, b) => b.players - a.players);
+}
+
+/** Net של שרת אחד בתוך החדר: רואים רק את השחקנים של אותו שרת, והודעות עוברות רק בתוכו */
+export function scopedRoomNet(base: Net, key: string, info?: SrvInfo): Net {
+  const tag = (p: Presence) => ({ ...p, srv: key, ...(info ? { si: info } : {}) });
+  base.setPresence(tag({}));
+  return {
+    kind: "room",
+    code: key,
+    selfId: () => base.selfId(),
+    peers: () => base.peers().filter((p) => p.me || p.p.srv === key),
+    onPeers: (fn) => base.onPeers(fn),
+    setPresence: (patch) => base.setPresence(tag(patch)),
+    emit: (topic, data) => base.emit(`${key}~${topic}`, data),
+    on: (topic, fn) => base.on(`${key}~${topic}`, fn),
+    connected: () => base.connected(),
+    close: () => base.setPresence({ srv: "", si: null, st: 0 }),
+  };
+}

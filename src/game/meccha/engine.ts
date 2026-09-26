@@ -111,6 +111,8 @@ export interface HudState {
   win?: string;
   why?: string;
   toast: { text: string; id: number } | null;
+  /** נקודות "ראו אותי ולא מצאו": כמה נצברו עכשיו ומאיזה מרחק (מוצג כמספר עולה) */
+  ptsPop: { v: number; d: number; id: number } | null;
   locked: boolean;
   spectating: string | null;
   freeCam: boolean;
@@ -488,7 +490,7 @@ export class Engine {
       settings: this.rs.s, mapName: "Lobby", myRole: "hider", alive: true, ammo: 0, pts: 0,
       paintMode: false, picking: false, pickPreview: null, color: this.brush.color, alpha: 1, metal: 0, rough: 0.8, emis: 0, brush: this.brushSize, history: [],
       pose: "stand", size: "normal", bodyType: "normal", room: "", players: [], hiderIcons: [],
-      toast: null, locked: false, spectating: null, freeCam: false, freeLook: false, finds: 0, cloneSlots: [1, 1], ranking: [], portraits: [], filters: false, tps: false, attached: false, crouch: false, clones: 0,
+      toast: null, ptsPop: null, locked: false, spectating: null, freeCam: false, freeLook: false, finds: 0, cloneSlots: [1, 1], ranking: [], portraits: [], filters: false, tps: false, attached: false, crouch: false, clones: 0,
       nameplates: true, xray: false, shadow: true, chat: [], votes: { have: 0, need: 0, mine: false }, nearPlay: false, onPad: false,
       likeTarget: null, likedThisRound: false, likes: this.likes, frozen: false,
     };
@@ -506,6 +508,7 @@ export class Engine {
     window.setTimeout(() => { if (!this.disposed) this.net.emit("paintreq", {}); }, 2500);
 
     this.bindInput();
+    this.refreshLabelsWhenFontReady();
     this.resize();
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
@@ -1116,6 +1119,16 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
     this.scene.remove(p.ch.root);
     disposeCharacter(p.ch);
     this.players.delete(id);
+  }
+
+  /** הפונט של המשחק נטען אחרי שכבר ציירנו שמות — מציירים מחדש כדי שהשם מעל השחקן יהיה באותו פונט */
+  private refreshLabelsWhenFontReady() {
+    try {
+      Promise.all(["700 30px", "800 22px"].map((w) => document.fonts.load(`${w} "M PLUS Rounded 1c"`))).then(() => {
+        if (this.disposed) return;
+        for (const p of this.players.values()) { p.labelKey = ""; this.updateLabel(p); }
+      }).catch(() => {});
+    } catch { /* אין FontFaceSet */ }
   }
 
   private updateLabel(p: Player) {
@@ -2768,7 +2781,8 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
         const to = at.clone().sub(eye);
         const d = to.length();
         if (d > 26) continue;
-        const yaw = s.local ? this.camYaw + Math.PI : s.bot ? s.camYaw : s.camYaw + Math.PI;
+        // כיוון המבט של הצייד: אני = המצלמה; בוט אצל המארח = הגוף+הראש; בוט אצל לקוח = cy שפורסם; שחקן מרוחק = המצלמה שלו
+        const yaw = s.local ? this.camYaw + Math.PI : s.bot ? (s.ai ? s.yaw + s.ai.headYaw : s.camYaw) : s.camYaw + Math.PI;
         const look = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
         if (look.dot(new THREE.Vector3(to.x, 0, to.z).normalize()) < Math.cos(0.9)) continue;
         this.ray.set(eye, to.normalize());
@@ -2778,12 +2792,15 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
       }
       return -1;
     };
+    // כמו במשחק (Missed-Spot Ranking): צייד קרוב שמסתכל עליך ולא מוצא = נקודות; ככל שקרוב יותר — יותר נקודות
     const check = (h: Player) => {
       if (h.role !== "hider" || !h.alive || h.moveT < 0.5) return; // מי שזז לא צובר נקודות
+      let got = 0, dmin = Infinity;
       for (const s of [h.pos, ...h.clones.map((c) => c.pos)]) {
         const d = seenBy(s.clone().add(new THREE.Vector3(0, 0.7 * sizeScale(h.size), 0)));
-        if (d >= 0) h.pts += 0.5 * (1 + 6 / (d + 2));
+        if (d >= 0) { const v = 0.5 * (1 + 6 / (d + 2)); h.pts += v; got += v; dmin = Math.min(dmin, d); }
       }
+      if (h === this.me && got > 0) { this.hud.ptsPop = { v: Math.max(1, Math.round(got * 2)), d: Math.round(dmin), id: ++this.toastId }; this.emit(); }
     };
     check(this.me);
     if (this.isHost()) for (const p of this.players.values()) if (p.bot) check(p);

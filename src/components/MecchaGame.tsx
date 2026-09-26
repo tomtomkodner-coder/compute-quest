@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Volume2, VolumeX, Home, Copy, X, Pipette, Send, Settings as Gear, Search } from "lucide-react";
 import type { Engine, HudState, Settings } from "@/game/meccha/engine";
 import type { PoseId, SizeId, BodyType } from "@/game/meccha/character";
-import type { Net } from "@/game/meccha/net";
+import { listRoomServers, pwHash, type Net, type RoomServer, type SrvInfo } from "@/game/meccha/net";
 import { setMuted as setSoundMuted, setVolume as setSoundVolume, sfxClick } from "@/lib/sound";
 import { t, getLang, setLang, onLang, isRtl, type Lang } from "@/game/meccha/i18n";
 import { THUMBS } from "@/game/meccha/thumbs";
@@ -79,7 +79,7 @@ function saveName(n: string) {
 }
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-type Conn = { kind: "local" } | { kind: "room" } | { kind: "p2p"; code: string; host: boolean; password?: string; max?: number };
+type Conn = { kind: "local" } | { kind: "room"; key: string; info?: SrvInfo } | { kind: "p2p"; code: string; host: boolean; password?: string; max?: number };
 
 export function MecchaGame() {
   useLang();
@@ -93,6 +93,7 @@ export function MecchaGame() {
   ]));
   const [form, setForm] = useState<ServerForm>({ name: "", server: "", password: "", region: "Not Specified", tags: ["Everyone Welcome"] });
   const [showPublic, setShowPublic] = useState(false);
+  const [note, setNote] = useState("");
   const [name, setName] = useState("");
   const [color, setColor] = useState(PLAYER_COLORS[0]);
   const [muted, setMuted] = useState(false);
@@ -108,8 +109,19 @@ export function MecchaGame() {
   const [joinPw, setJoinPw] = useState("");
   const [runId, setRunId] = useState(0);
 
+  // רשימת השרתים מתעדכנת חי
+  const [, setTickN] = useState(0);
+  useEffect(() => {
+    if (!roomNet || (screen !== "find" && screen !== "create")) return;
+    const off = roomNet.onPeers(() => setTickN((n) => n + 1));
+    const iv = window.setInterval(() => setTickN((n) => n + 1), 1500);
+    return () => { off(); window.clearInterval(iv); };
+  }, [roomNet, screen]);
+
   useEffect(() => {
     setName(loadName() || `Player${Math.floor(Math.random() * 900 + 100)}`);
+    applySavedSettings(null); // עוצמות שמורות גם לצלילי התפריט
+    try { if (localStorage.getItem("meccha_mute") === "1") { setMuted(true); setSoundMuted(true); } } catch { /* ignore */ }
     setColor(PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)]);
     let alive = true;
     import("@/game/meccha/net")
@@ -120,7 +132,7 @@ export function MecchaGame() {
   }, []);
 
   function toggleMute() {
-    setMuted((m) => { setSoundMuted(!m); return !m; });
+    setMuted((m) => { setSoundMuted(!m); try { localStorage.setItem("meccha_mute", m ? "0" : "1"); } catch { /* ignore */ } return !m; });
   }
   function go(c: Conn) {
     saveName(name.trim() || "Player");
@@ -145,23 +157,43 @@ export function MecchaGame() {
   if (screen === "maps") return wrap(<MapsScreen maps={MAP_LIST} onBack={back} />);
   if (screen === "credits") return wrap(<CreditsScreen onBack={back} />);
   if (screen === "create" || screen === "find") {
-    const pub = roomNet && (screen === "create" || showPublic) ? [{ id: "room", name: t("This page's server"), players: `${Math.max(1, roomNet.peers().length)}/24`, tags: ["Everyone Welcome", "Basic Mode Main"], join: () => { setName(myName); go({ kind: "room" }); } }] : [];
+    // שרתים אמיתיים: בתוך דף ה־Artifact (claude.ai) — מעל החדר החי; באתר עצמאי — WebRTC עם קוד
+    const all = roomNet ? listRoomServers(roomNet) : [];
+    const q = form.server.trim().toLowerCase();
+    const shown = showPublic || !q ? all : all.filter((sv) => sv.name.toLowerCase().includes(q));
+    const joinSrv = (sv: RoomServer) => {
+      if (sv.locked && pwHash(form.password) !== sv.pw) { setNote(t("Wrong password")); return; }
+      if (sv.players >= sv.max) { setNote(t("Server is full")); return; }
+      setName(myName);
+      go({ kind: "room", key: sv.key });
+    };
+    const found = shown.map((sv) => ({ id: sv.key, name: (sv.locked ? "🔒 " : "") + sv.name, players: `${sv.players}/${sv.max}`, tags: sv.tags, join: () => joinSrv(sv) }));
     const mine = screen === "create" ? [{ id: "mine", name: form.server || t("{name}'s server", { name: myName }), players: "1/24", tags: [form.region, ...form.tags].filter((x) => x !== "Not Specified"), join: () => create() }] : [];
     function create() {
       setName(myName);
-      const key = serverKey(form.server || `${myName} server`) || Math.random().toString(36).slice(2, 8);
-      go({ kind: "p2p", code: key, host: true, password: form.password || undefined, max: 24 });
+      const title = (form.server || t("{name}'s server", { name: myName })).slice(0, 30);
+      const key = (serverKey(title) || "srv") + "-" + Math.random().toString(36).slice(2, 6);
+      if (roomNet) go({ kind: "room", key, info: { name: title, tags: [form.region, ...form.tags].filter((x) => x !== "Not Specified"), pw: pwHash(form.password), max: 24 } });
+      else go({ kind: "p2p", code: key, host: true, password: form.password || undefined, max: 24 });
     }
     return wrap(
-      <ServerScreen mode={screen} form={{ ...form, name: form.name || name }} setForm={(f) => { setForm(f); setName(f.name); }}
-        results={screen === "create" ? mine : pub}
+      <ServerScreen mode={screen} form={{ ...form, name: form.name || name }} setForm={(f) => { setForm(f); setName(f.name); setNote(""); }}
+        results={screen === "create" ? mine : found} note={note}
         onPrimary={() => {
+          setNote("");
           if (screen === "create") return create();
-          if (!form.server.trim()) { setShowPublic(true); return; }
+          if (roomNet) {
+            setShowPublic(false);
+            const exact = all.find((sv) => sv.name.toLowerCase() === q);
+            if (exact) joinSrv(exact);
+            else if (q && !shown.length) setNote(t("No servers found"));
+            return;
+          }
+          if (!form.server.trim()) return;
           setName(myName);
           go({ kind: "p2p", code: serverKey(form.server) || form.server, host: false, password: form.password || undefined });
         }}
-        onPublic={() => setShowPublic(true)} onOffline={() => { setName(myName); go({ kind: "local" }); }} onBack={back} />,
+        onPublic={() => { setNote(""); setShowPublic(true); }} onOffline={() => { setName(myName); go({ kind: "local" }); }} onBack={back} />,
     );
   }
   return wrap(
@@ -203,14 +235,14 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
       try {
         const netMod = await import("@/game/meccha/net");
         let net: Net;
-        if (conn.kind === "room" && roomNet) net = roomNet;
+        if (conn.kind === "room" && roomNet) net = netMod.scopedRoomNet(roomNet, conn.key, conn.info);
         else if (conn.kind === "p2p") net = await netMod.createP2PNet(conn.code, conn.host, { password: conn.password, max: conn.max });
         else net = netMod.createLocalNet();
         performance.mark("m-net");
         const { Engine } = await import("@/game/meccha/engine");
         performance.mark("m-import");
         await Promise.all([(await import("@/game/meccha/character")).loadCharacterModels(), (await import("@/game/meccha/paintings")).loadPaintings()]);
-        if (!alive || !mountRef.current) { if (net.kind === "p2p") net.close(); return; }
+        if (!alive || !mountRef.current) { net.close(); return; }
         performance.mark("m-assets");
         eng = new Engine(mountRef.current, net, { name, color, muted, defaultBots: net.kind === "local" ? 3 : 0, onHud: setHud });
         performance.mark("m-engine");
@@ -450,6 +482,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           </div>
 
           {toast && <div className="absolute top-28 left-1/2 -translate-x-1/2 z-30 rounded-2xl bg-black/70 px-4 py-2 text-lg font-bold">{toast}</div>}
+          {hud.ptsPop && hud.phase === "hunt" && <PtsPop key={hud.ptsPop.id} v={hud.ptsPop.v} d={hud.ptsPop.d} />}
 
           {touch && <TouchControls hud={hud} engine={e} onPose={() => setPoseMenu((v) => !v)} onChat={() => setChatOpen(true)} />}
         </>
@@ -1137,6 +1170,19 @@ function RotateHint() {
         <div className="mt-4 text-xl font-bold">{t("Rotate your device to landscape")}</div>
         <div className="mt-2 text-sm text-white/70">{t("Tap for full screen")}</div>
       </div>
+    </div>
+  );
+}
+
+/** נקודות עולות: צייד קרוב שמסתכל עליך ולא מוצא — ככל שקרוב יותר המספר גדול ובולט יותר */
+function PtsPop({ v, d }: { v: number; d: number }) {
+  const near = d <= 4 ? 2 : d <= 10 ? 1 : 0;
+  const color = ["#ffffff", "#ffd84d", "#ff6b3d"][near];
+  return (
+    <div className="absolute left-1/2 top-[38%] z-30 pointer-events-none font-black text-center" style={{ color, textShadow: OUTLINE, fontSize: 22 + near * 10, animation: "ptsUp 1.1s ease-out forwards", translate: "-50% 0" }}>
+      <style>{"@keyframes ptsUp{0%{opacity:0;transform:translateY(10px) scale(.8)}15%{opacity:1;transform:translateY(0) scale(1.1)}100%{opacity:0;transform:translateY(-60px) scale(1)}}"}</style>
+      +{v}
+      <div className="text-xs font-bold opacity-90">{t("Hunter nearby")} · {d}m</div>
     </div>
   );
 }

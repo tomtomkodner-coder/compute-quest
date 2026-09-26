@@ -149,8 +149,8 @@ function Chip({ n, on, onClick }: { n: string; on: boolean; onClick: () => void 
   return <button onClick={onClick} className="text-white hover:brightness-125" style={{ fontSize: U(19), padding: `${U(5)} ${U(12)}`, margin: U(3), background: on ? "#23b34a" : "#2c3a33", border: `${U(1)} solid rgba(255,255,255,.08)` }}>{t(n)}</button>;
 }
 
-export function ServerScreen({ mode, form, setForm, results, onPrimary, onPublic, onOffline, onBack }: {
-  mode: "create" | "find"; form: ServerForm; setForm: (f: ServerForm) => void;
+export function ServerScreen({ mode, form, setForm, results, note, onPrimary, onPublic, onOffline, onBack }: {
+  mode: "create" | "find"; form: ServerForm; setForm: (f: ServerForm) => void; note?: string;
   results: { id: string; name: string; players: string; tags: string[]; join: () => void }[];
   onPrimary: () => void; onPublic: () => void; onOffline: () => void; onBack: () => void;
 }) {
@@ -176,6 +176,7 @@ export function ServerScreen({ mode, form, setForm, results, onPrimary, onPublic
       {/* ימין: תוצאות */}
       <div className="absolute" style={{ left: U(1290), top: U(64), width: U(560), height: U(690) }}>
         <div className="font-bold text-white" style={{ fontSize: U(30), marginBottom: U(8) }}>{t(mode === "find" ? "Search Results" : "Your Server")}</div>
+        {note && <div className="font-bold text-[#ff6b6b]" style={{ fontSize: U(26), marginBottom: U(8) }}>{note}</div>}
         <div className="overflow-auto" style={{ height: U(640) }}>
           {results.map((r) => (
             <div key={r.id} style={{ marginBottom: U(12), padding: U(12), background: "linear-gradient(90deg,#ff2d6f,#ff8a1f 30%,#ffd21f 55%,#6fe23a 80%,#22c24a)" }}>

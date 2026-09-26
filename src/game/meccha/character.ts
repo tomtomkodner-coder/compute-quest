@@ -544,6 +544,8 @@ export function samplePart(p: Part, uv: THREE.Vector2, out: THREE.Color) {
 }
 
 /** שם מעל הראש */
+/** אותו פונט כמו כל הממשק של המשחק (M PLUS Rounded) + גיבוי לשמות בעברית/סינית/קוריאנית/ערבית */
+export const LABEL_FONT = `"M PLUS Rounded 1c", "Noto Sans SC", "Noto Sans KR", "Noto Sans Arabic", "Noto Sans Hebrew", system-ui, sans-serif`;
 export function setLabel(ch: Character, text: string | null, color = "#ffffff", likes = 0) {
   if (ch.label) {
     ch.root.remove(ch.label);
@@ -561,7 +563,7 @@ export function setLabel(ch: Character, text: string | null, color = "#ffffff", 
   g.textBaseline = "middle";
   g.shadowColor = "rgba(0,0,0,0.85)";
   g.shadowBlur = 6;
-  g.font = `500 30px "M PLUS Rounded 1c", Arial, sans-serif`;
+  g.font = `700 30px ${LABEL_FONT}`;
   g.fillStyle = color;
   g.fillText(text, 160, 70);
   if (likes > 0) {
@@ -571,7 +573,7 @@ export function setLabel(ch: Character, text: string | null, color = "#ffffff", 
     g.roundRect(147, 20, 17, 18, 3);
     g.moveTo(150, 21); g.lineTo(154, 8); g.quadraticCurveTo(160, 8, 159, 14); g.lineTo(158, 21);
     g.fill();
-    g.font = `700 22px "M PLUS Rounded 1c", Arial, sans-serif`;
+    g.font = `800 22px ${LABEL_FONT}`;
     g.fillText(String(likes), 178, 28);
   }
   const t = new THREE.CanvasTexture(c);

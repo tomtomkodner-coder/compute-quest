@@ -171,7 +171,7 @@ export function playDrip(volume = 0.1) {
   const t = ac.currentTime;
   o.frequency.setValueAtTime(900 + Math.random() * 500, t);
   o.frequency.exponentialRampToValueAtTime(2200 + Math.random() * 600, t + 0.06);
-  g.gain.setValueAtTime(volume * masterVolume, t);
+  g.gain.setValueAtTime(Math.max(0.0001, volume * masterVolume * seVolume), t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
   o.connect(g).connect(ac.destination);
   o.start(t);

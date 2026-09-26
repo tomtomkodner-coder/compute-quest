@@ -2674,6 +2674,7 @@ const EXTRA: Record<string, Partial<Record<L | "he", string>>> = {
   "Tap for full screen": { ja: "タップで全画面", zh: "点击全屏", zht: "點擊全螢幕", pt: "Toque para tela cheia", es: "Toca para pantalla completa", fr: "Touchez pour le plein écran", ko: "탭하여 전체 화면", ar: "اضغط لملء الشاشة", it: "Tocca per lo schermo intero", de: "Tippen für Vollbild", ru: "Нажмите для полноэкранного режима", he: "הקישו למסך מלא" },
   "Run": { ja: "ダッシュ", zh: "奔跑", zht: "奔跑", pt: "Correr", es: "Correr", fr: "Courir", ko: "달리기", ar: "ركض", it: "Corri", de: "Rennen", ru: "Бег", he: "ריצה" },
   "Climb": { ja: "よじ登る", zh: "攀爬", zht: "攀爬", pt: "Escalar", es: "Trepar", fr: "Grimper", ko: "오르기", ar: "تسلق", it: "Arrampica", de: "Klettern", ru: "Лезть", he: "טיפוס" },
+  "Hunter nearby": { ja: "ハンターが近い", zh: "猎人就在附近", zht: "獵人就在附近", pt: "Caçador por perto", es: "Cazador cerca", fr: "Chasseur à proximité", ko: "헌터가 가까이 있음", ar: "صياد قريب", it: "Cacciatore vicino", de: "Jäger in der Nähe", ru: "Охотник рядом", he: "צייד קרוב" },
   "{name}'s server": { ja: "{name}のサーバー", zh: "{name}的服务器", zht: "{name}的伺服器", pt: "Servidor de {name}", es: "Servidor de {name}", fr: "Serveur de {name}", ko: "{name}의 서버", ar: "خادم {name}", it: "Server di {name}", de: "Server von {name}", ru: "Сервер {name}", he: "השרת של {name}" },
 };
 export const HE_EXTRA: Record<string, string> = {};
