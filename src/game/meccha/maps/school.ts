@@ -168,8 +168,8 @@ export function buildSchool(): World {
   const mSteelDark = k.mat(null, "#3a4045", [1, 1], { metalness: 0.6, roughness: 0.45 });
   const mStainless = k.mat(null, "#d5d9db", [1, 1], { metalness: 0.95, roughness: 0.18 });
   const mTray = k.mat(null, "#7f8589", [1, 1], { metalness: 0.4, roughness: 0.5 });
-  const mCabGrey = k.mat(null, "#b5b8b1", [1, 1], { metalness: 0.35, roughness: 0.45 });
-  const mCream = k.mat(null, "#e3dfd1", [1, 1], { metalness: 0.25, roughness: 0.45 });
+  const mCabGrey = k.mat(k.tex("sc-wornG", () => S.wornPaint("#b5b8b1", 1)), "#ffffff", [1, 1], { metalness: 0.35, roughness: 0.45, bump: 0.25 });
+  const mCream = k.mat(k.tex("sc-wornC", () => S.wornPaint("#e3dfd1", 2)), "#ffffff", [1, 1], { metalness: 0.25, roughness: 0.45, bump: 0.25 });
   const mBoardFrame = k.mat(null, "#a7abad", [1, 1], { metalness: 0.8, roughness: 0.35 });
   const mCork = k.mat(k.tex("sc-cork", () => S.cork(4)), "#ffffff", [1, 1], { roughness: 0.95, bump: 0.35 });
   const mCork2 = mCork;
@@ -203,7 +203,7 @@ export function buildSchool(): World {
   const mDrumHead = k.mat(null, "#efebe0", [1, 1], { roughness: 0.6 });
   const mDrumShell = k.mat(null, "#962029", [1, 1], { roughness: 0.18, metalness: 0.25 });
   const mLabTop = k.mat(null, "#1b1d20", [1, 1], { roughness: 0.22 });
-  const mLabCab = k.mat(null, "#d8dad4", [1, 1], { roughness: 0.55 });
+  const mLabCab = k.mat(k.tex("sc-wornL", () => S.wornPaint("#d8dad4", 3)), "#ffffff", [1, 1], { roughness: 0.55, bump: 0.2 });
   const mBone = k.mat(null, "#e9e1cb", [1, 1], { roughness: 0.55 });
   const mMatBlue = k.mat(k.tex("sc-matb", () => S.gymMat("#2b59a6")), "#ffffff", [1, 1], { roughness: 0.55, bump: 0.4 });
   const mMatGreen = k.mat(k.tex("sc-matg", () => S.gymMat("#4f7f55")), "#ffffff", [1, 1], { roughness: 0.6, bump: 0.4 });
@@ -238,7 +238,38 @@ export function buildSchool(): World {
   const mRedLamp = k.mat(null, "#ff3a2a", [1, 1], { emissive: "#ff2a1a", emissiveIntensity: 1.6 });
   const mScreen = k.mat(null, "#0e1114", [1, 1], { roughness: 0.12, metalness: 0.2 });
 
-  const boardMats = { math: k.mat(k.tex("sc-bmath", () => S.blackboard("math")), "#fff", [1, 1], { roughness: 0.85, bump: 0.08 }), eng: k.mat(k.tex("sc-beng", () => S.blackboard("eng")), "#fff", [1, 1], { roughness: 0.85, bump: 0.08 }), music: k.mat(k.tex("sc-bmus", () => S.blackboard("music")), "#fff", [1, 1], { roughness: 0.85, bump: 0.08 }), lab: k.mat(k.tex("sc-blab", () => S.blackboard("lab")), "#fff", [1, 1], { roughness: 0.85, bump: 0.08 }) };
+  const boardMats = { math: k.mat(k.tex("sc-bmath", () => S.blackboard("math")), "#fff", [1, 1], { roughness: 0.85, bump: 0 }), eng: k.mat(k.tex("sc-beng", () => S.blackboard("eng")), "#fff", [1, 1], { roughness: 0.85, bump: 0 }), music: k.mat(k.tex("sc-bmus", () => S.blackboard("music")), "#fff", [1, 1], { roughness: 0.85, bump: 0 }), lab: k.mat(k.tex("sc-blab", () => S.blackboard("lab")), "#fff", [1, 1], { roughness: 0.85, bump: 0 }) };
+
+  // ---- desks, chairs, papers, dirt ----
+  const mDeskTops = [0, 1, 2, 3].map((v) => k.mat(k.tex("sc-desk" + v, () => S.deskTop(v)), "#ffffff", [1, 1], { roughness: 0.45, bump: 0.22 }));
+  const mDeskUnder = k.mat(tGrainL, "#c9b08a", [1, 1], { roughness: 0.7, bump: 0.2 });
+  const mBand = k.mat(null, "#5a4632", [1, 1], { roughness: 0.4 });
+  const mDeskFrame = k.mat(null, "#9aa3a0", [1, 1], { metalness: 0.7, roughness: 0.4 });
+  const mPly = k.mat(k.tex("sc-ply", S.plywood), "#ffffff", [1, 1], { roughness: 0.5, bump: 0.2 });
+  const mPapers = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => k.mat(k.tex("sc-paper" + i, () => S.paper(i)), "#ffffff", [1, 1], { roughness: 0.85, bump: 0 }));
+  for (const m of mPapers) m.m.side = THREE.DoubleSide;
+  const mNotebook = k.mat(k.tex("sc-notebooks", S.notebooks), "#ffffff", [1, 1], { roughness: 0.6, bump: 0 });
+  const mTags = k.mat(k.tex("sc-tags", S.nameTags), "#ffffff", [1, 1], { roughness: 0.7, bump: 0 });
+  const decal = (t: ReturnType<typeof S.dirt>) => {
+    const m = k.mat(t, "#ffffff", [1, 1], { roughness: 0.9, bump: 0 });
+    Object.assign(m.m, { transparent: true, depthWrite: false, alphaTest: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    B.noShadow.add(m);
+    return m;
+  };
+  const mDustCorner = decal(k.tex("sc-dirt0", () => S.dirt(0)));
+  const mDustLine = decal(k.tex("sc-dirt1", () => S.dirt(1)));
+  const mScuffFloor = decal(k.tex("sc-dirt2", () => S.dirt(2)));
+  const mScuffWall = decal(k.tex("sc-dirt3", () => S.dirt(3)));
+  const mDeskMat = k.mat(null, "#3f6b52", [1, 1], { roughness: 0.65 });
+  const mCoffee = k.mat(null, "#3a2414", [1, 1], { roughness: 0.15 });
+  const mChalkFloor = decal(k.tex("sc-dirt4", () => S.dirt(4)));
+  mChalkFloor.m.opacity = 0.45;
+  const mMottoA = k.mat(k.tex("sc-motto-a", () => S.motto("ביחד מצליחים!", "כיתה ט'3 - המחנכת: מירי")), "#ffffff", [1, 1], { roughness: 0.7, bump: 0 });
+  const mMottoB = k.mat(k.tex("sc-motto-b", () => S.motto("לומדים באהבה", "כיתה ט'4 - המחנך: אבי")), "#ffffff", [1, 1], { roughness: 0.7, bump: 0 });
+  const mMopHead = k.mat(k.tex("sc-fab", () => T.noise("#ffffff", 0.12, 5, 3000)), "#b8b0a0", [2, 2], { roughness: 1, bump: 0.6 });
+  const mChalkDust = k.mat(null, "#f4f4ee", [1, 1], { roughness: 1 });
+  Object.assign(mChalkDust.m, { transparent: true, opacity: 0.45, depthWrite: false });
+  B.noShadow.add(mChalkDust);
 
   // instanced lists
   const boxI = new IList(new THREE.BoxGeometry(1, 1, 1), mInst); // books, erasers, boxes
@@ -248,7 +279,6 @@ export function buildSchool(): World {
   const toePair = mergeG([place(new THREE.BoxGeometry(0.088, 0.04, 0.07), -0.052, 0.02, -0.08), place(new THREE.BoxGeometry(0.088, 0.04, 0.07), 0.052, 0.02, -0.08)]);
   const shoeI = new IList(shoePair, mInst);
   const toeI = new IList(toePair, mInst);
-  const tagI = new IList(new THREE.PlaneGeometry(0.1, 0.03), mPaper, true);
   const ballB = new IList(new THREE.SphereGeometry(0.12, 16, 10), mBasket);
   const ballV = new IList(new THREE.SphereGeometry(0.105, 16, 10), mVolley);
   const leafI = new IList(new THREE.IcosahedronGeometry(1, 1), mLeaves);
@@ -257,6 +287,83 @@ export function buildSchool(): World {
   const bottleI = new IList(latheG([[0.001, 0], [0.04, 0], [0.042, 0.01], [0.042, 0.12], [0.02, 0.16], [0.015, 0.2], [0.017, 0.21]], 10), mInst);
   const liquidI = new IList(new THREE.CylinderGeometry(1, 1, 1, 12), mInst, true);
   const cylI = new IList(new THREE.CylinderGeometry(1, 1, 1, 12), mInst); // pencils, chalk, umbrellas, cans
+  const gumI = new IList(new THREE.SphereGeometry(1, 8, 5), k.mat(null, "#ffffff", [1, 1], { roughness: 0.3 }), true);
+  const crumbI = new IList(new THREE.BoxGeometry(1, 1, 1), mInst, true);
+  const hexI = new IList(new THREE.CylinderGeometry(1, 1, 1, 6), mInst, true);
+  const tipI = new IList(new THREE.ConeGeometry(1, 1, 6), mInst, true);
+  const paperBallI = new IList((() => {
+    const g = new THREE.IcosahedronGeometry(1, 1);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const d = 0.78 + 0.28 * Math.sin(x * 9.1 + y * 5.3) * Math.cos(z * 7.7 - x * 3.1);
+      p.setXYZ(i, x * d, y * d, z * d);
+    }
+    g.computeVertexNormals();
+    return g;
+  })(), mPaper);
+  const tagLists = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new IList(uvPlane(0.1, 0.03, [(i % 4) / 4, 0.5 - Math.floor(i / 4) * 0.5, 0.25, 0.5]), mTags, true));
+  const tagI = { add: (x: number, y: number, z: number, s: V3t = [1, 1, 1], _c?: string, ry = 0) => tagLists[Math.floor(rnd() * 8)].add(x, y, z, s, undefined, ry) };
+  const gumCols = ["#f07aa8", "#f59ac0", "#7fd08a", "#6fb0f0", "#d9d0c4", "#e86a9a", "#b8e070"];
+  const penCols = ["#e6c640", "#e6c640", "#3a6fd8", "#d83a3a", "#2f9a4e", "#222226", "#f08a2a"];
+  const nbCols = ["#2d5aa0", "#c43d3d", "#3a8a4f", "#e7b93a", "#7b4ba6", "#e07a2c", "#2f9ab0", "#d8d4c6"];
+  // school chair: bent plywood seat (dished, rolled front edge) + curved backrest on a bent steel-tube frame
+  const chairParts = (() => {
+    const seat = new THREE.BoxGeometry(0.4, 0.013, 0.38, 8, 1, 6);
+    const sp = seat.attributes.position;
+    for (let i = 0; i < sp.count; i++) {
+      const x = sp.getX(i), zz = sp.getZ(i);
+      let dy = 0.016 * (x / 0.2) ** 2 + 0.008 * (zz / 0.19) ** 2;
+      if (zz < -0.12) dy -= ((-zz - 0.12) / 0.07) ** 2 * 0.03;
+      sp.setY(i, sp.getY(i) + dy);
+    }
+    seat.computeVertexNormals();
+    seat.translate(0, 0.43, 0);
+    const back = new THREE.BoxGeometry(0.38, 0.17, 0.013, 8, 1, 1);
+    const bp = back.attributes.position;
+    for (let i = 0; i < bp.count; i++) bp.setZ(i, bp.getZ(i) - 0.035 * (bp.getX(i) / 0.19) ** 2);
+    back.computeVertexNormals();
+    back.rotateX(0.12);
+    back.translate(0, 0.68, 0.215);
+    const steel: G[] = [], feet: G[] = [];
+    for (const s of [-1, 1]) {
+      const x = s * 0.185;
+      steel.push(tubeG([[x, 0.012, -0.165], [x, 0.2, -0.168], [x, 0.39, -0.17], [x, 0.415, -0.135], [x, 0.418, 0.1]], 0.011, 10, 6));
+      steel.push(tubeG([[x, 0.012, 0.2], [x, 0.2, 0.188], [x, 0.41, 0.175], [x, 0.6, 0.195], [x, 0.77, 0.23]], 0.011, 10, 6));
+      steel.push(beam([x, 0.13, -0.166], [x, 0.13, 0.19], 0.008, 6));
+      steel.push(place(new THREE.BoxGeometry(0.03, 0.1, 0.01), x * 0.96, 0.68, 0.206 - 0.004 * s * 0, 0.12));
+      feet.push(place(new THREE.CylinderGeometry(0.014, 0.014, 0.02, 8), x, 0.01, -0.165), place(new THREE.CylinderGeometry(0.014, 0.014, 0.02, 8), x, 0.01, 0.2));
+    }
+    steel.push(beam([-0.185, 0.405, 0.12], [0.185, 0.405, 0.12], 0.009, 6), beam([-0.185, 0.405, -0.12], [0.185, 0.405, -0.12], 0.009, 6));
+    return { wood: mergeG([seat, back]), steel: mergeG(steel), feet: mergeG(feet) };
+  })();
+  // school desk shared parts (local frame, student at +z)
+  const deskParts = (() => {
+    const bx0 = (w: number, h: number, d: number, x: number, y: number, z: number) => place(boxGeo(w, h, d), x, y + h / 2, z);
+    const under = [bx0(0.63, 0.02, 0.43, 0, 0.678, 0)];
+    const band: G[] = [], frame: G[] = [], shelf: G[] = [], feet: G[] = [];
+    for (const s of [-1, 1]) {
+      band.push(new THREE.BoxGeometry(0.654, 0.026, 0.012).translate(0, 0.688, s * 0.221), new THREE.BoxGeometry(0.012, 0.026, 0.43).translate(s * 0.321, 0.688, 0));
+      for (const sz of [-1, 1]) {
+        frame.push(place(new THREE.CylinderGeometry(0.013, 0.013, 0.66, 8, 1, true), s * 0.295, 0.34, sz * 0.19));
+        feet.push(place(new THREE.CylinderGeometry(0.016, 0.016, 0.02, 8), s * 0.295, 0.01, sz * 0.19));
+      }
+      frame.push(beam([s * 0.295, 0.09, -0.19], [s * 0.295, 0.09, 0.19], 0.009, 6), bx0(0.02, 0.03, 0.4, s * 0.295, 0.645, 0));
+      frame.push(tubeG([[s * 0.33, 0.645, 0.03], [s * 0.35, 0.635, 0.03], [s * 0.356, 0.605, 0.03], [s * 0.346, 0.59, 0.03]], 0.004, 8, 4));
+      shelf.push(new THREE.BoxGeometry(0.008, 0.1, 0.33).translate(s * 0.28, 0.605, -0.035));
+    }
+    frame.push(beam([-0.295, 0.09, -0.19], [0.295, 0.09, -0.19], 0.009, 6));
+    shelf.push(new THREE.BoxGeometry(0.56, 0.008, 0.33).translate(0, 0.559, -0.035), new THREE.BoxGeometry(0.56, 0.1, 0.008).translate(0, 0.605, -0.2));
+    return { under: mergeG(under), band: mergeG(band), frame: mergeG(frame), shelf: mergeG(shelf), feet: mergeG(feet) };
+  })();
+  const deskUnderI = new IList(deskParts.under, mDeskUnder);
+  const deskBandI = new IList(deskParts.band, mBand);
+  const deskFrameI = new IList(deskParts.frame, mDeskFrame);
+  const deskShelfI = new IList(deskParts.shelf, mTray);
+  const deskFootI = new IList(deskParts.feet, mRubber, true);
+  const chairWoodI = new IList(chairParts.wood, mPly);
+  const chairSteelI = new IList(chairParts.steel, mSteel);
+  const chairFootI = new IList(chairParts.feet, mRubber, true);
 
   // ---------- local frame ----------
   class Fr {
@@ -532,38 +639,138 @@ export function buildSchool(): World {
   // ---------- student furniture ----------
   const bagCols = ["#1e2638", "#23262c", "#2b3a5c", "#3d2a22", "#5a1f24", "#2a4a3a"];
   const bookCols = ["#2d5aa0", "#c43d3d", "#3a8a4f", "#e7c23a", "#7b4ba6", "#e07a2c", "#2f9ab0", "#f2f0e8", "#3a3a3a"];
+  /** blackboard chalk tray: chalk sticks (whole + broken), felt erasers, a chalk box and a film of chalk dust */
+  function boardTray(f: Fr, n: number, floorY = 0.182) {
+    f.geo(mChalkDust, new THREE.PlaneGeometry(5.2, 0.075).rotateX(-Math.PI / 2), 0, 0.8315, 0.075);
+    for (let i = 0; i < n; i++) f.inst(cylI, rr(-2.4, 2.4), 0.8375, rr(0.06, 0.1), [0.0065, rnd() < 0.4 ? rr(0.015, 0.035) : rr(0.05, 0.075), 0.0065], pick(["#f4f4ee", "#f4f4ee", "#f4f4ee", "#f2d64a", "#ef8fa0", "#8fc8f0"]), rr(0, 3), 0, Math.PI / 2);
+    for (const [e, a] of [[-1.6, 0.1], [0.9, -0.2]]) {
+      f.inst(boxI, e, 0.836, 0.075, [0.13, 0.012, 0.05], "#d6d2c8", a);
+      f.inst(boxI, e, 0.857, 0.075, [0.128, 0.03, 0.048], pick(["#2f3a4a", "#3a5a8a", "#7a2a2a"]), a);
+      f.inst(boxI, e, 0.873, 0.075, [0.05, 0.004, 0.035], "#e8e4d6", a);
+    }
+    f.inst(boxI, 2.2, 0.855, 0.075, [0.1, 0.05, 0.06], "#f2f0ea", 0.2);
+    f.geo(mChalkFloor, flatUV(4.6, 0.5, [0, 0, 1.7, 1]), 0, floorY, 0.3);
+  }
+  /** dust in the corners and along the skirting, grey shoe/chair scuffs on the walls above the skirting, floor scuffs */
+  function dirtRoom(x1: number, x2: number, z1: number, z2: number, scuffs = 6, wallScuff = true) {
+    const a1 = x1 + 0.15, a2 = x2 - 0.15, b1 = z1 + 0.15, b2 = z2 - 0.15;
+    const fl = (m: Mat, w: number, d: number, x: number, z: number, ry: number, uv: [number, number, number, number] = [0, 0, 1, 1], y = 0.003) =>
+      B.add(m, place(flatUV(w, d, uv), x, y, z, 0, ry));
+    const cs = 0.7;
+    fl(mDustCorner, cs, cs, a2 - cs / 2, b1 + cs / 2, 0); fl(mDustCorner, cs, cs, a1 + cs / 2, b1 + cs / 2, Math.PI / 2);
+    fl(mDustCorner, cs, cs, a1 + cs / 2, b2 - cs / 2, Math.PI); fl(mDustCorner, cs, cs, a2 - cs / 2, b2 - cs / 2, -Math.PI / 2);
+    const lw = 0.1;
+    fl(mDustLine, a2 - a1, lw, (a1 + a2) / 2, b1 + lw / 2, 0, [0, 0, (a2 - a1) / 1.5, 1]);
+    fl(mDustLine, a2 - a1, lw, (a1 + a2) / 2, b2 - lw / 2, Math.PI, [0, 0, (a2 - a1) / 1.5, 1]);
+    fl(mDustLine, b2 - b1, lw, a1 + lw / 2, (b1 + b2) / 2, Math.PI / 2, [0, 0, (b2 - b1) / 1.5, 1]);
+    fl(mDustLine, b2 - b1, lw, a2 - lw / 2, (b1 + b2) / 2, -Math.PI / 2, [0, 0, (b2 - b1) / 1.5, 1]);
+    for (let i = 0; i < scuffs; i++) fl(mScuffFloor, rr(0.8, 1.4), rr(0.8, 1.4), rr(a1 + 1, a2 - 1), rr(b1 + 1, b2 - 1), rr(0, 6), [0, 0, 1, 1], 0.0025 + i * 0.0002);
+    if (!wallScuff) return;
+    const off = 0.163, hh = 0.4, yc = 0.1 + hh / 2;
+    const wl = (w: number, x: number, z: number, ry: number) => B.add(mScuffWall, place(uvPlane(w, hh, [rnd(), 0, w / 3, 1]), x, yc, z, 0, ry));
+    wl(a2 - a1, (a1 + a2) / 2, b1 - 0.15 + off, 0); wl(a2 - a1, (a1 + a2) / 2, b2 + 0.15 - off, Math.PI);
+    wl(b2 - b1, a1 - 0.15 + off, (b1 + b2) / 2, Math.PI / 2); wl(b2 - b1, a2 + 0.15 - off, (b1 + b2) / 2, -Math.PI / 2);
+  }
+  /** things kids dropped on the floor: pencils, erasers, paper balls, a sheet, eraser crumbs */
+  function litter(x1: number, x2: number, z1: number, z2: number, n: number) {
+    for (let i = 0; i < n; i++) {
+      const x = rr(x1, x2), z = rr(z1, z2), q = rnd();
+      if (q < 0.3) pencil(W, x, 0, z, rr(0, 6));
+      else if (q < 0.45) eraser(W, x, 0, z);
+      else if (q < 0.75) { const rb = rr(0.025, 0.04); paperBallI.add(x, rb * 0.85, z, [rb, rb, rb], pick(["#f6f4ec", "#f4f0e0", "#eef2f8"]), rr(0, 6), rr(0, 6)); }
+      else if (q < 0.85) sheet(W, pick([0, 1, 2, 3, 4, 5, 6, 8]), x, 0.004, z, rr(0, 6));
+      else for (let c = 0; c < 8; c++) crumbI.add(x + rr(-0.08, 0.08), 0.0013, z + rr(-0.08, 0.08), [rr(0.003, 0.007), 0.0025, rr(0.002, 0.004)], pick(["#8a8078", "#e8a0a8", "#9a9290"]), rr(0, 3));
+    }
+  }
   function desk(x: number, z: number, ry: number) {
     const f = new Fr(x, z, ry);
-    f.box(mDeskTop, 0.65, 0.025, 0.45, 0, 0.675, 0);
-    f.box(mTray, 0.58, 0.09, 0.36, 0, 0.57, -0.035);
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) f.box(mSteel, 0.026, 0.665, 0.026, sx * 0.3, 0, sz * 0.19);
-      f.box(mSteel, 0.022, 0.022, 0.4, sx * 0.3, 0.1, 0);
-    }
-    f.box(mSteel, 0.58, 0.022, 0.022, 0, 0.1, -0.19);
+    const v = Math.floor(rnd() * 4);
+    // wood-grain top (graffiti texture, readable from the student side) + plastic edge banding
+    f.geo(mDeskTops[v], flatUV(0.63, 0.43, [0, 0, 1, 1]), 0, 0.6985, 0);
+    // under-board, edge banding, steel frame, shelf and hooks: shared geometry, one instance each (tinted per desk)
+    deskUnderI.add(x, 0, z, [1, 1, 1], pick(["#ffffff", "#f2e6d4", "#e8dccb"]), ry);
+    deskBandI.add(x, 0, z, [1, 1, 1], pick(["#ffffff", "#d8c8b0", "#b8a890"]), ry);
+    deskFrameI.add(x, 0, z, [1, 1, 1], pick(["#ffffff", "#e0e8e4", "#c8d4d0", "#f0ece0"]), ry);
+    deskShelfI.add(x, 0, z, [1, 1, 1], pick(["#ffffff", "#e6e6e6", "#d0d4d8"]), ry);
+    deskFootI.add(x, 0, z, [1, 1, 1], undefined, ry);
     f.col(-0.33, 0.33, -0.23, 0.23, 0, 0.7);
-    // items on top
+    // shelf contents
+    const q0 = rnd();
+    if (q0 < 0.55) for (let b = 0; b < 1 + Math.floor(rnd() * 3); b++) f.inst(boxI, rr(-0.1, 0.1), 0.565 + b * 0.022, rr(-0.08, 0), [0.19, 0.02, 0.26], pick(bookCols), rr(-0.25, 0.25));
+    else if (q0 < 0.75) f.inst(paperBallI, rr(-0.15, 0.15), 0.59, rr(-0.1, 0.05), [0.03, 0.03, 0.03], "#f4f2ea", rr(0, 6), rr(0, 6));
+    // chewing gum stuck under the top / under the shelf (students' secret stash)
+    const ng = rnd() < 0.8 ? 1 + Math.floor(rnd() * 3) : 0;
+    for (let i = 0; i < ng; i++) f.inst(gumI, rr(-0.29, 0.29), 0.675, rr(0.155, 0.205), [rr(0.008, 0.014), 0.005, rr(0.007, 0.012)], pick(gumCols), rr(0, 3));
+    if (rnd() < 0.3) f.inst(gumI, rr(-0.24, 0.24), 0.553, rr(-0.15, 0.1), [0.01, 0.004, 0.009], pick(gumCols));
+    if (rnd() < 0.15) f.inst(gumI, rr(-0.25, 0.25), 0.699, rr(-0.18, 0.18), [0.011, 0.003, 0.009], pick(gumCols), rr(0, 3));
+    // side hook with a hanging school bag (and sometimes a gym bag on the other hook)
+    const qb = rnd();
+    if (qb < 0.5) {
+      const col = pick(bagCols);
+      f.inst(bagI, 0.405, 0.39, 0.03, [0.1, 0.3, 0.34], col, rr(-0.05, 0.05));
+      for (const sz of [-1, 1]) f.geo(mBlackP, tubeG([[0.35, 0.6, 0.03], [0.375, 0.57, 0.03 + sz * 0.06], [0.4, 0.545, 0.03 + sz * 0.11]], 0.006, 6, 4));
+      if (rnd() < 0.5) { f.inst(gumI, 0.46, 0.47, 0.03 + rr(-0.1, 0.1), [0.022, 0.022, 0.022], pick(["#f5c21a", "#e8584f", "#6fb0f0", "#f07aa8"])); }
+    } else if (qb < 0.7) f.inst(bagI, 0.38, 0.17, rr(-0.1, 0.1), [0.14, 0.34, 0.3], pick(bagCols), rr(-0.2, 0.2), 0, -0.25);
+    if (rnd() < 0.3) {
+      f.inst(bagI, -0.37, 0.47, 0.03, [0.04, 0.2, 0.17], pick(["#e84a7a", "#3a8fd8", "#f2c23c", "#4fb06a"]));
+      f.geo(mSteel, tubeG([[-0.346, 0.59, 0.03], [-0.36, 0.575, 0.0], [-0.37, 0.57, 0.03]], 0.003, 6, 3));
+    }
+    // things on the top
     const r = rnd();
-    if (r < 0.35) { f.inst(boxI, rr(-0.15, 0.1), 0.7 + 0.012, rr(-0.05, 0.05), [0.19, 0.024, 0.26], pick(bookCols), rr(-0.3, 0.3)); f.inst(boxI, 0.15, 0.703, 0.05, [0.36, 0.006, 0.25], "#f6f5ef", rr(-0.2, 0.2)); }
-    else if (r < 0.6) { f.inst(boxI, rr(-0.18, 0.18), 0.7 + 0.03, rr(-0.08, 0.08), [0.19, 0.06, 0.26], pick(bookCols), rr(-0.3, 0.3)); f.inst(boxI, rr(-0.2, 0.2), 0.7 + 0.02, 0.15, [0.2, 0.04, 0.06], pick(["#3a6fd8", "#e04a7a", "#2f2f2f", "#f0c030"]), rr(-0.4, 0.4)); }
-    else if (r < 0.72) f.inst(cylI, rr(-0.2, 0.2), 0.707, 0.1, [0.004, 0.16, 0.004], "#e6c640", 0, 0, Math.PI / 2);
-    if (rnd() < 0.45) f.inst(bagI, 0.36, 0.28, 0, [0.09, 0.3, 0.38], pick(bagCols));
-    if (rnd() < 0.5) f.inst(boxI, 0, 0.6, -0.05, [0.52, 0.05, 0.3], pick(bookCols));
+    const top = 0.7;
+    if (r < 0.3) {
+      const nb = Math.floor(rnd() * 8);
+      const a = rr(-0.3, 0.3), lx = rr(-0.14, 0.1), lz = rr(-0.07, 0.05);
+      f.inst(boxI, lx, top + 0.004, lz, [0.17, 0.008, 0.24], nbCols[nb], a);
+      f.geo(mNotebook, flatUV(0.17, 0.24, [(nb % 4) / 4, 0.5 - Math.floor(nb / 4) * 0.5, 0.25, 0.5]), lx, top + 0.0085, lz, 0, a);
+      sheet(f, pick([0, 1, 2, 3, 4, 5, 6, 8]), 0.15, top + 0.002, rr(-0.05, 0.05), rr(-0.3, 0.3));
+      pencil(f, rr(-0.2, 0.2), top, rr(0.1, 0.17), rr(-0.5, 0.5));
+    } else if (r < 0.62) {
+      sheet(f, pick([0, 1, 2, 3, 4, 5, 6, 8]), rr(-0.08, 0.08), top + 0.002, rr(-0.04, 0.03), rr(-0.25, 0.25));
+      if (rnd() < 0.4) sheet(f, pick([0, 1, 2, 3, 4, 5, 6, 8]), rr(-0.15, 0.15), top + 0.003, rr(-0.06, 0.02), rr(-0.4, 0.4));
+      pencil(f, rr(-0.2, 0.2), top + 0.004, rr(0.08, 0.17), rr(-0.5, 0.5));
+      if (rnd() < 0.6) eraser(f, rr(-0.25, 0.25), top, rr(0.1, 0.18));
+    } else if (r < 0.75) {
+      f.inst(boxI, rr(-0.18, 0.18), top + 0.02, rr(0.05, 0.12), [0.2, 0.04, 0.06], pick(["#3a6fd8", "#e04a7a", "#2f2f2f", "#f0c030", "#8a4ad0"]), rr(-0.4, 0.4));
+      pencil(f, rr(-0.2, 0.2), top, rr(-0.1, 0.0), rr(-0.5, 0.5));
+    }
+    if (rnd() < 0.45) for (let i = 0; i < 6; i++) f.inst(crumbI, rr(-0.2, 0.2), top + 0.0015, rr(0.02, 0.18), [rr(0.003, 0.007), 0.0025, rr(0.002, 0.004)], pick(["#8a8078", "#e8a0a8", "#9a9290"]), rr(0, 3));
+  }
+  /** a sheet of Hebrew-handwritten paper lying flat (local frame) */
+  function sheet(f: Fr, kind: number, lx: number, ly: number, lz: number, rot: number, s = 1) {
+    const g = new THREE.PlaneGeometry(0.21 * s, 0.294 * s);
+    g.rotateX(-Math.PI / 2);
+    f.geo(mPapers[kind], g, lx, ly, lz, 0, rot);
+  }
+  function flatUV(w: number, h: number, uv: [number, number, number, number]) {
+    const g = uvPlane(w, h, uv);
+    g.rotateX(-Math.PI / 2);
+    return g;
+  }
+  function pencil(f: Fr, lx: number, ly: number, lz: number, rot: number) {
+    const col = pick(penCols);
+    const [x, z] = f.pt(lx, lz);
+    const a = f.ry + rot;
+    const dx = Math.cos(a), dz = -Math.sin(a);
+    hexI.add(x, ly + 0.0036, z, [0.0036, 0.15, 0.0036], col, a, 0, Math.PI / 2);
+    tipI.add(x - dx * 0.087, ly + 0.0036, z - dz * 0.087, [0.0036, 0.024, 0.0036], "#e8c9a0", a, 0, Math.PI / 2);
+    if (rnd() < 0.5) cylI.add(x + dx * 0.08, ly + 0.0036, z + dz * 0.08, [0.0037, 0.012, 0.0037], "#f09aa8", 0, 0, 0);
+  }
+  function eraser(f: Fr, lx: number, ly: number, lz: number) {
+    f.inst(boxI, lx, ly + 0.006, lz, [0.042, 0.012, 0.02], pick(["#f2f0ea", "#f5a0b0", "#9ad0f0", "#f2f0ea"]), rr(0, 3));
   }
   function chair(x: number, z: number, ry: number, flipY = -1) {
-    const f = new Fr(x, z, ry);
     const fl = flipY >= 0;
-    const Y = (ly: number, h: number) => (fl ? flipY + 0.87 - ly - h : ly);
-    const bxp = (m: Mat, w: number, h: number, d: number, lx: number, ly: number, lz: number, rx = 0) => f.box(m, w, h, d, lx, Y(ly, h), lz, fl ? -rx : rx);
-    bxp(mDeskTop, 0.4, 0.022, 0.38, 0, 0.42, 0);
-    bxp(mDeskTop, 0.38, 0.19, 0.018, 0, 0.62, 0.185, -0.06);
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) bxp(mSteel, 0.022, 0.42, 0.022, sx * 0.18, 0, sz * 0.16);
-      bxp(mSteel, 0.02, 0.44, 0.02, sx * 0.17, 0.42, 0.18);
-      bxp(mSteel, 0.02, 0.02, 0.34, sx * 0.18, 0.12, 0);
-    }
+    const tint = pick(["#ffffff", "#f6e6ce", "#ead2ae", "#fff3e2", "#e2c49a", "#f0d8b8"]);
+    const st = pick(["#ffffff", "#e6ebe8", "#d4d9d6"]);
+    const y = fl ? flipY + 0.437 : 0, rz = fl ? Math.PI : 0;
+    chairWoodI.add(x, y, z, [1, 1, 1], tint, ry, 0, rz);
+    chairSteelI.add(x, y, z, [1, 1, 1], st, ry, 0, rz);
+    chairFootI.add(x, y, z, [1, 1, 1], undefined, ry, 0, rz);
     if (fl) return;
-    f.col(-0.21, 0.21, -0.2, 0.21, 0, 0.84);
+    const f = new Fr(x, z, ry);
+    if (rnd() < 0.4) f.inst(gumI, rr(-0.15, 0.15), 0.418, rr(-0.12, 0.1), [rr(0.008, 0.013), 0.005, rr(0.008, 0.012)], pick(gumCols), rr(0, 3));
+    f.col(-0.21, 0.21, -0.2, 0.23, 0, 0.84);
   }
 
   // ---------- classroom ----------
@@ -577,13 +784,13 @@ export function buildSchool(): World {
     f.geo(boardMats[kind], new THREE.PlaneGeometry(5.2, 1.2), 0, 1.45, 0.035);
     f.box(mBoardFrame, 5.3, 0.05, 0.1, 0, 0.78, 0.07);
     f.box(mBoardFrame, 5.3, 0.03, 0.02, 0, 0.81, 0.12);
-    for (let i = 0; i < 9; i++) f.inst(cylI, rr(-2.4, 2.4), 0.82, 0.08, [0.006, 0.06, 0.006], pick(["#f4f4ee", "#f4f4ee", "#f2d64a", "#ef8fa0", "#8fc8f0"]), rr(0, 3), 0, Math.PI / 2);
-    for (const e of [-1.6, 0.9]) { f.inst(boxI, e, 0.835, 0.08, [0.13, 0.04, 0.05], "#2f3a4a"); f.inst(boxI, e, 0.815, 0.08, [0.13, 0.012, 0.05], "#d8d4c8"); }
+    boardTray(f, 12);
     // clock, speaker, TV, class motto
     clock(bxw, 2.6, 5, Math.PI / 2);
     f.box(mWhiteP, 0.36, 0.26, 0.14, 1.9, 2.5, 0.07);
     f.box(mBlackP, 0.3, 0.2, 0.01, 1.9, 2.53, 0.145);
     f.box(mWhiteP, 1.6, 0.34, 0.005, -1.7, 2.45, 0.003);
+    f.geo(kind === "math" ? mMottoA : mMottoB, new THREE.PlaneGeometry(1.56, 0.33), -1.7, 2.62, 0.0065);
     const tv = new Fr(x0 + 0.55, 0.75, Math.PI * 0.75);
     tv.box(mBlackP, 0.95, 0.58, 0.07, 0, 2.2, 0);
     tv.box(mScreen, 0.88, 0.5, 0.005, 0, 2.24, 0.037);
@@ -600,26 +807,48 @@ export function buildSchool(): World {
     lec.inst(boxI, 0.25, 1.15, 0.05, [0.12, 0.04, 0.08], "#f2f2ea");
     B.add(mGlassWare, lec.put(latheG([[0.001, 0], [0.04, 0], [0.05, 0.08], [0.03, 0.2], [0.035, 0.22]], 12), 0.36, 1.13, -0.12));
     for (let i = 0; i < 3; i++) leafI.add(...(() => { const [a, b] = lec.pt(0.36 + (i - 1) * 0.04, -0.12); return [a, 1.42 + i * 0.02, b] as V3t; })(), [0.05, 0.05, 0.05], pick(["#e8584f", "#f2c23c", "#f0f0ea"]));
-    // teacher's steel desk by the window
+    // teacher's steel desk by the window (worn grey paint, green desk mat, drawers with handles, marking pile)
     const td = new Fr(x0 + 2.2, 8.8, Math.PI);
     td.box(mCabGrey, 1.2, 0.03, 0.7, 0, 0.7, 0);
+    td.box(mBand, 1.21, 0.012, 0.71, 0, 0.695, 0);
+    td.box(mDeskMat, 0.95, 0.004, 0.52, -0.06, 0.73, -0.02);
     td.box(mCabGrey, 0.4, 0.68, 0.66, 0.38, 0.02, 0);
-    for (let i = 0; i < 3; i++) td.box(mCream, 0.38, 0.2, 0.01, 0.38, 0.06 + i * 0.22, -0.335);
-    for (const sx of [-0.57]) td.box(mCabGrey, 0.03, 0.7, 0.66, sx, 0, 0);
+    for (let i = 0; i < 3; i++) {
+      td.box(mCream, 0.38, 0.2, 0.012, 0.38, 0.06 + i * 0.22, -0.335);
+      td.box(mStainless, 0.14, 0.018, 0.025, 0.38, 0.2 + i * 0.22, -0.35);
+      td.box(mWhiteP, 0.06, 0.025, 0.003, 0.38, 0.12 + i * 0.22, -0.342);
+    }
+    td.box(mCream, 0.66, 0.1, 0.012, -0.2, 0.58, -0.335);
+    td.box(mStainless, 0.18, 0.016, 0.022, -0.2, 0.62, -0.35);
+    td.box(mCabGrey, 0.03, 0.7, 0.66, -0.57, 0, 0);
     td.box(mCabGrey, 1.1, 0.4, 0.02, 0, 0.3, 0.32);
+    td.geo(mRubber, new THREE.BoxGeometry(0.4, 0.02, 0.66), 0.38, 0.01, 0);
     td.col(-0.6, 0.6, -0.35, 0.35, 0, 0.73);
-    td.box(mBlackP, 0.34, 0.02, 0.24, -0.2, 0.73, -0.05);
-    td.box(mBlackP, 0.34, 0.22, 0.01, -0.2, 0.74, 0.07, -0.25);
-    td.inst(boxI, 0.3, 0.76, 0, [0.22, 0.06, 0.3], "#f6f5ef", 0.1);
-    td.inst(cylI, 0.5, 0.78, 0.2, [0.035, 0.1, 0.035], "#d8d4c8");
+    // laptop
+    td.box(mBlackP, 0.34, 0.02, 0.24, -0.25, 0.734, -0.05);
+    td.box(mBlackP, 0.34, 0.22, 0.01, -0.25, 0.744, 0.07, -0.25);
+    td.box(mScreen, 0.3, 0.18, 0.003, -0.25, 0.765, 0.063, -0.25);
+    // pile of worksheets to mark (top one graded) + red pen, attendance book, pencil cup, mug, stapler
+    td.inst(boxI, 0.3, 0.749, -0.02, [0.21, 0.03, 0.297], "#f4f2ea", 0.08);
+    sheet(td, 0, 0.3, 0.7652, -0.02, 0.08 + Math.PI);
+    sheet(td, 1, 0.12, 0.735, 0.1, 0.5 + Math.PI);
+    pencil(td, 0.25, 0.766, 0.05, 0.9);
+    td.inst(boxI, 0.02, 0.742, -0.2, [0.24, 0.02, 0.32], "#1f3f7a", 0.05);
+    td.geo(mNotebook, flatUV(0.2, 0.28, [0, 0.5, 0.25, 0.5]), 0.02, 0.7525, -0.2, 0, 0.05 + Math.PI);
+    B.add(mSteelDark, td.put(latheG([[0.001, 0], [0.035, 0], [0.036, 0.1], [0.033, 0.1], [0.032, 0.005], [0.001, 0.005]], 14), 0.5, 0.732, 0.2));
+    for (let i = 0; i < 5; i++) { const [px, pz] = td.pt(0.5 + rr(-0.015, 0.015), 0.2 + rr(-0.015, 0.015)); cylI.add(px, 0.8, pz, [0.004, 0.15, 0.004], pick(penCols), 0, rr(-0.2, 0.2), rr(-0.2, 0.2)); }
+    B.add(mWhiteP, td.put(latheG([[0.001, 0], [0.04, 0], [0.042, 0.1], [0.038, 0.1], [0.036, 0.008], [0.001, 0.008]], 16), 0.46, 0.732, -0.22));
+    B.add(mWhiteP, td.put(new THREE.TorusGeometry(0.025, 0.007, 6, 12), 0.505, 0.785, -0.22, 0, 0, 0));
+    B.add(mCoffee, td.put(new THREE.CircleGeometry(0.036, 14).rotateX(-Math.PI / 2), 0.46, 0.815, -0.22));
+    td.box(mRedP, 0.16, 0.035, 0.04, -0.4, 0.734, 0.2, 0, 0.3);
     chair(...td.pt(0, -0.6), 0);
     // student desks: 6 rows × 5 columns
-    const flipRow = kind === "eng" ? 5 : -1;
-    for (let i = 0; i < 6; i++) for (let j = 0; j < 5; j++) {
-      const dx = x0 + 3.7 + i * 1.15 + rr(-0.04, 0.04), dz = 2.0 + j * 1.5 + rr(-0.04, 0.04), ry = Math.PI / 2 + rr(-0.05, 0.05);
+    const flipRow = kind === "eng" ? 4 : -1;
+    for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+      const dx = x0 + 3.8 + i * 1.2 + rr(-0.04, 0.04), dz = 2.0 + j * 1.5 + rr(-0.04, 0.04), ry = Math.PI / 2 + rr(-0.05, 0.05);
       desk(dx, dz, ry);
       if (i === flipRow) { chair(dx, dz, ry, 0.7); k.collider(dx - 0.25, dx + 0.25, dz - 0.25, dz + 0.25, 0.7, 1.58, true); continue; }
-      const out = i < 5 && rnd() < 0.3 ? rr(0.08, 0.2) : 0;
+      const out = i < 4 && rnd() < 0.3 ? rr(0.08, 0.2) : 0;
       chair(dx + 0.5 + out, dz + rr(-0.05, 0.05), ry + (out ? rr(-0.35, 0.35) : 0));
     }
     // back cubby lockers (x0+12 wall)
@@ -667,6 +896,11 @@ export function buildSchool(): World {
     cl.box(mCream, 0.4, 1.7, 0.01, 0.21, 0.05, 0.228);
     for (const s of [-1, 1]) cl.box(mSteelDark, 0.02, 0.12, 0.02, s * 0.03, 0.95, 0.24);
     cl.box(mSteelDark, 0.3, 0.04, 0.005, 0.2, 1.55, 0.235);
+    for (const sx of [-0.21, 0.21]) for (let v = 0; v < 5; v++) cl.box(mDarkInside, 0.22, 0.012, 0.004, sx, 1.45 + v * 0.035, 0.234);
+    for (const sx of [-0.21, 0.21]) for (let v = 0; v < 3; v++) cl.box(mDarkInside, 0.22, 0.012, 0.004, sx, 0.15 + v * 0.035, 0.234);
+    cl.geo(mPapers[5], new THREE.PlaneGeometry(0.15, 0.21), 0.21, 1.1, 0.236, 0, 0, 0.06);
+    B.add(mMopHead, place(new THREE.CylinderGeometry(0.02, 0.12, 0.18, 10), x0 + 11.25, 0.09, 1.35));
+    B.add(mWoodL, beam([x0 + 11.25, 0.15, 1.35], [x0 + 11.72, 1.4, 1.3], 0.012, 6));
     cl.col(-0.44, 0.44, -0.23, 0.26, 0, 1.8);
     trashBin(x0 + 0.45, 9.05, mBlueP);
     trashBin(x0 + 0.45, 9.5, mGreenP);
@@ -678,6 +912,8 @@ export function buildSchool(): World {
     fc.box(mWoodL, 1.2, 0.9, 0.45, 0, 0, 0);
     fc.box(mWoodM, 0.58, 0.8, 0.01, -0.3, 0.05, 0.228);
     fc.box(mWoodM, 0.58, 0.8, 0.01, 0.3, 0.05, 0.228);
+    for (const sx of [-0.04, 0.04]) fc.box(mStainless, 0.015, 0.1, 0.02, sx, 0.5, 0.24);
+    fc.geo(mTags, uvPlane(0.16, 0.05, [0.25, 0.5, 0.25, 0.5]), -0.3, 0.75, 0.2345);
     fc.col(-0.6, 0.6, -0.23, 0.23, 0, 0.9);
     for (let b = 0; b < 10; b++) fc.inst(boxI, -0.5 + b * 0.05, 0.9 + 0.12, 0, [0.04, 0.24 + rr(-0.03, 0.03), 0.18], pick(bookCols));
     fc.inst(boxI, 0.35, 0.92, 0, [0.3, 0.04, 0.22], "#f5f3ec");
@@ -697,6 +933,11 @@ export function buildSchool(): World {
     tk.box(mSand, 0.46, 0.03, 0.22, 0, 0.855, 0);
     for (let i = 0; i < 3; i++) tk.inst(bagI, rr(-0.15, 0.15), 1.0 + rr(-0.05, 0.05), rr(-0.06, 0.06), [0.05, 0.025, 0.018], "#f07a1e", rr(0, 3));
     for (const px of [1.2, 3.1, 10.5]) pot(x0 + px, 9.73, 0.55, 0.865);
+    dirtRoom(x0, x0 + 12, 0, 10, 7);
+    litter(x0 + 3.2, x0 + 11, 1.2, 9.2, 16);
+    // gum stuck on the floor + under the window sill
+    for (let i = 0; i < 5; i++) gumI.add(rr(x0 + 2, x0 + 11), 0.0015, rr(1, 9), [rr(0.01, 0.015), 0.0025, rr(0.01, 0.014)], pick(["#8a8078", "#6a6660", "#c890a0"]), rr(0, 3));
+    for (let i = 0; i < 4; i++) gumI.add(rr(x0 + 1, x0 + 11), 0.826, 9.74, [0.01, 0.005, 0.009], pick(gumCols));
   }
   function curtainPanel(x: number, z: number, w: number, h: number, yTop: number) {
     const n = 18;
@@ -714,6 +955,7 @@ export function buildSchool(): World {
 
   // ---------- corridor ----------
   k.room("Corridor", -24, 24, -3, 0);
+  dirtRoom(-24, 24, -3, 0, 14, false);
   seed = 91;
   painting(-19.5, 1.55, -0.16, Math.PI, 0.9, 0.7, 1);
   painting(-16.4, 1.55, -0.16, Math.PI, 0.7, 0.9, 2);
@@ -817,11 +1059,13 @@ export function buildSchool(): World {
   // ---------- music room ----------
   seed = 131;
   k.room("Music Room", 0, 11, 0, 10);
+  dirtRoom(0, 11, 0, 10, 3);
   {
     const f = new Fr(0.15, 5, Math.PI / 2);
     f.box(mBoardFrame, 5.32, 1.32, 0.03, 0, 0.79, 0.015);
     f.geo(boardMats.music, new THREE.PlaneGeometry(5.2, 1.2), 0, 1.45, 0.035);
     f.box(mBoardFrame, 5.3, 0.05, 0.1, 0, 0.78, 0.07);
+    boardTray(f, 6, 0.018);
     clock(0.15, 2.6, 5, Math.PI / 2);
     poster(0, 0.16, 1.6, 8.6, Math.PI / 2, 0.7);
     // carpet
@@ -921,7 +1165,7 @@ export function buildSchool(): World {
     for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; f.geo(mBlackP, beam([0, 0.3, 0], [Math.cos(a) * 0.25, 0, Math.sin(a) * 0.25], 0.007, 5)); }
     f.box(mBlackP, 0.5, 0.32, 0.01, 0, 0.98, 0.02, -0.35);
     f.box(mBlackP, 0.5, 0.03, 0.05, 0, 0.97, 0.06);
-    if (rnd() < 0.7) f.box(mPaper, 0.42, 0.28, 0.004, 0, 1.0, 0.03, -0.35);
+    if (rnd() < 0.8) for (const s of [-1, 1]) f.geo(mPapers[7], new THREE.PlaneGeometry(0.2, 0.28), s * 0.102, 1.142, 0.027, -0.35, s * 0.03);
   }
   function marimba(x: number, z: number) {
     const f = new Fr(x, z, 0);
@@ -995,12 +1239,14 @@ export function buildSchool(): World {
   // ---------- science lab ----------
   seed = 177;
   k.room("Science Lab", 11, 24, 0, 10);
+  dirtRoom(11, 24, 0, 10, 5);
+  litter(14, 23, 1, 9, 6);
   {
     const f = new Fr(11.15, 5, Math.PI / 2);
     f.box(mBoardFrame, 5.32, 1.32, 0.03, 0, 0.79, 0.015);
     f.geo(boardMats.lab, new THREE.PlaneGeometry(5.2, 1.2), 0, 1.45, 0.035);
     f.box(mBoardFrame, 5.3, 0.05, 0.1, 0, 0.78, 0.07);
-    for (let i = 0; i < 6; i++) f.inst(cylI, rr(-2.4, 2.4), 0.82, 0.08, [0.006, 0.06, 0.006], pick(["#f4f4ee", "#f2d64a"]), rr(0, 3), 0, Math.PI / 2);
+    boardTray(f, 8, 0.004);
     clock(11.15, 2.6, 5, Math.PI / 2);
     // periodic table on the corridor wall
     const pt = new Fr(17, 0.15, 0);
@@ -1406,7 +1652,7 @@ export function buildSchool(): World {
 
   // ---------- flush ----------
   B.flush(k);
-  for (const l of [boxI, bagI, shoeI, toeI, tagI, ballB, ballV, leafI, glassI, flaskI, bottleI, liquidI, cylI]) l.flush(k);
+  for (const l of [boxI, bagI, shoeI, toeI, ...tagLists, ballB, ballV, leafI, glassI, flaskI, bottleI, liquidI, cylI, gumI, crumbI, hexI, tipI, paperBallI, chairWoodI, chairSteelI, chairFootI, deskUnderI, deskBandI, deskFrameI, deskShelfI, deskFootI]) l.flush(k);
 
   // hider spawns: centre of the gym
   const hiders: THREE.Vector3[] = [];
