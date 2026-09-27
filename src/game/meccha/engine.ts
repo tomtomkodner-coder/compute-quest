@@ -3166,7 +3166,7 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
       if (e.button === 0) this.lmb = true;
       if (e.button === 2) {
         this.rmb = true;
-        if (this.me.armed && !this.hud.paintMode && (this.rs.ph === "hide" || (this.rs.ph === "hunt" && this.rs.s.hunterTps))) { this.tps = !this.tps; this.updateVisibility(this.me); this.emit(); }
+        this.toggleTps();
       }
       if (this.pointerLocked) {
         if (e.button === 0) this.fire();
@@ -3269,6 +3269,10 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
     this.emit();
   }
   /** 4 — תנועה חופשית של המצלמה (WASD, Shift מהר, רווח למעלה, Ctrl למטה) */
+  /** צייד: מעבר גוף ראשון/שלישי (כפתור ימני בעכבר, או כפתור בטלפון) */
+  toggleTps() {
+    if (this.me.armed && !this.hud.paintMode && (this.rs.ph === "hide" || (this.rs.ph === "hunt" && this.rs.s.hunterTps))) { this.tps = !this.tps; this.updateVisibility(this.me); this.emit(); }
+  }
   toggleFreeCam() {
     if (!this.deadOrSpec() && !this.freeLook) return;
     this.freeCam = !this.freeCam || this.rs.ph === "check";

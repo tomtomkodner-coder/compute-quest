@@ -1122,6 +1122,8 @@ function TouchControls({ hud, engine, onPose, onChat }: { hud: HudState; engine:
         {hud.phase === "check" && <button className={b} onClick={() => engine?.giveLike()}>👍</button>}
         {(hud.phase === "hide" || hud.phase === "check") && <button className={b} onClick={() => engine?.voteSkip()}>{t("Skip")}</button>}
         {hud.spectating !== null && <button className={b} onClick={() => engine?.cycleSpectate()}>{t("Next")}</button>}
+        {!hud.paintMode && hud.alive && <button className={`${b} touch-none`} onPointerDown={() => key("ControlLeft", true)} onPointerUp={() => key("ControlLeft", false)} onPointerCancel={() => key("ControlLeft", false)}>{t(hud.attached ? "Move Down" : "Crouch")}</button>}
+        {hud.myRole === "hunter" && hud.alive && (hud.phase === "hide" || hud.phase === "hunt") && <button className={b} onClick={() => engine?.toggleTps()}>{t("TPS")}</button>}
         <button className={b} onClick={onChat}>{t("Chat")}</button>
       </div>
     </>
