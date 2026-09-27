@@ -158,7 +158,7 @@ export function MecchaGame() {
   const back = () => setScreen("menu");
   const myName = (form.name || name).trim().slice(0, 30) || t("Player");
   const wrap = (el: React.ReactNode) => (
-    <div dir="ltr" style={{ fontFamily: FONT }} onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>{el}<RotateHint /></div>
+    <div dir="ltr" className="mc-bidi" style={{ fontFamily: FONT }} onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}><BidiStyle />{el}<RotateHint /></div>
   );
   if (screen === "splash") return wrap(<Splash ready={ready} onDone={() => setScreen("menu")} />);
   if (screen === "settings") return wrap(<SettingsScreen engine={null} inGame={false} muted={muted} onToggleMute={toggleMute} onClose={back} />);
@@ -322,9 +322,9 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   }[hud.phase];
 
   return (
-    <div className="fixed inset-0 bg-black select-none overflow-hidden text-white" dir="ltr" style={{ fontFamily: FONT }}
+    <div className="mc-bidi fixed inset-0 bg-black select-none overflow-hidden text-white" dir="ltr" style={{ fontFamily: FONT }}
       onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>
-      <RotateHint />
+      <RotateHint /><BidiStyle />
       <div ref={mountRef} className="absolute inset-0" />
 
       {error && (
@@ -670,7 +670,7 @@ function Opt<T extends string | number | boolean>({ label, value, options, onCha
       <span className="text-[13px] text-white/85">{t(label)}</span>
       <div className="flex items-center gap-1">
         <button disabled={disabled} onClick={() => step(isRtl() ? 1 : -1)} className="w-7 h-7 rounded bg-white/10 hover:bg-white/25 font-bold disabled:opacity-30">‹</button>
-        <span className="min-w-[128px] text-center text-[13px] font-bold truncate" dir="ltr">{t(options[i]?.n ?? "")}</span>
+        <span className="min-w-[60px] lg:min-w-[128px] text-center text-[13px] font-bold truncate" dir="ltr">{t(options[i]?.n ?? "")}</span>
         <button disabled={disabled} onClick={() => step(isRtl() ? -1 : 1)} className="w-7 h-7 rounded bg-white/10 hover:bg-white/25 font-bold disabled:opacity-30">›</button>
       </div>
     </div>
@@ -957,7 +957,7 @@ function ColorWheel({ color, onChange }: { color: string; onChange: (c: string) 
   return (
     <div className="relative w-[112px] h-[112px] shrink-0">
       <canvas ref={ref} width={S} height={S} className="w-full h-full rounded-full cursor-crosshair touch-none"
-        onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); pick(ev); }}
+        onPointerDown={(ev) => { try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ } pick(ev); }}
         onPointerMove={(ev) => { if (ev.buttons) pick(ev); }} />
       <span className="absolute w-3.5 h-3.5 rounded-full border-2 border-white shadow pointer-events-none -translate-x-1/2 -translate-y-1/2" style={{ left: `${mx}%`, top: `${my}%`, background: color }} />
     </div>
@@ -985,7 +985,7 @@ function Bar({ label, value, bg, onChange, max = 1, digits = 3 }: { label: strin
     <div className="flex items-center gap-1">
       {label && <span className="w-2.5 text-[9px] opacity-80">{label}</span>}
       <div className="relative flex-1 h-[11px] rounded-[2px] cursor-ew-resize touch-none" style={{ background: bg }}
-        onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); set(ev); }} onPointerMove={(ev) => { if (ev.buttons) set(ev); }}>
+        onPointerDown={(ev) => { try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ } set(ev); }} onPointerMove={(ev) => { if (ev.buttons) set(ev); }}>
         <span className="absolute top-[-1px] bottom-[-1px] w-[3px] bg-white border border-black -translate-x-1/2 pointer-events-none" style={{ left: `${(value / max) * 100}%` }} />
       </div>
       <input value={value.toFixed(digits)} onChange={(ev) => { const v = Number(ev.target.value); if (!Number.isNaN(v)) onChange(Math.max(0, Math.min(max, v))); }}
@@ -1002,7 +1002,7 @@ function VBar({ value, bg, onChange }: { value: number; bg: string; onChange: (v
   };
   return (
     <div className="relative w-[13px] h-[104px] cursor-ns-resize touch-none border border-white/20" style={{ background: bg }}
-      onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); set(ev); }} onPointerMove={(ev) => { if (ev.buttons) set(ev); }}>
+      onPointerDown={(ev) => { try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ } set(ev); }} onPointerMove={(ev) => { if (ev.buttons) set(ev); }}>
       <span className="absolute left-[-2px] right-[-2px] h-[3px] bg-white border border-black -translate-y-1/2 pointer-events-none" style={{ top: `${(1 - value) * 100}%` }} />
     </div>
   );
@@ -1117,7 +1117,7 @@ function TouchControls({ hud, engine, onPose, onChat }: { hud: HudState; engine:
         {hider && !hud.paintMode && <button className={b} onClick={() => engine?.whistle()}>♪</button>}
         {hud.attached && <button className={b} onClick={() => engine?.detach()}>{t("Leave")}</button>}
         {!hud.paintMode && <button className={`${b} ${run ? "!bg-[#ffd84d]" : ""}`} onClick={() => { key("ShiftLeft", !run); setRun(!run); }}>{t("Run")}</button>}
-        {!hud.paintMode && <button className={`${b} !bg-[#8ef56b] touch-none`} onPointerDown={(ev) => { ev.currentTarget.setPointerCapture(ev.pointerId); key("Space", true); }}
+        {!hud.paintMode && <button className={`${b} !bg-[#8ef56b] touch-none`} onPointerDown={(ev) => { try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ } key("Space", true); }}
           onPointerUp={() => key("Space", false)} onPointerCancel={() => key("Space", false)}>{t(hud.attached ? "Climb" : "Jump")}</button>}
         {hud.phase === "check" && <button className={b} onClick={() => engine?.giveLike()}>👍</button>}
         {(hud.phase === "hide" || hud.phase === "check") && <button className={b} onClick={() => engine?.voteSkip()}>{t("Skip")}</button>}
@@ -1149,7 +1149,7 @@ function Joystick({ onChange }: { onChange: (x: number, y: number) => void }) {
   }
   return (
     <div ref={base} className="absolute z-20 left-6 bottom-24 w-32 h-32 rounded-full bg-white/15 border-[3px] border-white/40" style={{ touchAction: "none" }}
-      onPointerDown={(ev) => { id.current = ev.pointerId; ev.currentTarget.setPointerCapture(ev.pointerId); move(ev); }}
+      onPointerDown={(ev) => { id.current = ev.pointerId; try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ } move(ev); }}
       onPointerMove={(ev) => { if (id.current === ev.pointerId) move(ev); }}
       onPointerUp={end} onPointerCancel={end}>
       <div className="absolute w-14 h-14 rounded-full bg-white/70 border-2 border-black left-1/2 top-1/2" style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }} />
@@ -1200,4 +1200,10 @@ function PtsPop({ v, d }: { v: number; d: number }) {
       <div className="text-xs font-bold opacity-90">{t("Hunter nearby")} · {t("{n} m", { n: d })}</div>
     </div>
   );
+}
+
+/** עברית/ערבית אמיתיות: המסכים ממוקמים משמאל לימין, אבל כל שורת טקסט מקבלת את הכיוון של השפה שלה
+ * (אחרת "…", נקודות, סוגריים ומספרים נופלים בצד הלא נכון) */
+function BidiStyle() {
+  return <style>{".mc-bidi *{unicode-bidi:plaintext}.mc-bidi input,.mc-bidi textarea{unicode-bidi:plaintext}"}</style>;
 }

@@ -564,6 +564,7 @@ export function setLabel(ch: Character, text: string | null, color = "#ffffff", 
   g.shadowColor = "rgba(0,0,0,0.85)";
   g.shadowBlur = 6;
   g.font = `700 30px ${LABEL_FONT}`;
+  g.direction = /[\u0590-\u08FF]/.test(text) ? "rtl" : "ltr"; // שם בעברית/ערבית — כיוון נכון
   g.fillStyle = color;
   g.fillText(text, 160, 70);
   if (likes > 0) {

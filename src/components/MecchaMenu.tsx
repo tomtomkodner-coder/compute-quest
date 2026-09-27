@@ -138,7 +138,7 @@ function Field({ label, value, max, onChange, type }: { label: string; value: st
     <label className="block" style={{ marginBottom: U(26) }}>
       <div className="font-bold text-white" style={{ fontSize: U(30) }}>{t(label)}</div>
       <div className="relative" style={{ marginTop: U(8) }}>
-        <input value={value} type={type} maxLength={max} onChange={(e) => onChange(e.target.value)} className="w-full text-center text-white outline-none bg-white/15 focus:bg-white/25"
+        <input dir="auto" value={value} type={type} maxLength={max} onChange={(e) => onChange(e.target.value)} className="w-full text-center text-white outline-none bg-white/15 focus:bg-white/25"
           style={{ height: U(58), fontSize: U(34) }} />
         <span className="absolute font-bold" style={{ right: U(8), top: U(-30), fontSize: U(20), color: GREEN }}>{value.length}/{max}</span>
       </div>
