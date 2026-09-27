@@ -137,7 +137,7 @@ export async function createP2PNet(code: string, host: boolean, opts: ServerOpts
   const hostId = PREFIX + code.toUpperCase();
   const peer: PeerType = host ? new Peer(hostId) : new Peer();
   const myId = await new Promise<string>((resolve, reject) => {
-    const t = window.setTimeout(() => reject(new Error("timeout")), 12000);
+    const t = window.setTimeout(() => reject(new Error("Connection timed out")), 12000);
     peer.on("open", (id) => { window.clearTimeout(t); resolve(id); });
     peer.on("error", (e: { type?: string }) => {
       window.clearTimeout(t);

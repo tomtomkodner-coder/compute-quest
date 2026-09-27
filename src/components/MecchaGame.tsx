@@ -68,6 +68,14 @@ const ALL_POSES: PoseId[] = [
   "squat", "run", "salute", "armscross", "point", "wave", "hugknees", "flamingo", "fly", "dab", "lean",
 ];
 const POSE_PAGES: PoseId[][] = [ALL_POSES.slice(0, 12), ALL_POSES.slice(12, 24), ALL_POSES.slice(24)];
+// שמות התנוחות (מוצגים בגלגל — מתורגמים)
+const POSE_NAMES: Record<PoseId, string> = {
+  stand: "Stand", sit: "Sit", lie: "Lie Down", spread: "Star Jump", lump: "Rock", cactus: "Cactus", surrender: "Hands Up", side: "Lie on Side",
+  crosslegged: "Cross-Legged", bridge: "Bridge", onehand: "Raise Hand", bend: "Bow", tpose: "T-Pose", hips: "Hands on Hips", handstand: "Handstand",
+  banzai: "Banzai", zazen: "Zazen", airplane: "Airplane", thinker: "Thinker", bolt: "Lightning", glico: "Glico", kneel: "Kneel", prone: "Lie Face Down",
+  curl: "Curl Up", squat: "Squat", run: "Running", salute: "Salute", armscross: "Arms Crossed", point: "Point", wave: "Wave", hugknees: "Hug Knees",
+  flamingo: "Flamingo", fly: "Fly", dab: "Dab", lean: "Lean", crouch: "Crouch",
+};
 const SIZE_LIST: { id: SizeId; name: string }[] = [{ id: "normal", name: "Normal" }, { id: "petit", name: "Petit Chameleon" }];
 const BODY_LIST: { id: BodyType; name: string }[] = [{ id: "normal", name: "Normal" }, { id: "cube", name: "Cube" }, { id: "plump", name: "Plump" }];
 
@@ -119,7 +127,7 @@ export function MecchaGame() {
   }, [roomNet, screen]);
 
   useEffect(() => {
-    setName(loadName() || `Player${Math.floor(Math.random() * 900 + 100)}`);
+    setName(loadName() || `${t("Player")}${Math.floor(Math.random() * 900 + 100)}`);
     applySavedSettings(null); // עוצמות שמורות גם לצלילי התפריט
     try { if (localStorage.getItem("meccha_mute") === "1") { setMuted(true); setSoundMuted(true); } } catch { /* ignore */ }
     setColor(PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)]);
@@ -135,7 +143,7 @@ export function MecchaGame() {
     setMuted((m) => { setSoundMuted(!m); try { localStorage.setItem("meccha_mute", m ? "0" : "1"); } catch { /* ignore */ } return !m; });
   }
   function go(c: Conn) {
-    saveName(name.trim() || "Player");
+    saveName(name.trim() || t("Player"));
     setConn(c);
     setRunId((r) => r + 1);
     setScreen("game");
@@ -143,12 +151,12 @@ export function MecchaGame() {
 
   if (screen === "game")
     return (
-      <GameView key={runId} conn={conn} roomNet={roomNet ?? null} name={name.trim().slice(0, 14) || "Player"} color={color}
+      <GameView key={runId} conn={conn} roomNet={roomNet ?? null} name={name.trim().slice(0, 14) || t("Player")} color={color}
         muted={muted} onToggleMute={toggleMute} onExit={() => setScreen("menu")} />
     );
 
   const back = () => setScreen("menu");
-  const myName = (form.name || name).trim().slice(0, 30) || "Player";
+  const myName = (form.name || name).trim().slice(0, 30) || t("Player");
   const wrap = (el: React.ReactNode) => (
     <div dir="ltr" style={{ fontFamily: FONT }} onClickCapture={(ev) => { if ((ev.target as HTMLElement).closest?.("button")) sfxClick(); }}>{el}<RotateHint /></div>
   );
@@ -224,6 +232,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [missedOpen, setMissedOpen] = useState(false);
   const poseHover = useRef<PoseId | null>(null);
+  const panelsRef = useRef(false);
 
   useEffect(() => {
     const coarse = window.matchMedia("(pointer: coarse)").matches;
@@ -252,7 +261,11 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           if (poseHover.current) eng?.setPose(poseHover.current); // משחררים R = בוחרים
           setPoseMenu(false);
         };
-        eng.onOptions = () => setOptionsOpen((v) => !v);
+        eng.onOptions = () => {
+          // Esc סוגר קודם חלון פתוח (הגדרות מפה / דמות) ורק אחר כך פותח את ההגדרות
+          if (panelsRef.current) { setSettingsOpen(false); setCharOpen(false); return; }
+          setOptionsOpen((v) => !v);
+        };
         eng.onInteract = () => setSettingsOpen(true);
         eng.onChatKey = () => setChatOpen(true);
         eng.onTab = () => setMissedOpen((v) => !v);
@@ -301,6 +314,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
 
   const e = engineRef.current;
   const overlayOpen = settingsOpen || charOpen || chatOpen || optionsOpen;
+  panelsRef.current = settingsOpen || charOpen;
   const hider = !!hud && hud.alive && hud.myRole === "hider" && hud.phase !== "check";
   const hunter = !!hud && hud.myRole === "hunter" && (hud.phase === "hide" || hud.phase === "hunt");
   const phaseTitle = !hud ? "" : {
@@ -351,7 +365,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
                     <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-black" style={{ background: p.color }} />
                     <span className="truncate">{p.name}{p.me ? ` ${t("(You)")}` : ""}</span>
                     {p.host && <span className="text-[#ffd23f]">★</span>}
-                    {p.onPad && !p.bot && <span className="text-[#ff4d4d]">HUNTER</span>}
+                    {p.onPad && !p.bot && <span className="text-[#ff4d4d]">{t("HUNTER")}</span>}
                   </div>
                 ))}
               </div>
@@ -443,7 +457,7 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
                 <circle cx="22" cy="22" r="11" fill="none" stroke="#000" strokeWidth="0.8" />
                 <circle cx="22" cy="22" r="2" fill="#fff" stroke="#000" strokeWidth="0.6" />
               </svg>
-              {hud.tps && <div className="absolute top-[58%] text-xs font-bold" style={{ textShadow: OUTLINE }}>TPS</div>}
+              {hud.tps && <div className="absolute top-[58%] text-xs font-bold" style={{ textShadow: OUTLINE }}>{t("TPS")}</div>}
             </div>
           )}
           {hud.phase === "check" && !overlayOpen && (
@@ -571,7 +585,7 @@ function KeyColumn({ hud, hider, hunter }: { hud: HudState; hider: boolean; hunt
       {row(<KeyBox k="2" on={hud.nameplates} />, "Toggle Nameplate Display")}
       {row(<KeyBox k="3" on={hud.xray} />, "Toggle X-Ray Rendering")}
       {hider && row(<KeyBox k="5" color={hud.freeLook ? "#27c93f" : "#ff7ad9"} />, "Switch to Free Camera")}
-      {hud.phase === "hide" && row(<KeyBox k="Y" on={hud.votes.mine} />, `Skip (${hud.votes.have}/${hud.votes.need})`)}
+      {hud.phase === "hide" && row(<KeyBox k="Y" on={hud.votes.mine} />, `${t("Skip")} (${hud.votes.have}/${hud.votes.need})`)}
       {hunter && hud.phase === "hunt" && hud.settings.hunterTps && row(<KeyBox k="RMB" />, "FPS / TPS")}
     </div>
   );
@@ -663,7 +677,7 @@ function Opt<T extends string | number | boolean>({ label, value, options, onCha
   );
 }
 
-const secs = (list: number[]) => list.map((v) => ({ v, n: v >= 60 ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}` : isRtl() ? `${v} שנ׳` : `${v}s` }));
+const secs = (list: number[]) => list.map((v) => ({ v, n: v >= 60 ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}` : t("{n}s", { n: v }) }));
 const nums = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => ({ v: a + i, n: String(a + i) }));
 const onOff = [{ v: true, n: "ON" }, { v: false, n: "OFF" }];
 
@@ -873,15 +887,16 @@ function PoseWheel({ icons, current, hover, onPick, onClose, touch }: { icons: R
           return (
             <button key={p} onPointerEnter={() => { if (!touch) pick(p); }} onClick={() => { pick(p); onPick(p); if (touch) onClose(); }}
               className={`absolute -translate-x-1/2 -translate-y-1/2 w-[72px] h-[72px] rounded-full border-4 grid place-items-center overflow-hidden transition-transform ${on ? "bg-[#4cc9f0] border-[#0b5f8a] scale-110" : "bg-white/90 border-black/60"}`}
-              style={{ left: x, top: y }} aria-label={p}>
+              style={{ left: x, top: y }} aria-label={t(POSE_NAMES[p])} title={t(POSE_NAMES[p])}>
               {icons[p] ? <img src={icons[p]} alt="" className="w-[66px] h-[66px] pointer-events-none" draggable={false} /> : null}
             </button>
           );
         })}
         {/* לוחצים על המרכז כדי לעבור עמוד */}
         <button onClick={() => { setPage((page + 1) % POSE_PAGES.length); setHl(null); hover.current = null; }}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-black/60 border-4 border-white/70 font-bold text-lg" aria-label="Next page">
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-black/60 border-4 border-white/70 font-bold text-lg" aria-label={t("Next page")}>
           {page + 1}/{POSE_PAGES.length}
+          <span className="block text-[11px] leading-tight px-1 truncate">{t(POSE_NAMES[hl ?? current] ?? "")}</span>
         </button>
       </div>
     </div>
@@ -1038,7 +1053,7 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
             <Bar label="V" value={hsv.v} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} />
             <Bar label="A" value={hud.alpha} bg={`linear-gradient(90deg,transparent,${hud.color}), ${CHECKER}`} onChange={(v) => engine?.setBrush({ alpha: v })} />
             <div className="flex items-center gap-1">
-              <span className="text-[9px] opacity-80 whitespace-nowrap">Hex sRGB</span>
+              <span className="text-[9px] opacity-80 whitespace-nowrap">{t("Hex sRGB")}</span>
               <input value={hexText} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9a-f]/gi, "").slice(0, 8); setHexText(v); if (v.length >= 6) set("#" + v.slice(0, 6).toLowerCase()); }}
                 className="w-full bg-black/60 border border-white/15 rounded-[2px] px-1 text-[9px] uppercase outline-none" />
             </div>
@@ -1073,7 +1088,7 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
             <div className="flex items-center gap-1.5"><span className="w-4 text-center">◎</span><KeyBox k="RMB" /><span>{t("Brush Size")}</span></div>
             <div className="flex items-center gap-1.5"><span className="w-4 text-center">☀</span><KeyBox k="V" on={hud.shadow} /><span>{t(hud.shadow ? "Shadow" : "Shadow OFF")}</span></div>
             <div className="flex items-center gap-1.5"><span className="w-4 text-center">⟲</span><KeyBox k="MMB" /><span>{t("Rotate Camera")}</span></div>
-            <div className="flex items-center gap-1.5"><span className="w-4 text-center">⌕</span><KeyBox k="Wheel" /><span>{t("Zoom")}</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-4 text-center">⌕</span><KeyBox k={t("Wheel")} /><span>{t("Zoom")}</span></div>
             <div className="flex items-center gap-1.5"><span className="w-4 text-center">✕</span><KeyBox k="F" /><span>{t("Paint Mode")}</span></div>
           </div>
         )}
@@ -1182,7 +1197,7 @@ function PtsPop({ v, d }: { v: number; d: number }) {
     <div className="absolute left-1/2 top-[38%] z-30 pointer-events-none font-black text-center" style={{ color, textShadow: OUTLINE, fontSize: 22 + near * 10, animation: "ptsUp 1.1s ease-out forwards", translate: "-50% 0" }}>
       <style>{"@keyframes ptsUp{0%{opacity:0;transform:translateY(10px) scale(.8)}15%{opacity:1;transform:translateY(0) scale(1.1)}100%{opacity:0;transform:translateY(-60px) scale(1)}}"}</style>
       +{v}
-      <div className="text-xs font-bold opacity-90">{t("Hunter nearby")} · {d}m</div>
+      <div className="text-xs font-bold opacity-90">{t("Hunter nearby")} · {t("{n} m", { n: d })}</div>
     </div>
   );
 }

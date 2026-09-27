@@ -1241,7 +1241,7 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
       keep.add(pr.id);
       let p = this.players.get(pr.id);
       if (!p) {
-        p = this.makePlayer(pr.id, String(pr.p.n ?? "Player").slice(0, 16), HEX.test(String(pr.p.c)) ? String(pr.p.c) : "#ffffff", false, false);
+        p = this.makePlayer(pr.id, String(pr.p.n ?? t("Player")).slice(0, 16), HEX.test(String(pr.p.c)) ? String(pr.p.c) : "#ffffff", false, false);
         const pos = pr.p.p as number[] | undefined;
         if (Array.isArray(pos) && pos.length === 3 && pos.every(Number.isFinite)) { p.pos.set(pos[0], pos[1], pos[2]); p.tpos.copy(p.pos); }
         this.addChat("", "#aaaaaa", t("{n} joined", { n: p.name }));
@@ -1268,6 +1268,11 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
     const pos = pr.p as number[] | undefined;
     if (Array.isArray(pos) && pos.length === 3 && pos.every(Number.isFinite)) p.tpos.set(pos[0], pos[1], pos[2]);
     if (Number.isFinite(pr.y)) p.tyaw = pr.y;
+    // הצבעת דילוג, לייקים ונקודות נקראים גם בבדיקת התשובות
+    if (Number.isFinite(pr.am)) p.ammo = pr.am;
+    if (Number.isFinite(pr.pts)) p.pts = pr.pts;
+    if (Number.isFinite(pr.lk) && pr.lk !== p.likes) { p.likes = pr.lk; this.updateLabel(p); }
+    p.vote = typeof pr.vo === "string" ? pr.vo : "";
     if (p.display) { this.syncClones(p, pr.cl); return; } // בבדיקת התשובות: נשארים מקובעים כפי שהיו
     if (Number.isInteger(pr.po)) p.pose = idxPose(pr.po);
     const bt = Number.isInteger(pr.bt) ? idxBody(pr.bt) : p.bodyType;
@@ -1277,10 +1282,6 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
     p.moving = !!pr.mv;
     if (Number.isFinite(pr.cy)) p.camYaw = pr.cy;
     if (Number.isFinite(pr.cp)) p.camPitch = pr.cp;
-    if (Number.isFinite(pr.am)) p.ammo = pr.am;
-    if (Number.isFinite(pr.pts)) p.pts = pr.pts;
-    if (Number.isFinite(pr.lk) && pr.lk !== p.likes) { p.likes = pr.lk; this.updateLabel(p); }
-    p.vote = typeof pr.vo === "string" ? pr.vo : "";
     this.syncClones(p, pr.cl);
   }
 
@@ -1767,7 +1768,7 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
       const id = `bot-${i}`;
       const has = this.players.has(id);
       if (i < want && !has) {
-        const p = this.makePlayer(id, BOT_NAMES[i], BOT_COLORS[i], true, false);
+        const p = this.makePlayer(id, t(BOT_NAMES[i]), BOT_COLORS[i], true, false);
         this.spawnInLobby(p);
         p.ai = this.newAI();
       } else if (i >= want && has) this.removePlayer(id);
@@ -3526,7 +3527,7 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
     const pad = this.world.lobby?.pad;
     h.players = [...this.players.values()].map((p) => ({
       id: p.id, name: p.name, color: p.color, role: pre ? "hider" : p.role, alive: p.alive, bot: p.bot, me: p.local,
-      host: p.id === this.hostId || (p.local && this.isHost()), pts: Math.floor(p.pts), likes: p.likes,
+      host: p.id === this.hostId || (p.local && this.isHost()), pts: Math.floor(p.pts), likes: p.local ? this.likes : p.likes,
       onPad: !!pad && pre && Math.hypot(p.pos.x - pad.x, p.pos.z - pad.z) < pad.r, ammo: p.ammo,
     }));
     const double = rs.s.mode === "double";

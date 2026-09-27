@@ -67,7 +67,7 @@ export function Splash({ ready, onDone }: { ready: Promise<unknown>; onDone: () 
           <div className="h-full rounded-full transition-[width] duration-100"
             style={{ width: `${p}%`, backgroundImage: "linear-gradient(90deg,#ff3d7f,#ffb700,#7cf23a,#3ec7ff,#b04dff,#ff3d7f)", backgroundSize: "200% 100%", animation: "mcLoad 1.2s linear infinite" }} />
         </div>
-        <div className="mt-2 text-center text-white font-bold tracking-wider text-[18px]" style={{ textShadow: "0 2px 6px #000" }}>Now Loading… {Math.floor(p)}%</div>
+        <div className="mt-2 text-center text-white font-bold tracking-wider text-[18px]" style={{ textShadow: "0 2px 6px #000" }}>{t("Now Loading…")} {Math.floor(p)}%</div>
       </div>
       <style>{`@keyframes mcLoad{from{background-position:0 0}to{background-position:200% 0}}`}</style>
     </div>
@@ -112,7 +112,7 @@ export function MainMenu({ onCreate, onFind, onSettings, onQuit, onMaps, onCredi
           <path d="M20 2 L20 38 M44 8 L44 44" stroke="#0a3a10" strokeWidth="3" />
           <path d="M26 30 L34 18 L40 30 Z" fill="#0a3a10" /><circle cx="52" cy="14" r="3" fill="#0a3a10" />
         </svg>
-        <span className="font-black leading-none" style={{ color: GREEN, fontSize: U(30), marginTop: U(-8) }}>MAPS</span>
+        <span className="font-black leading-none" style={{ color: GREEN, fontSize: U(30), marginTop: U(-8) }}>{t("MAPS")}</span>
       </button>
       {/* קרדיטים */}
       <button onClick={onCredits} className="absolute grid place-items-center font-bold text-white hover:text-[#5dff5d]"
@@ -156,6 +156,7 @@ export function ServerScreen({ mode, form, setForm, results, note, onPrimary, on
 }) {
   useLangTick();
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onBack(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onBack]);
+  const [modSpin, setModSpin] = useState(false);
   const tog = (tag: string) => setForm({ ...form, tags: form.tags.includes(tag) ? form.tags.filter((x) => x !== tag) : [...form.tags, tag] });
   return (
     <Stage bg={MENU_BG} dim={0.25}>
@@ -208,7 +209,7 @@ export function ServerScreen({ mode, form, setForm, results, note, onPrimary, on
       <div className="absolute" style={{ left: U(90), top: U(mode === "find" ? 905 : 850), width: U(1760), height: U(mode === "find" ? 120 : 175), background: "linear-gradient(90deg,#b0158a,#e0158a)" }}>
         <div className="font-bold text-white" style={{ fontSize: U(26), padding: U(10) }}>{t("Downloaded Mods")}</div>
         <div className="absolute text-center text-white" style={{ left: 0, right: 0, bottom: U(8), fontSize: U(20) }}>
-          <span className="inline-block bg-[#ff2fa8]" style={{ padding: `${U(3)} ${U(40)}` }}>{t("Refresh Mod Download Status")}</span>
+          <button onClick={() => { setModSpin(true); window.setTimeout(() => setModSpin(false), 700); }} className={`inline-block bg-[#ff2fa8] hover:brightness-125 ${modSpin ? "animate-pulse" : ""}`} style={{ padding: `${U(3)} ${U(40)}` }}>{modSpin ? "…" : t("Refresh Mod Download Status")}</button>
         </div>
       </div>
       {mode === "create" && (
@@ -224,6 +225,7 @@ export function ServerScreen({ mode, form, setForm, results, note, onPrimary, on
 // ---------- גלריית MAPS ----------
 export function MapsScreen({ maps, onBack }: { maps: { id: string; name: string }[]; onBack: () => void }) {
   useLangTick();
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onBack(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onBack]);
   return (
     <Stage bg={MENU_BG} dim={0.55}>
       <div className="absolute overflow-auto grid grid-cols-4" style={{ left: U(90), top: U(70), right: U(90), bottom: U(80), gap: U(18) }}>
@@ -344,7 +346,7 @@ export function SettingsScreen({ engine, inGame, muted, onToggleMute, onClose, o
             <button onClick={() => { upd({ res: g.res }); if (fullscreen > 0) document.documentElement.requestFullscreen?.().catch(() => {}); else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); }}
               className="w-full font-bold text-white hover:text-[#5dff5d]" style={{ height: U(52), fontSize: U(30), marginBottom: U(6), background: "#101010", border: `${U(3)} solid ${GREEN}` }}>{t("Apply Resolution/Screen Mode")}</button>
             <SSlider label="Motion Blur" value={g.motionBlur} min={0} max={100} step={5} text={`${g.motionBlur} %`} onChange={(v) => upd({ motionBlur: v })} />
-            <SSlider label="Frame Rate Limit" value={g.fpsLimit || 241} min={30} max={241} step={1} text={g.fpsLimit ? `${g.fpsLimit}fps` : t("Unlimited")} onChange={(v) => upd({ fpsLimit: v > 240 ? 0 : v })} />
+            <SSlider label="Frame Rate Limit" value={g.fpsLimit || 241} min={30} max={241} step={1} text={g.fpsLimit ? t("{n} fps", { n: g.fpsLimit }) : t("Unlimited")} onChange={(v) => upd({ fpsLimit: v > 240 ? 0 : v })} />
             <SChoice label="VSync" value={g.fpsLimit ? 1 : 0} options={["OFF", "ON"]} onChange={(i) => upd({ fpsLimit: i ? 60 : 0 })} />
             <SChoice label="Shadow quality" value={g.shadow} options={LEVELS} onChange={(i) => upd({ shadow: i })} />
             <SChoice label="Texture quality" value={g.texture} options={LEVELS} onChange={(i) => upd({ texture: i })} />

@@ -32,7 +32,7 @@ export function t(s: string, vars?: Record<string, string | number>) {
   return out;
 }
 
-const HE: Record<string, string> = {
+export const HE: Record<string, string> = {
   // תפריט ראשי
   "Home": "בית", "Quit": "יציאה", "Find Server": "מציאת שרת", "Offline (with Bots)": "לא מקוון (עם בוטים)",
   "Server Name": "שם השרת", "Password": "סיסמה", "(none)": "(ללא)", "Max Players": "מספר שחקנים מרבי", "Wrong password": "סיסמה שגויה", "Server is full": "השרת מלא",
