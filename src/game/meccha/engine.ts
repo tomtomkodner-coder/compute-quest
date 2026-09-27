@@ -504,6 +504,7 @@ export class Engine {
     this.offs.push(net.on("like", (d, f) => this.onLike(d as { to: string }, f)));
     this.offs.push(net.on("chat", (d, f) => this.onChat(d as { m: string }, f)));
     this.offs.push(net.on("find", (d, f) => this.onFind(d as { t: string }, f)));
+    this.offs.push(net.on("balls", (d) => this.onBalls(d as number[][])));
     this.offs.push(net.onPeers(() => this.syncPeers()));
     window.setTimeout(() => { if (!this.disposed) this.net.emit("paintreq", {}); }, 2500);
 
@@ -675,7 +676,8 @@ export class Engine {
   private keyDir = new THREE.Vector3(0, 1, 0);
   private pointBase: number[] = [];
   private spinners: { o: THREE.Object3D; axis: THREE.Vector3; speed: number }[] = [];
-  private pushBalls: { im: THREE.InstancedMesh; i: number; p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3; v: THREE.Vector3; r: number; y0: number }[] = [];
+  private pushBalls: { im: THREE.InstancedMesh; i: number; p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3; v: THREE.Vector3; r: number; y0: number; own?: number; still?: boolean }[] = [];
+  private ballSendT = 0;
   private pushMeshes = new Set<THREE.InstancedMesh>();
   private boingT = 0;
   private flowMats: { m: THREE.MeshStandardMaterial; f: [number, number] }[] = [];
@@ -824,8 +826,10 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
     }
     for (const s of this.spinners) s.o.rotateOnAxis(s.axis, s.speed * dt);
     if (!this.pushBalls.length) return;
+    // רק גופים שהלקוח הזה אחראי עליהם דוחפים (אני, והבוטים אצל המארח); השאר מגיע ברשת (הודעת "balls")
     const bodies: THREE.Vector3[] = [];
-    for (const p of this.players.values()) if (p.ch.root.visible) bodies.push(p.pos);
+    const nowMs = performance.now();
+    for (const p of this.players.values()) if (p.ch.root.visible && (p.local || (p.bot && this.isHost()) || this.net.kind === "local")) bodies.push(p.pos);
     const B = this.world.bounds, obs = this.world.obstacles, balls = this.pushBalls;
     this.boingT -= dt;
     for (const b of balls) {
@@ -836,6 +840,7 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
         const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0, push = R - d;
         b.p.x += nx * push; b.p.z += nz * push;
         b.v.x += nx * push * 16; b.v.z += nz * push * 16;
+        b.own = nowMs; b.still = false;
         if (push > 0.05 && this.boingT <= 0 && !this.opts.muted) { this.boingT = 0.2; playTone(260 + Math.random() * 120, 0.09, "sine", 0.05); }
       }
     }
@@ -847,8 +852,22 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
       if (d >= R || d < 1e-4) continue;
       const nx = dx / d, nz = dz / d, o = (R - d) / 2;
       a.p.x -= nx * o; a.p.z -= nz * o; c.p.x += nx * o; c.p.z += nz * o;
+      if ((a.own ?? -1e9) > nowMs - 1500) c.own = Math.max(c.own ?? 0, a.own!); else if ((c.own ?? -1e9) > nowMs - 1500) a.own = c.own;
       const rel = (c.v.x - a.v.x) * nx + (c.v.z - a.v.z) * nz;
       if (rel < 0) { a.v.x += nx * rel * 0.9; a.v.z += nz * rel * 0.9; c.v.x -= nx * rel * 0.9; c.v.z -= nz * rel * 0.9; }
+    }
+    this.ballSendT -= dt;
+    if (this.net.kind !== "local" && this.ballSendT <= 0) {
+      this.ballSendT = 0.1;
+      const out: number[][] = [];
+      balls.forEach((b, i) => {
+        // שולחים כל עוד דחפנו לאחרונה או שהכדור עדיין מתגלגל, ועוד פעם אחת כשנעצר
+        const age = nowMs - (b.own ?? -1e9), moving = Math.hypot(b.v.x, b.v.z) > 0.01;
+        if (age > 10000 || (age > 1500 && !moving && b.still)) return;
+        b.still = !moving && age > 1500;
+        out.push([i, r2(b.p.x), r2(b.p.z), r2(b.v.x), r2(b.v.z)]);
+      });
+      if (out.length) this.net.emit("balls", { w: this.worldId, b: out });
     }
     const t = performance.now() / 1000, m4 = new THREE.Matrix4(), rq = new THREE.Quaternion(), ax = new THREE.Vector3();
     for (const b of balls) {
@@ -1321,6 +1340,22 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
       if (bt !== p.bodyType) this.setModel(p, p.armed, bt);
       const sz = idxSize(b.sz);
       if (sz !== p.size) { p.size = sz; if (!p.armed) setSize(p.ch, sz); }
+    }
+  }
+
+  /** בלונים/כדורים שמישהו אחר דחף: מאמצים את המיקום והמהירות שלו */
+  private onBalls(d: unknown) {
+    const m = d as { w?: string; b?: number[][] } | null;
+    if (!m || m.w !== this.worldId || !Array.isArray(m.b)) return;
+    const now = performance.now(), m4 = new THREE.Matrix4();
+    for (const e of m.b) {
+      if (!Array.isArray(e) || e.length < 5 || !e.every(Number.isFinite)) continue;
+      const b = this.pushBalls[e[0]];
+      if (!b || (b.own ?? -1e9) > now - 400) continue; // אני דוחף אותו עכשיו — המקומי קובע
+      b.p.x = e[1]; b.p.z = e[2]; b.v.x = e[3]; b.v.z = e[4];
+      m4.compose(b.p, b.q, b.s);
+      b.im.setMatrixAt(b.i, m4);
+      b.im.instanceMatrix.needsUpdate = true;
     }
   }
 
