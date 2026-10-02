@@ -689,7 +689,7 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
   const u = (n: number) => `calc(var(--u) * ${n})`;
   const panel: React.CSSProperties = { background: "rgba(28,28,28,0.62)", borderRadius: u(8), padding: `${u(26)} ${u(30)}` };
   const pic = s.map === "random" ? null : THUMBS[s.map];
-  const bodies: { id: BodyType; n: string }[] = [{ id: "normal", n: "v1.0" }, { id: "cube", n: "v1.6" }, { id: "plump", n: "v1.7" }];
+  const bodies: { id: BodyType; n: string }[] = [{ id: "normal", n: "Default" }, { id: "cube", n: "Cube" }, { id: "plump", n: "Plump" }];
   const onOffOpts = [{ v: true, n: "On" }, { v: false, n: "Off" }];
   return (
     <div className="absolute inset-0 z-40 grid place-items-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
@@ -726,7 +726,7 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
                   background: hud.bodyType === b.id ? "radial-gradient(circle at 50% 35%,#5cff63 0%,#1fc226 55%,#0d7a12 100%)" : "radial-gradient(circle at 50% 35%,#4a4a4a 0%,#262626 60%,#141414 100%)",
                   boxShadow: hud.bodyType === b.id ? `0 0 ${u(16)} rgba(60,255,70,.55), inset 0 0 0 ${u(3)} #8dff8f` : `inset 0 0 0 ${u(2)} rgba(255,255,255,.12)` }}>
                 <BodyIcon kind={b.id} size={u(104)} />
-                <span className="font-bold text-white" style={{ fontSize: u(21), textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>{b.n}</span>
+                <span className="font-bold text-white" style={{ fontSize: u(21), textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>{t(b.n)}</span>
               </button>
             ))}
           </div>
@@ -1063,7 +1063,6 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
           <div className="flex gap-1.5 items-start">
             <ColorWheel color={hud.color} onChange={set} />
             <VBar value={hsv.v} bg={`linear-gradient(${hsvToHex(hsv.h, hsv.s, 1)},#000)`} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} />
-            <VBar value={hud.alpha} bg={`linear-gradient(${hud.color},transparent), ${CHECKER}`} onChange={(v) => engine?.setBrush({ alpha: v })} />
             <div className="grid gap-1 flex-1">
               <div className="h-[34px] border border-white/20 grid">
                 <div style={{ background: preview(col) }} />
@@ -1080,8 +1079,7 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
             <Bar label="S" value={hsv.s} bg={`linear-gradient(90deg,#fff,${hsvToHex(hsv.h, 1, 1)})`} onChange={(v) => set(hsvToHex(hsv.h, v, hsv.v))} />
             <Bar label="B" value={b} bg={`linear-gradient(90deg,#000,#00f)`} onChange={(v) => setRgb(2, v)} />
             <Bar label="V" value={hsv.v} bg={`linear-gradient(90deg,#000,${hsvToHex(hsv.h, hsv.s, 1)})`} onChange={(v) => set(hsvToHex(hsv.h, hsv.s, v))} />
-            <Bar label="A" value={hud.alpha} bg={`linear-gradient(90deg,transparent,${hud.color}), ${CHECKER}`} onChange={(v) => engine?.setBrush({ alpha: v })} />
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 col-span-2">
               <span className="text-[9px] opacity-80 whitespace-nowrap">{t("Hex sRGB")}</span>
               <input value={hexText} onChange={(ev) => { const v = ev.target.value.replace(/[^0-9a-f]/gi, "").slice(0, 8); setHexText(v); if (v.length >= 6) set("#" + v.slice(0, 6).toLowerCase()); }}
                 className="w-full bg-black/60 border border-white/15 rounded-[2px] px-1 text-[9px] uppercase outline-none" />
@@ -1105,7 +1103,6 @@ function PaintPanel({ hud, engine, touch }: { hud: HudState; engine: Engine | nu
             <span />
             <span className="-mt-1 text-[9px] opacity-80">{t("Emissive")}</span>
           </div>
-          <label className="flex items-center gap-1 text-[9px]"><input type="checkbox" checked={engine?.overwritePick ?? true} onChange={(e) => engine?.setOverwritePick(e.target.checked)} className="w-2.5 h-2.5" /> {t("Overwrite color picker on sample")}</label>
           <button onPointerDown={() => engine?.setPicking(!hud.picking)} className={`rounded py-1.5 font-bold flex items-center justify-center gap-1.5 ${hud.picking ? "bg-[#ffd23f] text-black" : "bg-white/10"}`}>
             <span className="w-3.5 h-3.5 bg-white rounded-[2px]" /> {t("3D Eyedropper")}
           </button>
