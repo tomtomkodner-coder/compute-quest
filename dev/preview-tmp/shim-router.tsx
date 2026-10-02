@@ -1,0 +1,1 @@
+export function Link({ children, className }: { children?: React.ReactNode; className?: string; to?: string }) { return <a href="#" onClick={(e) => { e.preventDefault(); location.reload(); }} className={className}>{children}</a>; }
