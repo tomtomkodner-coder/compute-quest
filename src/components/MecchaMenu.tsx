@@ -119,6 +119,7 @@ export function MainMenu({ onCreate, onFind, onSettings, onQuit, onMaps, onCredi
         style={{ left: U(1478), top: U(940), width: U(398), height: U(121), fontSize: U(38), background: "linear-gradient(#2c2c2c,#121212)", border: `${U(3)} solid ${GREEN}` }}>
         {t("Credits")}
       </button>
+      <UpdateButton />
     </Stage>
   );
 }
@@ -408,10 +409,41 @@ export function CreditsScreen({ onBack }: { onBack: () => void }) {
         <div className="font-bold" style={{ fontSize: U(40), color: "#5dff5d" }}>{t("Credits")}</div>
         <div style={{ fontSize: U(30), opacity: 0.8 }}>{t("Created by")}</div>
         <div className="font-black" style={{ fontSize: U(96), textShadow: "0 4px 14px rgba(0,0,0,.7)", background: "linear-gradient(90deg,#ff3d7f,#ffb700,#7cf23a,#3ec7ff,#b04dff)", WebkitBackgroundClip: "text", color: "transparent" }}>Tom Kodner</div>
+        <div style={{ maxWidth: U(1200), fontSize: U(27), lineHeight: 1.45, opacity: 0.92 }}>
+          <p>{t("A fan-made browser remake of MECCHA CHAMELEON, the multiplayer hide-and-seek game where chameleons paint themselves to blend into the world and hunters try to find them.")}</p>
+          <p style={{ marginTop: U(14) }}>{t("Tom Kodner designed and built this version: the menus, servers and online multiplayer, the paintable chameleon with its poses and clones, the hunter's paint shotgun, bots, 23 detailed maps with real-time lights and shadows, Missed-Spot points, 13 languages, phone controls and the Windows app.")}</p>
+        </div>
       </div>
       <button onClick={onBack} className="absolute flex items-center text-white" style={{ left: U(40), bottom: U(20), gap: U(8), fontSize: U(24) }}>
         <span className="bg-white text-black font-bold rounded" style={{ fontSize: U(16), padding: `${U(1)} ${U(6)}` }}>Esc</span>{t("Back")}
       </button>
     </Stage>
+  );
+}
+
+/** כפתור Update — מופיע רק באפליקציית Windows (הלאנצ'ר): מוריד את הגרסה החדשה ומפעיל מחדש, בלי להתקין exe חדש */
+function UpdateButton() {
+  const [ver, setVer] = useState<number | null>(null);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    fetch("/__launcher").then((r) => r.json()).then((j) => { if (j?.launcher) setVer(Number(j.version) || 0); }).catch(() => {});
+  }, []);
+  if (ver === null) return null;
+  const run = async () => {
+    setMsg(t("Checking for updates…"));
+    try {
+      const j = await (await fetch("/__update", { method: "POST" })).json();
+      if (j.updated) { setMsg(t("Updated! Restarting…")); setTimeout(() => location.reload(), 900); }
+      else if (j.latest) setMsg(t("You have the latest version"));
+      else setMsg(t("Update failed — check your internet connection"));
+    } catch { setMsg(t("Update failed — check your internet connection")); }
+  };
+  return (
+    <div className="absolute flex flex-col items-end" style={{ right: U(44), top: U(36), gap: U(6) }}>
+      <button onClick={run} className="font-bold text-white hover:text-[#5dff5d]" style={{ fontSize: U(28), padding: `${U(8)} ${U(26)}`, background: "linear-gradient(#2c2c2c,#121212)", border: `${U(3)} solid ${GREEN}` }}>
+        ⟳ {t("Update")} <span className="opacity-60" style={{ fontSize: U(18) }}>v{ver}</span>
+      </button>
+      {msg && <div className="text-white font-bold" style={{ fontSize: U(20), textShadow: "0 2px 4px #000" }}>{msg}</div>}
+    </div>
   );
 }

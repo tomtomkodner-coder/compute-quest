@@ -307,7 +307,6 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
   }, [phase]);
   useEffect(() => {
     if (phase !== "lobby") setSettingsOpen(false);
-    if (phase === "countdown") setCharOpen(true);
     if (phase !== "lobby" && phase !== "countdown") setCharOpen(false);
     if (phase === "check" || phase === "countdown") setPoseMenu(false);
   }, [phase]);
@@ -433,7 +432,6 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
               {hud.onPad && <div className="text-xl font-bold text-[#ff4d4d]" style={{ textShadow: OUTLINE }}>{t("You will be a HUNTER")}</div>}
               {touch && <div className="flex gap-2 pointer-events-auto">
                 <button onClick={() => setSettingsOpen(true)} className="rounded-xl bg-[#ffd23f] text-black px-3 py-1.5 text-sm font-bold border-2 border-black">{t("Settings")}</button>
-                <button onClick={() => setCharOpen(true)} className="rounded-xl bg-white text-black px-3 py-1.5 text-sm font-bold border-2 border-black">{t("Character")}</button>
               </div>}
             </div>
           )}
@@ -483,7 +481,6 @@ function GameView({ conn, roomNet, name, color, muted, onToggleMute, onExit }: {
           {optionsOpen && <SettingsScreen engine={e} inGame muted={muted} onToggleMute={onToggleMute} onClose={() => setOptionsOpen(false)} onReturnTitle={onExit}
             players={hud.players.filter((p) => !p.bot).map((p) => ({ id: p.id, name: p.name, me: p.me }))} />}
           {settingsOpen && <SettingsPanel hud={hud} engine={e} onClose={() => setSettingsOpen(false)} />}
-          {charOpen && <CharPanel hud={hud} engine={e} onClose={() => setCharOpen(false)} />}
 
           {/* צ'אט */}
           <div className="absolute left-2 bottom-2 z-20 w-[min(320px,60vw)] grid gap-0.5 text-[12px] font-bold">
@@ -724,13 +721,12 @@ function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine
           <div className="font-bold text-white" style={{ fontSize: u(40), margin: `${u(26)} 0 ${u(12)}` }}>{t("Body Type")}</div>
           <div className="grid grid-cols-3" style={{ gap: u(12) }}>
             {bodies.map((b) => (
-              <button key={b.id} onClick={() => engine?.setMyBody(b.id)} className="flex flex-col items-center justify-center"
-                style={{ height: u(150), background: hud.bodyType === b.id ? "linear-gradient(#26c22c,#159a1b)" : "rgba(0,0,0,0.55)", gap: u(6) }}>
-                <svg viewBox="0 0 40 60" style={{ width: u(46), height: u(70) }} aria-hidden>
-                  <g fill="#f2f2f2">{b.id === "cube" ? <><rect x="13" y="2" width="14" height="14" rx="2" /><rect x="11" y="18" width="18" height="22" rx="2" /><rect x="5" y="19" width="5" height="17" rx="2" /><rect x="30" y="19" width="5" height="17" rx="2" /><rect x="12" y="41" width="7" height="17" rx="2" /><rect x="21" y="41" width="7" height="17" rx="2" /></>
-                    : <><circle cx="20" cy="9" r="7" /><rect x={b.id === "plump" ? 8 : 12} y="17" width={b.id === "plump" ? 24 : 16} height="24" rx={b.id === "plump" ? 11 : 7} /><rect x={b.id === "plump" ? 3 : 6} y="19" width="5" height="18" rx="2.5" /><rect x={b.id === "plump" ? 32 : 29} y="19" width="5" height="18" rx="2.5" /><rect x="13" y="39" width="6" height="19" rx="3" /><rect x="21" y="39" width="6" height="19" rx="3" /></>}</g>
-                </svg>
-                <span className="font-bold text-white" style={{ fontSize: u(20) }}>{b.n}</span>
+              <button key={b.id} onClick={() => engine?.setMyBody(b.id)} className="group relative flex flex-col items-center justify-end overflow-hidden transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5"
+                style={{ height: u(170), paddingBottom: u(10), gap: u(4), borderRadius: u(6),
+                  background: hud.bodyType === b.id ? "radial-gradient(circle at 50% 35%,#5cff63 0%,#1fc226 55%,#0d7a12 100%)" : "radial-gradient(circle at 50% 35%,#4a4a4a 0%,#262626 60%,#141414 100%)",
+                  boxShadow: hud.bodyType === b.id ? `0 0 ${u(16)} rgba(60,255,70,.55), inset 0 0 0 ${u(3)} #8dff8f` : `inset 0 0 0 ${u(2)} rgba(255,255,255,.12)` }}>
+                <BodyIcon kind={b.id} size={u(104)} />
+                <span className="font-bold text-white" style={{ fontSize: u(21), textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>{b.n}</span>
               </button>
             ))}
           </div>
@@ -1241,4 +1237,31 @@ function PtsPop({ v, d }: { v: number; d: number }) {
  * (אחרת "…", נקודות, סוגריים ומספרים נופלים בצד הלא נכון) */
 function BidiStyle() {
   return <style>{".mc-bidi *{unicode-bidi:plaintext}.mc-bidi input,.mc-bidi textarea{unicode-bidi:plaintext}"}</style>;
+}
+
+/** אייקון של הדמות (לבן, מעוגל, עם הצללה רכה) לכל סוג גוף */
+function BodyIcon({ kind, size }: { kind: BodyType; size: string }) {
+  const id = `bi-${kind}`;
+  const plump = kind === "plump", cube = kind === "cube";
+  return (
+    <svg viewBox="0 0 60 90" style={{ width: size, height: size }} aria-hidden>
+      <defs>
+        <radialGradient id={id} cx="38%" cy="30%" r="75%"><stop offset="0" stopColor="#ffffff" /><stop offset=".65" stopColor="#e6e6e6" /><stop offset="1" stopColor="#a9a9a9" /></radialGradient>
+      </defs>
+      <ellipse cx="30" cy="86" rx={plump ? 20 : 15} ry="3" fill="rgba(0,0,0,.35)" />
+      <g fill={`url(#${id})`}>
+        {cube ? <>
+          <rect x="19" y="3" width="22" height="20" rx="4" /><rect x="16" y="26" width="28" height="30" rx="4" />
+          <rect x="7" y="27" width="8" height="25" rx="3" /><rect x="45" y="27" width="8" height="25" rx="3" />
+          <rect x="18" y="57" width="10" height="27" rx="3" /><rect x="32" y="57" width="10" height="27" rx="3" />
+        </> : <>
+          <circle cx="30" cy="13" r="10.5" />
+          <rect x={plump ? 11 : 17} y="25" width={plump ? 38 : 26} height={plump ? 36 : 32} rx={plump ? 17 : 12} />
+          <rect x={plump ? 4 : 9} y="28" width="8" height="25" rx="4" transform={`rotate(${plump ? 12 : 8} ${plump ? 8 : 13} 28)`} />
+          <rect x={plump ? 48 : 43} y="28" width="8" height="25" rx="4" transform={`rotate(${plump ? -12 : -8} ${plump ? 52 : 47} 28)`} />
+          <rect x={plump ? 17 : 19} y="55" width={plump ? 11 : 10} height="29" rx="5" /><rect x={plump ? 32 : 31} y="55" width={plump ? 11 : 10} height="29" rx="5" />
+        </>}
+      </g>
+    </svg>
+  );
 }

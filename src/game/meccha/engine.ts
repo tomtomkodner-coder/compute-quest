@@ -3043,8 +3043,7 @@ float grN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
     const ph = this.rs.ph;
     if (!m.alive || ph === "check") return false;
     if (ph === "lobby" || ph === "countdown") return true;
-    if (m.role === "hider") return true;
-    return m.role === "hunter" && ph === "hide"; // גם ציידים יכולים להיצבע בזמן ההמתנה
+    return m.role === "hider"; // כמו במשחק: צייד לא יכול לצבוע
   }
 
   /** צובעים סביב נקודה על הגוף (בתנוחת המנוחה); prev = הנקודה הקודמת בקו */
