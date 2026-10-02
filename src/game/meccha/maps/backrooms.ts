@@ -7,6 +7,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Kit, grid, type Mat, type World } from "./kit";
 import * as BT from "./tex/backrooms";
+import { Life, HAND } from "./tex/life";
 
 type V3 = [number, number, number];
 
@@ -471,6 +472,79 @@ export function buildBackrooms(): World {
       else outs.push({ pos: [s.c + side * (T / 2 + 0.006), 0.32, a], rotY: side > 0 ? Math.PI / 2 : -Math.PI / 2 });
     }
     k.instances(outletGeo, k.mat(null, "#efeada", [1, 1], { roughness: 0.35 }), outs, { noShadow: true });
+  }
+
+  // ---------- LIFE: scrawls, notes, an abandoned office desk ----------
+  {
+    const life = new Life(k, 404);
+    const wood = k.mat(k.tex("br-desk", () => BT.brCeiling()), "#b89a6a", [1, 1], { roughness: 0.6, bump: 0.1 });
+    const grey = k.mat(null, "#8e8f8a", [1, 1], { roughness: 0.45, metalness: 0.6 });
+    const beige = k.mat(null, "#d8d0b8", [1, 1], { roughness: 0.5 });
+    const dark = k.mat(null, "#232323", [1, 1], { roughness: 0.4 });
+    const screen = k.mat(null, "#1d2a22", [1, 1], { roughness: 0.15, emissive: "#3a6a4a", emissiveIntensity: 0.35 });
+    const deskParts: THREE.BufferGeometry[] = [], metalParts: THREE.BufferGeometry[] = [], beigeParts: THREE.BufferGeometry[] = [], darkParts: THREE.BufferGeometry[] = [];
+    // office desk against the west wall of the empty office (x=-7), top 0.74
+    const dx = -6.5, dz = -7.2;
+    deskParts.push(new RoundedBoxGeometry(0.72, 0.035, 1.5, 2, 0.01).translate(dx, 0.74 - 0.0175, dz));
+    for (const sz of [-1, 1]) metalParts.push(new THREE.BoxGeometry(0.66, 0.72, 0.03).translate(dx, 0.36, dz + sz * 0.72));
+    metalParts.push(new THREE.BoxGeometry(0.03, 0.4, 1.4).translate(dx - 0.3, 0.5, dz));
+    // drawer pedestal with three drawers + handles
+    metalParts.push(new RoundedBoxGeometry(0.62, 0.66, 0.42, 2, 0.01).translate(dx, 0.35, dz + 0.45));
+    for (let i = 0; i < 3; i++) { beigeParts.push(new THREE.BoxGeometry(0.02, 0.19, 0.38).translate(dx + 0.315, 0.15 + i * 0.21, dz + 0.45)); darkParts.push(new THREE.BoxGeometry(0.02, 0.02, 0.14).translate(dx + 0.33, 0.21 + i * 0.21, dz + 0.45)); }
+    k.collider(dx - 0.36, dx + 0.36, dz - 0.75, dz + 0.75, 0, 0.76, true);
+    // CRT monitor + keyboard
+    beigeParts.push(new RoundedBoxGeometry(0.4, 0.36, 0.38, 2, 0.03).translate(dx - 0.05, 0.74 + 0.2, dz - 0.25));
+    beigeParts.push(new THREE.CylinderGeometry(0.1, 0.16, 0.24, 4).rotateZ(Math.PI / 2).rotateX(Math.PI / 4).translate(dx - 0.3, 0.74 + 0.2, dz - 0.25));
+    beigeParts.push(new THREE.BoxGeometry(0.2, 0.03, 0.44).translate(dx + 0.18, 0.755, dz - 0.25));
+    beigeParts.push(new THREE.BoxGeometry(0.22, 0.03, 0.22).translate(dx - 0.05, 0.755, dz - 0.25));
+    darkParts.push(new THREE.BoxGeometry(0.01, 0.26, 0.3).translate(dx + 0.155, 0.95, dz - 0.25));
+    // filing cabinet
+    const fx = -6.62, fz = -8.55;
+    metalParts.push(new RoundedBoxGeometry(0.46, 1.32, 0.6, 2, 0.012).translate(fx, 0.66, fz));
+    for (let i = 0; i < 4; i++) { beigeParts.push(new THREE.BoxGeometry(0.012, 0.28, 0.54).translate(fx + 0.236, 0.18 + i * 0.32, fz)); darkParts.push(new THREE.BoxGeometry(0.02, 0.03, 0.16).translate(fx + 0.25, 0.26 + i * 0.32, fz)); }
+    k.collider(fx - 0.24, fx + 0.24, fz - 0.31, fz + 0.31, 0, 1.32, true);
+    // swivel chair (5-star base, gas lift, seat, back)
+    const cx = -5.75, cz = -7.0;
+    for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; darkParts.push(rod([cx, 0.07, cz], [cx + Math.cos(a) * 0.3, 0.05, cz + Math.sin(a) * 0.3], 0.018)); darkParts.push(new THREE.SphereGeometry(0.028, 8, 6).translate(cx + Math.cos(a) * 0.3, 0.028, cz + Math.sin(a) * 0.3)); }
+    darkParts.push(rod([cx, 0.07, cz], [cx, 0.42, cz], 0.025));
+    darkParts.push(new RoundedBoxGeometry(0.48, 0.08, 0.46, 2, 0.03).translate(cx, 0.46, cz));
+    darkParts.push(new RoundedBoxGeometry(0.06, 0.5, 0.44, 2, 0.025).rotateZ(-0.12).translate(cx + 0.25, 0.8, cz));
+    k.collider(cx - 0.3, cx + 0.3, cz - 0.3, cz + 0.3, 0, 0.5, true);
+    k.merged(deskParts, wood); k.merged(metalParts, grey); k.merged(beigeParts, beige); k.merged(darkParts, dark);
+    k.add(new THREE.PlaneGeometry(0.28, 0.22), screen, [dx + 0.152, 0.95, dz - 0.25], { rotY: Math.PI / 2, noShadow: true });
+    // papers on the desk
+    life.flat(life.letter({ head: "LEVEL 0 ADMINISTRATION", to: "Dear Tom Kodner,", body: "Your request to leave Level 0 has been received. Current processing time: 10,000 years. Please remain in the hallway and do not follow the exit signs.", sign: "- Dept. of Liminal Spaces", hand: false, size: 13, date: "Day 47" }), dx + 0.1, 0.74, dz + 0.25, 0.22, -Math.PI / 2 + 0.1);
+    life.stack(dx - 0.05, 0.74, dz + 0.55, 0.3, 0.23, 0.06, 0.1);
+    life.flat(life.custom(256, 256, (g, w, h, r) => {
+      g.fillStyle = "#efe9d6"; g.fillRect(0, 0, w, h);
+      g.strokeStyle = "#2a2a6a"; g.lineWidth = 2.5; g.lineCap = "round";
+      const walls = [[20, 20, 236, 20], [236, 20, 236, 236], [20, 236, 236, 236], [20, 20, 20, 236], [20, 90, 150, 90], [110, 90, 110, 180], [60, 150, 200, 150], [190, 40, 190, 120], [150, 190, 150, 236]];
+      for (const [a, b, c, d] of walls) { g.beginPath(); g.moveTo(a + (r() - 0.5) * 3, b + (r() - 0.5) * 3); g.lineTo(c + (r() - 0.5) * 3, d + (r() - 0.5) * 3); g.stroke(); }
+      g.fillStyle = "#2a2a6a"; g.font = `15px ${HAND}`; g.fillText("toilets", 34, 60); g.fillText("chairs", 196, 180); g.fillText("bikes", 40, 200); g.fillText("signs?", 160, 220);
+      g.fillStyle = "#c0231d"; g.font = `bold 20px ${HAND}`; g.fillText("EXIT??", 120, 128); g.lineWidth = 3; g.strokeStyle = "#c0231d"; g.beginPath(); g.arc(150, 122, 34, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = "#2a2a6a"; g.font = `12px ${HAND}`; g.fillText("it moves every time - T.K.", 30, 250);
+    }), dx - 0.05, 0.8, dz + 0.55, 0.24, -Math.PI / 2 - 0.2);
+    life.wall(life.note({ text: "DON'T trust the EXIT signs", color: "#fff27a" }), dx + 0.158, 1.14, dz - 0.25, 0.1, Math.PI / 2, 0.08);
+    life.wall(life.note({ text: "day 47. still humming.", color: "#ffd1dc" }), dx + 0.158, 0.79 + 0.05, dz - 0.37, 0.08, Math.PI / 2, -0.1);
+    // scattered sheets on the carpet around the desk
+    const sheet = life.letter({ body: "the lights never turn off. the carpet is always damp. I have walked for days and every room looks the same. if you find this, go back the way you came.", sign: "- Tom K.", paper: "#f4efdc", age: 0.6, size: 13 });
+    life.flat(sheet, -5.3, 0.004, -8.4, 0.21, 0.9); life.flat(sheet, 7.5, 0.004, 3.5, 0.21, -0.5, 0.008);
+    // memo on the office partition, toilet sign, chairs notice, vending note
+    life.wall(life.poster({ title: "MAINTENANCE", sub: "LEVEL 0 - WEEK 2,391", body: "- replace tube 14 (buzzing)\n- carpet still damp. do not touch\n- toilets: why are there 21?\n- exits: DO NOT FOLLOW", bg: "#f3f0e2", fg: "#2a2a2a", accent: "#8a7a3a", style: "notice", wear: 0.5 }), -0.87, 1.5, -13.4, 0.42, Math.PI / 2, 0.02);
+    life.wall(life.label({ text: "RESTROOM", sub: "out of order since 1996", bg: "#e9e4cf", fg: "#3a3a3a", border: "#3a3a3a", wear: 0.5 }), -12.5, 1.9, -5.13, 0.5, Math.PI);
+    life.wall(life.label({ text: "MAX 10 CHAIRS", sub: "per stack - Facilities", bg: "#f5f2e6", fg: "#8a1a1a", border: "#8a1a1a", wear: 0.4 }), X2 - T / 2 - 0.005, 2.25, 0.8, 0.55, -Math.PI / 2);
+    life.wall(life.note({ text: "OUT OF ORDER. do not insert coins. it eats them.", color: "#ffffff", ink: "#c0231d", tape: true }), 6.96, 1.28, Z1 + T / 2 + 0.84 + 0.004, 0.14, 0, 0.1);
+    life.wall(life.poster({ title: "ALMOND WATER", sub: "stay hydrated", body: "Found a bottle? Share it.\nNever drink from the pools.", bg: "#f4ecd2", fg: "#5a3a18", accent: "#b88a3a", style: "notice", wear: 0.6 }), X2 - T / 2 - 0.005, 1.6, -12.4, 0.4, -Math.PI / 2, -0.02);
+    // scrawls on the wallpaper
+    life.wall(life.graffiti({ text: "TOM KODNER WAS HERE", color: "#3a2a1a", style: "tag", px: [512, 140], drip: false }), -5.2, 1.55, -5 + T / 2 + 0.004, 1.9, 0);
+    life.wall(life.custom(300, 180, (g, w, h, r) => {
+      g.strokeStyle = "rgba(40,30,20,0.85)"; g.lineWidth = 3; g.lineCap = "round";
+      for (let i = 0; i < 47; i++) { const grp = Math.floor(i / 5), j = i % 5, x0 = 10 + (grp % 5) * 58, y0 = 14 + Math.floor(grp / 5) * 76; if (j < 4) { g.beginPath(); g.moveTo(x0 + j * 10 + (r() - 0.5) * 2, y0); g.lineTo(x0 + j * 10 + (r() - 0.5) * 3, y0 + 52); g.stroke(); } else { g.beginPath(); g.moveTo(x0 - 4, y0 + 40); g.lineTo(x0 + 40, y0 + 12); g.stroke(); } }
+      g.fillStyle = "rgba(40,30,20,0.85)"; g.font = `bold 22px ${HAND}`; g.fillText("day 47", 170, 168);
+    }, true), X1 + T / 2 + 0.004, 1.35, -3.2, 0.9, Math.PI / 2);
+    life.wall(life.poster({ title: "MISSING", sub: "TOM KODNER", body: "Last seen: Level 0, near the toilets\nWearing: white (painted yellow?)\nIf found, do not follow him.", footer: "reward: almond water", bg: "#ece4cc", fg: "#222", accent: "#8a1a1a", style: "missing" }), -5.6, 1.62, 2.6 + 0.35 + 0.004, 0.42, 0, -0.03);
+    life.wall(life.graffiti({ text: "THIS WAY OUT \u2192", color: "#5a4a2a", style: "tag", px: [400, 120], drip: false }), -4 + T / 2 + 0.004, 1.3, 11.6, 1.2, Math.PI / 2, 0.04);
+    life.finish();
   }
 
   k.room("West Hall", X1, -10, -5, 5);

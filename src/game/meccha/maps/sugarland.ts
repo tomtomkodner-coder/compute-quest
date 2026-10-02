@@ -9,6 +9,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import * as T from "../textures";
 import * as S from "./tex/sugarland";
 import { Kit, type Mat, type World } from "./kit";
+import { Life, HAND } from "./tex/life";
 
 type G = THREE.BufferGeometry;
 type V3t = [number, number, number];
@@ -129,6 +130,9 @@ export function buildSugarland(): World {
   const __t0 = performance.now(); const __tl: string[] = []; const TT = (n: string) => __tl.push(n + ":" + Math.round(performance.now() - __t0));
   const B = new Batch(k);
   const rnd = S.sgRng(2024);
+  const life = new Life(k, 2024);
+  const doorPlates = ["The Kodners", "Hansel & Gretel", "Mr. Gingerbread", "Candy Witch - KEEP OUT"].map((t, i) => life.plate({ text: t, sub: ["No. 1 Gumdrop Lane", "No. 2 Gumdrop Lane", "No. 3 Gumdrop Lane", "no. 13 - beware"][i], style: "white", font: HAND, px: [300, 110] }));
+  let houseNo = 0;
 
   TT("materials");
   // ---------------- materials ----------------
@@ -503,6 +507,12 @@ export function buildSugarland(): World {
 
   TT("gingerbread houses");
   // ---------------- gingerbread houses ----------------
+  const houseNotes = [
+    life.letter({ to: "Dear Tom Kodner,", body: "Your gingerbread house is finished! The roof is marzipan, the windows are sugar glass. Please do not lick the walls - the cookies are watching.", sign: "- Gretel", paper: "#fff3f8", ink: "#b0186a", date: "Sept. 26" }),
+    life.letter({ to: "Shopping list", body: "3 kg icing sugar\n12 gumdrops (green!)\n1 chocolate river refill\nbirthday candles for Tom\nsprinkles, lots", ruled: true, paper: "#fbfbf6", age: 0.1 }),
+    life.letter({ to: "Note to self:", body: "The cake in the plaza is for Tom Kodner's birthday. Tell everyone to keep their hands off the strawberry until 5 pm!", sign: "- Mr. G.", paper: "#fff8e8" }),
+    life.letter({ to: "KEEP OUT", body: "This house belongs to the Candy Witch. Trespassers will be turned into gumdrops. (Tom Kodner, you are allowed.)", sign: "- W.", paper: "#efe8ff", ink: "#4a1a8a" }),
+  ];
   const house = (cx: number, cz: number, w: number, d: number, ry: number, roof: Mat, H = 2.9) => {
     const P = new THREE.Matrix4().compose(new V3(cx, 0, cz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new V3(1, 1, 1));
     const t = 0.3, dw = 1.5, dh = 2.35;
@@ -522,6 +532,13 @@ export function buildSugarland(): World {
     B.geo(frostPink, fl, 0, 0.018, 0, o());
     B.cyl(milk, 0.55, 0.55, 0.08, -w / 4, 0.68, -d / 5, o({ seg: 24 }));
     B.cyl(milk, 0.1, 0.18, 0.68, -w / 4, 0, -d / 5, o({ seg: 12 }));
+    // table dressing: icing doily, a cupcake, and a letter
+    B.cyl(icing, 0.36, 0.36, 0.01, -w / 4, 0.76, -d / 5, o({ seg: 24 }));
+    B.lathe(stripeR, [[0, 0], [0.07, 0], [0.09, 0.08], [0.001, 0.08]], -w / 4 + 0.2, 0.77, -d / 5 + 0.1, o({ seg: 12 }));
+    B.sphere(icingPink, 0.08, -w / 4 + 0.2, 0.87, -d / 5 + 0.1, { ...o({ s: [1, 0.8, 1] }), ws: 10, hs: 8 });
+    const hn = houseNo++;
+    { const pl = new V3(-w / 4 - 0.12, 0.772, -d / 5 - 0.05).applyMatrix4(P); life.flat(houseNotes[hn % houseNotes.length], pl.x, pl.y, pl.z, 0.2, ry + 0.3); }
+    { const pp = new V3(-(dw / 2 + 0.55), 1.5, d / 2 + 0.012).applyMatrix4(P); life.wall(doorPlates[hn % doorPlates.length], pp.x, pp.y, pp.z, 0.5, ry); }
     // roof
     const ov = 0.45, hr = d * 0.42;
     const th = Math.atan2(hr, d / 2), L = (d / 2 + ov) / Math.cos(th);
@@ -667,6 +684,9 @@ export function buildSugarland(): World {
     B.geo(leaf, new THREE.ConeGeometry(0.36, 0.14, 8), cx, 4.85, cz);
     // cake board
     B.cyl(k.mat(null, "#f7d9e6", [1, 1], { metalness: 0.4, roughness: 0.3 }), 4.6, 4.7, 0.08, cx, 0, cz, { seg: 48 });
+    // chocolate plaque on the top tier
+    B.box(milk, 1.3, 0.46, 0.06, cx, 3.84, cz + 0.95, { rx: -0.12 });
+    life.put(life.custom(320, 112, (g, w, h) => { g.fillStyle = "#6a3418"; g.fillRect(0, 0, w, h); g.strokeStyle = "#fffaf4"; g.lineWidth = 4; g.strokeRect(8, 8, w - 16, h - 16); g.fillStyle = "#fffaf4"; g.textAlign = "center"; g.font = `bold 34px ${HAND}`; g.fillText("Happy Birthday", w / 2, 50); g.fillStyle = "#ff9bc4"; g.font = `bold 32px ${HAND}`; g.fillText("Tom Kodner!", w / 2, 90); g.textAlign = "left"; }), cx, 3.84 + 0.23, cz + 0.95 + 0.034, 1.24, { rx: -0.12, h: 0.43 });
     k.room("Cake Plaza", -9, 9, -14, 4);
   }
 
@@ -804,9 +824,13 @@ export function buildSugarland(): World {
       B.geo(lockers[(i + 2) % 6], f, x, 0.08 + 0.76, 20.14, { ry: Math.PI });
     }
     k.collider(17.85, 20.55, 20.12, 20.7, 0, 1.6, true);
-    // wafer bench
+    // wafer bench on candy-cane legs
     B.box(wafer, 2.2, 0.12, 0.5, 20.4, 0.45, 16.9, { uv: 0.5 });
-    for (const dx of [-0.9, 0.9]) B.box(milk, 0.12, 0.45, 0.4, 20.4 + dx, 0, 16.9, {});
+    B.box(icing, 2.24, 0.03, 0.54, 20.4, 0.57, 16.9, { flat: true });
+    for (const dx of [-0.9, 0.9]) for (const dz of [-0.17, 0.17]) B.cyl(stripeR, 0.045, 0.045, 0.45, 20.4 + dx, 0, 16.9 + dz, { seg: 10, sv: 1 });
+    // name tags / notes on the lockers
+    ["TOM K.", "GRETEL", "HANSEL", "G. MAN", "WITCH", "SPARE"].forEach((t, i) => life.wall(life.label({ text: t, bg: "#fff2f8", fg: "#b0186a", border: "#ff8fbf", px: [160, 64] }), lx - 0.265, 1.72, z0 + 0.35 + i * 0.66, 0.16, -Math.PI / 2));
+    life.wall(life.note({ text: "gym at 5 - bring the gumdrops! - T.K.", color: "#b8f0ff", tape: true }), lx - 0.266, 1.3, z0 + 0.35, 0.14, -Math.PI / 2, 0.08);
     k.collider(19.3, 21.5, 16.65, 17.15, 0, 0.57, true);
     // gym bags (big candies in a heap) and a sign
     gumdrop(19.0, 18.8, 0.6, 3);
@@ -928,10 +952,38 @@ export function buildSugarland(): World {
     k.group.add(hz);
   }
 
+  // ---------------- LIFE: candy signposts ----------------
+  {
+    const stake = (x: number, z: number, ry: number, id: number, w = 0.9, h = 0.5, y = 1.3) => {
+      B.cyl(stripeR, 0.05, 0.05, y + h / 2, x, 0, z, { seg: 10, sv: 2 });
+      B.box(wafer, w + 0.08, h + 0.08, 0.06, x, y - h / 2 - 0.04, z, { ry, uv: 0.4 });
+      for (const f of [1, -1]) life.wall(id, x + Math.sin(ry) * f * 0.032, y, z + Math.cos(ry) * f * 0.032, w, ry + (f < 0 ? Math.PI : 0));
+      k.collider(x - 0.1, x + 0.1, z - 0.1, z + 0.1, 0, y + h / 2, false);
+    };
+    const sg = (t: string, sub: string, bg: string, fg: string) => life.label({ text: t, sub, bg, fg, border: fg, font: HAND, px: [300, 160] });
+    // direction post at the entrance
+    { const x = -5.0, z = 12.0;
+      B.cyl(stripeR, 0.07, 0.07, 2.6, x, 0, z, { seg: 12, sv: 4 });
+      B.lathe(gums[1], gumProfile, x, 2.58, z, { s: 0.36, seg: 10 });
+      k.collider(x - 0.12, x + 0.12, z - 0.12, z + 0.12, 0, 2.6, false);
+      const arrows: [string, string, number, number][] = [["CAKE PLAZA \u2191", "birthday party!", 0, 2.1], ["\u2190 GINGERBREAD", "village", -Math.PI / 2 + 0.4, 1.7], ["CHOCO RIVER \u2192", "no swimming", Math.PI / 2 - 0.3, 1.3]];
+      for (const [t, sub, ang, y] of arrows) {
+        const ry = ang, cx2 = x + Math.sin(ry + Math.PI / 2) * 0.0, cz2 = z;
+        B.box(wafer, 0.95, 0.3, 0.05, cx2, y - 0.15, cz2, { ry, uv: 0.4 });
+        const id = sg(t, sub, "#fff2f8", "#e8173a");
+        for (const f of [1, -1]) life.wall(id, cx2 + Math.sin(ry) * f * 0.028, y, cz2 + Math.cos(ry) * f * 0.028, 0.9, ry + (f < 0 ? Math.PI : 0));
+      }
+    }
+    stake(4.8, -0.6, 0.3, sg("PLEASE", "don't eat the cake (yet)", "#fffaf4", "#b0186a"), 0.8, 0.44, 1.1);
+    stake(7.6, 14.0, -Math.PI / 2 + 0.3, sg("NO SWIMMING", "in the chocolate river", "#6a3418", "#fffaf4"), 0.9, 0.48, 1.2);
+    stake(-10.8, 4.2, Math.PI / 2, sg("GUMDROP LANE", "gingerbread village", "#fff2f8", "#1f8a4a"), 0.9, 0.46, 1.4);
+  }
+
   TT("preCookies");
   // place cookies (after everything else so collider list is complete)
   for (const c of cookies) placeCookie(c);
   TT("cookies");
+  life.finish();
   B.flush();
   TT("flush");
   (globalThis as any).__sgT = __tl;

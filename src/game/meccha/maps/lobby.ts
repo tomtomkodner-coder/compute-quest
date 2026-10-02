@@ -6,6 +6,7 @@ import * as THREE from "three";
 import * as T from "../textures";
 import * as L from "./tex/lobby";
 import { Kit, boxGeo, ring, type Mat, type World } from "./kit";
+import { Life, drawChameleon, SERIF } from "./tex/life";
 
 type G = THREE.BufferGeometry;
 const V3 = THREE.Vector3;
@@ -79,6 +80,7 @@ class Frame {
 export function buildLobby(): World {
   const k = new Kit(5, 3.6);
   const b = new Batch();
+  const life = new Life(k, 5180);
   const H = 5; // גובה תקרה
   const IN = { n: -8.85, s: 8.85, w: -10.85, e: 10.85 }; // פני הקירות הפנימיים
 
@@ -431,6 +433,9 @@ export function buildLobby(): World {
     b.add(potMats[0], place(new THREE.LatheGeometry([[0, 0], [0.06, 0], [0.1, 0.08], [0.09, 0.18], [0.04, 0.26], [0.045, 0.3]].map(([r, h]) => new THREE.Vector2(r, h)), 24), cx - 0.25, 0.445, cz + 0.15));
     b.add(k.mat(null, "#e8b04a"), place(new THREE.SphereGeometry(0.09, 12, 8), cx - 0.25, 0.8, cz + 0.15));
     b.add(stemM, beam([cx - 0.25, 0.7, cz + 0.15], [cx - 0.25, 0.72, cz + 0.15], 0.01, 0.01, true));
+    // readable book covers on the coffee table + a sticky note
+    life.flat(life.custom(256, 190, (g, w, h) => { g.fillStyle = "#f1faee"; g.fillRect(0, 0, w, h); g.fillStyle = "#1d4e89"; g.fillRect(0, 0, 18, h); drawChameleon(g, w * 0.6, h * 0.45, 70, "#4cbf4c"); g.fillStyle = "#1d4e89"; g.font = `bold 22px ${SERIF}`; g.fillText("The Art of Hiding", 30, 150); g.font = `italic 16px ${SERIF}`; g.fillText("by Tom Kodner", 30, 176); }), cx + 0.2, 0.609, cz - 0.1, 0.24, 0.6 + Math.PI);
+    life.flat(life.note({ text: "Hunters stand on the red pad! - T.K.", color: "#fff27a" }), cx - 0.3, 0.448, cz - 0.25, 0.12, 0.3);
     // מנורת רצפה
     const lx = -9.9, lz = -8.0;
     b.add(blackM, place(new THREE.CylinderGeometry(0.18, 0.2, 0.03, 24), lx, 0.015, lz));
@@ -454,12 +459,17 @@ export function buildLobby(): World {
     b.add(walnutM, f.put(new THREE.TorusGeometry(0.15, 0.008, 5, 18), 0, 0.2, 0, Math.PI / 2, 0, 0), 0.4);
     f.box(k, -0.21, 0.21, -0.21, 0.21, 0, 0.48, true);
   };
+  const tentCard = life.plate({ text: "LOBBY CAFE", sub: "espresso 2 - cocoa 3 - Tom's cake 4", style: "white", px: [256, 128] });
   const bistro = (x: number, z: number) => {
     b.add(marbleM, place(new THREE.CylinderGeometry(0.38, 0.38, 0.03, 36), x, 0.745, z), 0.8);
     b.add(ironM, place(new THREE.LatheGeometry([[0.26, 0], [0.26, 0.02], [0.06, 0.06], [0.03, 0.12], [0.025, 0.7], [0.08, 0.73]].map(([r, h]) => new THREE.Vector2(r, h)), 24), x, 0, z));
     k.collider(x - 0.38, x + 0.38, z - 0.38, z + 0.38, 0, 0.76, true);
     const cup = k.mat(null, "#fbfbf8", [1, 1], { roughness: 0.2 });
-    b.add(cup, place(new THREE.CylinderGeometry(0.04, 0.03, 0.08, 14), x + 0.1, 0.8, z - 0.05));
+    b.add(cup, place(new THREE.LatheGeometry([[0.001, 0], [0.03, 0], [0.042, 0.02], [0.045, 0.08], [0.04, 0.08], [0.001, 0.012]].map(([r, h]) => new THREE.Vector2(r, h)), 16), x + 0.1, 0.768, z - 0.05));
+    b.add(cup, place(new THREE.TorusGeometry(0.022, 0.006, 6, 12), x + 0.148, 0.81, z - 0.05));
+    b.add(k.mat(null, "#4a2a14", [1, 1], { roughness: 0.15 }), place(new THREE.CircleGeometry(0.04, 14), x + 0.1, 0.835, z - 0.05, -Math.PI / 2, 0, 0));
+    life.put(tentCard, x - 0.12, 0.8, z + 0.02, 0.12, { rx: -0.3, ry: 0.4 });
+    life.put(tentCard, x - 0.12 - 0.035, 0.8, z + 0.02 - 0.03, 0.12, { rx: -0.3, ry: 0.4 + Math.PI });
     b.add(cup, place(new THREE.CylinderGeometry(0.07, 0.07, 0.008, 18), x + 0.1, 0.764, z - 0.05));
   };
   bistro(-7.4, 4.4);
@@ -532,6 +542,11 @@ export function buildLobby(): World {
 
   // ---------- עלים (מופע אחד) ----------
   k.instances(new THREE.SphereGeometry(1, 10, 6), leafM, leaves);
+  // ---------- LIFE: credits, welcome poster ----------
+  life.wall(life.poster({ title: "MECCHA", sub: "CHAMELEON", body: "paint yourself - hide - survive\na game by Tom Kodner", bg: "#1d2a33", fg: "#ffffff", accent: "#e76f51", style: "retro", art: (g, w, h) => drawChameleon(g, w * 0.5, h * 0.6, h * 0.9, "#4cbf4c"), wear: 0 }), -2.4, 1.75, IN.s - 0.012, 0.8, Math.PI);
+  life.wall(life.plate({ text: "Tom Kodner", sub: "creator & chief hider", style: "brass", px: [320, 110] }), 2.4, 1.6, IN.s - 0.012, 0.6, Math.PI);
+  life.wall(life.poster({ title: "HOW TO PLAY", body: "1. Hiders: grab the paint and match the walls.\n2. Hunters: wait on the red pad, then seek.\n3. Freeze! Moving gives you away.\n4. Last one found wins.", bg: "#fbf7ea", fg: "#2a1d10", accent: "#e76f51", style: "notice", wear: 0 }), 2.4, 2.35, IN.s - 0.012, 0.5, Math.PI);
+  life.finish();
   b.flush(k);
 
   // ---------- נקודות הופעה ----------

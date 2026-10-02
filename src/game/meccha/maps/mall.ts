@@ -12,6 +12,7 @@ import * as T from "../textures";
 import type { PaintTex } from "../textures";
 import * as M from "./tex/mall";
 import { Kit, grid, type Mat, type World } from "./kit";
+import { Life, drawChameleon } from "./tex/life";
 
 type G = THREE.BufferGeometry;
 type V3t = [number, number, number];
@@ -357,6 +358,15 @@ export function buildMall(): World {
   I.def("cube", bgeo(1, 1, 1), plainMat(0.5));
   I.def("pouf", new THREE.CylinderGeometry(0.34, 0.34, 0.42, 20), (c) => tm("mall.fabric", () => M.fabric(), c, { rough: 0.9, bump: 0.35 }));
 
+  // ---------- readable signs / notes / labels (one atlas, merged)
+  const life = new Life(k, 2468);
+  const lr = rng(97531);
+  const boxLabels = [
+    life.label({ text: "MALL STOCK", sub: "aisle 4 - do not stack > 3", bg: "#ffffff", fg: "#1d3557", stripe: "#1d3557", px: [200, 120] }),
+    life.label({ text: "FRAGILE", sub: "glassware", bg: "#f4efe2", fg: "#c0231d", border: "#c0231d", px: [200, 110] }),
+    life.label({ text: "AUTUMN SALE", sub: "window display", bg: "#fff3e0", fg: "#e76f51", border: "#e76f51", px: [200, 110] }),
+    life.label({ text: "T. KODNER", sub: "Mall Management", bg: "#fbf6e6", fg: "#222", border: "#222", px: [200, 110] }),
+  ];
   // ---------- small helpers
   const col = (x1: number, x2: number, z1: number, z2: number, top: number, bottom = 0, st = true) =>
     k.collider(Math.min(x1, x2), Math.max(x1, x2), Math.min(z1, z2), Math.max(z1, z2), bottom, top, st);
@@ -829,14 +839,24 @@ export function buildMall(): World {
       const bw = 0.4 + r() * 0.2, bh = 0.3 + r() * 0.2, bd = 0.35 + r() * 0.2;
       for (let bxp = -w / 2 + bw / 2; bxp <= w / 2 - bw / 2 + 0.01; bxp += bw + 0.01)
         for (let bzp = -d / 2 + bd / 2; bzp <= d / 2 - bd / 2 + 0.01; bzp += bd + 0.01)
-          if (l < levels - 1 || r() < 0.7) I.add("box", ["#ffffff", "#e8dcc8", "#f4efe6"][Math.floor(r() * 3)], { pos: [x + bxp, y + bh / 2, z + bzp], scale: [bw, bh, bd], rotY: (r() - 0.5) * 0.08 });
+          if (l < levels - 1 || r() < 0.7) {
+            const bry = (r() - 0.5) * 0.08;
+            I.add("box", ["#ffffff", "#e8dcc8", "#f4efe6"][Math.floor(r() * 3)], { pos: [x + bxp, y + bh / 2, z + bzp], scale: [bw, bh, bd], rotY: bry });
+            B.add(mTape, place(new THREE.BoxGeometry(0.07, 0.004, bd + 0.004), x + bxp, y + bh + 0.002, z + bzp, 0, bry, 0));
+            for (const side of [-1, 1]) if (Math.abs(bzp + side * bd / 2) > d / 2 - 0.02 && lr() < 0.7) life.wall(boxLabels[Math.floor(lr() * boxLabels.length)], x + bxp + side * Math.sin(bry) * (bd / 2 + 0.004), y + bh * 0.5, z + bzp + side * Math.cos(bry) * (bd / 2 + 0.004), Math.min(0.2, bw * 0.45), bry + (side < 0 ? PI : 0), (lr() - 0.5) * 0.1);
+          }
       y += bh;
     }
     col(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y, 0, true);
   };
+  const binLabel = life.label({ text: "\u267b RECYCLE", sub: "cans - bottles - paper", bg: "#2a9d8f", fg: "#ffffff", px: [200, 120] });
+  const mTape = sc("#c9a867", 0.35);
   const trash = (x: number, z: number, y = 0) => {
     B.add(mSteel, place(lathe([[0.001, 0], [0.22, 0], [0.24, 0.8], [0.25, 0.85], [0.001, 0.86]], 20), x, y, z));
-    B.add(mBlack, place(new THREE.CylinderGeometry(0.1, 0.1, 0.02, 16), x, y + 0.87, z));
+    B.add(mSteel, place(lathe([[0.001, 0.85], [0.26, 0.85], [0.26, 0.9], [0.2, 1.0], [0.001, 1.02]], 20), x, y, z));
+    for (const s2 of [0, PI]) B.add(mBlack, place(new THREE.BoxGeometry(0.2, 0.08, 0.02), x + Math.sin(s2) * 0.215, y + 0.92, z + Math.cos(s2) * 0.215, -0.55 * Math.cos(s2), s2, 0));
+    B.add(mBlack, place(new THREE.CylinderGeometry(0.262, 0.262, 0.06, 20, 1, true), x, y + 0.08, z));
+    for (const s2 of [0, PI]) life.wall(binLabel, x + Math.sin(s2) * 0.232, y + 0.55, z + Math.cos(s2) * 0.232, 0.2, s2);
     col(x - 0.25, x + 0.25, z - 0.25, z + 0.25, y + 0.86, y, true);
   };
   const potPlant = (x: number, z: number, s: number, seed: number, y = 0) => {
@@ -1550,9 +1570,67 @@ export function buildMall(): World {
     }
     totem(-2.9, -15.0, PI / 2);
     // ATM + stroller corral
-    sbx(sc("#1d3557", 0.4), 0.7, 1.7, 0.5, 3.5, 0, -22.1);
-    B.add(em("#8ecae6", 0.7), place(new THREE.PlaneGeometry(0.4, 0.3), 3.24, 1.3, -22.1, 0, -PI / 2));
+    { const f = fr(3.5, -22.1, -PI / 2), body = sc("#1d3557", 0.4);
+      B.add(body, f.put(bgeo(0.72, 1.05, 0.55), 0, 0.525, 0));
+      B.add(body, f.put(bgeo(0.72, 0.75, 0.3), 0, 1.4, -0.12));
+      B.add(sc("#12213a", 0.3), f.put(bgeo(0.74, 0.08, 0.6), 0, 1.07, 0.02, -0.25));
+      B.add(em("#8ecae6", 0.7), f.put(new THREE.PlaneGeometry(0.36, 0.27), 0, 1.42, 0.035, -0.12));
+      B.add(mSteel, f.put(bgeo(0.28, 0.05, 0.2), 0, 1.12, 0.2, -0.25));
+      for (let i = 0; i < 12; i++) B.add(mChrome, f.put(bgeo(0.05, 0.015, 0.04), -0.06 + (i % 3) * 0.06, 1.14, 0.14 + Math.floor(i / 3) * 0.045, -0.25));
+      B.add(mBlack, f.put(new THREE.BoxGeometry(0.12, 0.012, 0.02), 0.22, 1.2, 0.03));
+      B.add(mBlack, f.put(new THREE.BoxGeometry(0.26, 0.03, 0.02), 0, 0.85, 0.28));
+      B.add(em("#2a9d8f", 1.0), f.put(bgeo(0.74, 0.14, 0.32), 0, 1.84, -0.12));
+      col(3.2, 3.8, -22.45, -21.75, 1.9, 0, true);
+      const [lx, lz] = f.pt(0, 0.036); life.wall(life.label({ text: "ATM", sub: "cash 24/7 - Kodner Bank", bg: "#2a9d8f", fg: "#ffffff", px: [256, 96] }), lx - 0.0, 1.84, lz, 0.5, -PI / 2);
+    }
   }
+
+  // ================================================================ LIFE: signs, notices, receipts
+  {
+    const L = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    // entrance hall: opening hours + lost & found board on the stone walls
+    B.add(mDark, place(bgeo(0.03, 0.9, 0.7), -3.83, 1.65, -21.2));
+    L(life.poster({ title: "WELCOME", sub: "Opening hours", body: "Mon - Fri  10:00 - 21:00\nSat - Sun  10:00 - 22:00\nFood Court until 23:00\nMall manager: Tom Kodner", bg: "#1d3557", fg: "#ffffff", accent: "#2a9d8f", style: "notice", art: (g, w, h) => drawChameleon(g, w * 0.5, h * 0.55, h * 0.6, "#2a9d8f"), wear: 0.02 }), -3.81, 1.65, -21.2, 0.6, PI / 2);
+    B.add(mWood, place(bgeo(0.03, 0.8, 1.2), 3.83, 1.55, -17.6));
+    B.add(tm("mall.cork", () => T.noise("#b98a55", 0.25, 5, 3000), "#ffffff", { rough: 0.95, bump: 0.6 }), place(new THREE.PlaneGeometry(1.1, 0.7), 3.814, 1.95, -17.6, 0, -PI / 2));
+    L(life.label({ text: "LOST & FOUND", sub: "ask at the information desk", bg: "#ffffff", fg: "#1d3557", border: "#1d3557", px: [300, 110] }), 3.812, 2.2, -17.6, 0.5, -PI / 2);
+    L(life.note({ text: "FOUND: one red glove (left). Info desk.", color: "#fff27a", pin: "#e63946" }), 3.81, 1.85, -18.0, 0.16, -PI / 2, 0.08);
+    L(life.note({ text: "LOST my mum near the escalators - Timmy (6)", color: "#ffd1dc", pin: "#118ab2" }), 3.81, 1.82, -17.6, 0.16, -PI / 2, -0.06);
+    L(life.note({ text: "Tom Kodner: your car keys are at the Info desk!", color: "#c9f2c7", pin: "#ffb703" }), 3.81, 1.87, -17.2, 0.16, -PI / 2, 0.04);
+    L(life.photo({ caption: "found: this cat?", art: (g, w, h) => { g.fillStyle = "#cfd8dc"; g.fillRect(0, 0, w, h); g.fillStyle = "#f4a261"; g.beginPath(); g.ellipse(w / 2, h * 0.65, w * 0.26, h * 0.26, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.arc(w / 2, h * 0.36, w * 0.18, 0, Math.PI * 2); g.fill(); g.beginPath(); g.moveTo(w * 0.36, h * 0.28); g.lineTo(w * 0.4, h * 0.1); g.lineTo(w * 0.47, h * 0.24); g.moveTo(w * 0.64, h * 0.28); g.lineTo(w * 0.6, h * 0.1); g.lineTo(w * 0.53, h * 0.24); g.fill(); } }), 3.81, 1.6, -17.85, 0.13, -PI / 2, 0.1);
+    // food court: tray-return sign, employee of the month, receipts & a newspaper on the tables
+    L(life.label({ text: "PLEASE RETURN YOUR TRAY", sub: "thank you!", bg: "#ffffff", fg: "#d62828", border: "#d62828", px: [320, 110] }), -12.0, 0.75, -13.195, 0.7, 0);
+    B.add(sc("#c9a227", 0.3, 0.8), place(bgeo(0.46, 0.56, 0.03), -24.2, 1.95, -13.79));
+    L(life.certificate({ title: "EMPLOYEE OF THE MONTH", name: "Tom Kodner", body: "Burger Blast - September 2026\nfastest fries in the whole mall", sign: "The Manager", px: [300, 362] }), -24.2, 1.95, -13.77, 0.4, 0);
+    const rc = [
+      life.receipt({ title: "BURGER BLAST", lines: [["Blast Burger", "6.50"], ["Large Fries", "3.20"], ["Cola", "2.10"]], total: "11.80", foot: "Thank you, Tom! Come again" }),
+      life.receipt({ title: "NOODLE NOVA", lines: [["Ramen (spicy)", "8.90"], ["Gyoza x6", "4.50"], ["Green Tea", "1.90"]], total: "15.30", foot: "table 12 - staff: K." }),
+      life.receipt({ title: "TACO TORNADO", lines: [["Taco x3", "7.50"], ["Nachos", "4.00"], ["Horchata", "2.60"]], total: "14.10", foot: "have a spicy day!" }),
+    ];
+    [[-21.4, -7.6], [-18.2, 4.0], [-15.0, -11.2], [-11.8, 7.6], [-15.0, 11.2]].forEach(([x, z], i) => life.flat(rc[i % 3], x + 0.24, 0.752, z - 0.26, 0.09, lr() * 6));
+    life.flat(life.news({ name: "Mall Weekly", headline: "BIGGEST AUTUMN SALE EVER", sub: "Manager Tom Kodner: 'Everything must go - even the balloon sculpture'", photo: (g, w, h) => { g.fillStyle = "#9a948a"; g.fillRect(0, 0, w, h); for (let i = 0; i < 6; i++) { g.fillStyle = ["#e63946", "#ffb703", "#118ab2"][i % 3]; g.globalAlpha = 0.55; g.beginPath(); g.arc(w * (0.25 + (i % 3) * 0.25), h * (0.35 + Math.floor(i / 3) * 0.3), h * 0.18, 0, Math.PI * 2); g.fill(); } g.globalAlpha = 1; } }), -18.2 - 0.2, 0.752, -4.0 + 0.1, 0.34, 0.4);
+    // kiosk carts: price boards
+    for (const [kx, kz, t] of [[13.0, 10.6, "GIFT CORNER"], [-13.0, -3.0, "PHONE CASES"]] as [number, number, string][]) {
+      const id = life.label({ text: t, sub: t === "GIFT CORNER" ? "handmade by Tom Kodner - from 5.00" : "all models - 2 for 15.00", bg: "#ffffff", fg: "#1d3557", border: "#f39ab4", px: [300, 110] });
+      L(id, kx + 0.478, 0.7, kz, 0.6, PI / 2); L(id, kx - 0.478, 0.7, kz, 0.6, -PI / 2);
+    }
+    // wet-floor caution A-frame sign in the atrium
+    { const x = 3.6, z = -6.2, ry = 0.5;
+      const f = fr(x, z, ry), yel = sc("#f6c533", 0.35);
+      for (const s2 of [-1, 1]) B.add(yel, f.put(bgeo(0.3, 0.62, 0.015), 0, 0.3, s2 * 0.1, -s2 * 0.3));
+      B.add(yel, f.put(bgeo(0.1, 0.05, 0.05), 0, 0.64, 0));
+      const cau = life.custom(160, 320, (g, w, h) => {
+        g.fillStyle = "#f6c533"; g.fillRect(0, 0, w, h);
+        g.fillStyle = "#111"; g.font = "bold 30px Arial,sans-serif"; g.textAlign = "center"; g.fillText("CAUTION", w / 2, 44);
+        g.beginPath(); g.moveTo(w / 2, 70); g.lineTo(w * 0.85, 170); g.lineTo(w * 0.15, 170); g.closePath(); g.lineWidth = 8; g.strokeStyle = "#111"; g.stroke();
+        g.beginPath(); g.arc(w / 2 + 6, 104, 8, 0, Math.PI * 2); g.fill(); g.lineWidth = 6; g.beginPath(); g.moveTo(w / 2 + 4, 114); g.lineTo(w / 2 - 6, 140); g.lineTo(w / 2 - 22, 156); g.moveTo(w / 2 - 6, 140); g.lineTo(w / 2 + 14, 156); g.moveTo(w / 2, 122); g.lineTo(w / 2 + 20, 128); g.stroke();
+        g.font = "bold 26px Arial,sans-serif"; g.fillText("WET", w / 2, 220); g.fillText("FLOOR", w / 2, 252); g.font = "16px Arial,sans-serif"; g.fillText("PISO MOJADO", w / 2, 290); g.textAlign = "left";
+      });
+      for (const s2 of [-1, 1]) { const [px, pz] = f.pt(0, s2 * 0.11); life.put(cau, px, 0.32, pz, 0.26, { ry: ry + (s2 < 0 ? PI : 0), rx: -0.3, h: 0.54 }); }
+      col(x - 0.2, x + 0.2, z - 0.2, z + 0.2, 0.65, 0, false);
+    }
+  }
+  life.finish();
 
   // ================================================================ UPPER FLOOR PROPS
   {

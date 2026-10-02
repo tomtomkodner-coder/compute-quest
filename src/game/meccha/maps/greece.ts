@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import * as T from "../textures";
 import * as G from "./tex/greece";
+import { Life } from "./tex/life";
 import { Kit, type Mat, type World } from "./kit";
 
 type Geo = THREE.BufferGeometry;
@@ -157,6 +158,12 @@ interface HouseOpt {
 export function buildGreece(): World {
   const k = new Kit(6, 2.3);
   const B = new Batch();
+  const life = new Life(k, 1821);
+  const cafeBits = [
+    life.receipt({ title: "KAFENEIO ELENI", lines: [["Freddo espresso", "3.50"], ["Baklava", "4.00"], ["Water", "1.00"]], total: "8.50", foot: "Efharisto, Tom! table 3" }),
+    life.receipt({ title: "KAFENEIO ELENI", lines: [["Greek salad", "9.00"], ["Ouzo x2", "7.00"], ["Loukoumades", "5.50"]], total: "21.50", foot: "kali orexi!" }),
+    life.custom(256, 170, (g, w, h) => { const sk = g.createLinearGradient(0, 0, 0, h); sk.addColorStop(0, "#ff9a5a"); sk.addColorStop(0.6, "#ffd49a"); sk.addColorStop(0.6, "#2a5a9a"); sk.addColorStop(1, "#1a3a6a"); g.fillStyle = sk; g.fillRect(0, 0, w, h); g.fillStyle = "#fff"; g.fillRect(30, 60, 50, 42); g.fillRect(90, 70, 40, 32); g.fillStyle = "#1f5fbf"; g.beginPath(); g.arc(55, 60, 22, Math.PI, 0); g.fill(); g.fillStyle = "#fff"; g.font = "bold 26px Georgia,serif"; g.fillText("Greetings from", 70, 132); g.font = "bold 34px Georgia,serif"; g.fillText("SANTORINI", 60, 164); g.strokeStyle = "#fff"; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6); }),
+  ];
   const R = rng(20260925);
   const rr = (a: number, b: number) => a + R() * (b - a);
 
@@ -330,6 +337,13 @@ export function buildGreece(): World {
     B.add(mIron, cylG(0.03, 0.03, 0.72, x, y, z, 8));
     B.add(mCheck, cylG(0.47, 0.5, 0.26, x, y + 0.5, z, 24, true));
     B.add(mCheck, place(new THREE.CircleGeometry(0.47, 24).rotateX(-PI / 2), x, y + 0.762, z));
+    // cups with saucers + a receipt / postcard
+    for (let i = 0; i < 2; i++) {
+      const a = i * 2.6 + x, cx = x + Math.cos(a) * 0.22, cz = z + Math.sin(a) * 0.22;
+      B.add(mWhite, place(new THREE.CylinderGeometry(0.075, 0.06, 0.012, 14), cx, y + 0.768, cz));
+      B.add(mWhite, place(new THREE.LatheGeometry([[0.001, 0], [0.03, 0], [0.042, 0.02], [0.045, 0.07], [0.041, 0.07], [0.001, 0.012]].map(([a2, b2]) => new THREE.Vector2(a2, b2)), 12), cx, y + 0.774, cz));
+    }
+    life.flat(cafeBits[Math.floor(Math.abs(x * 7 + z * 3)) % cafeBits.length], x - 0.12, y + 0.765, z + 0.12, 0.13, x);
     k.collider(x - 0.5, x + 0.5, z - 0.5, z + 0.5, y, y + 0.76);
     for (let i = 0; i < chairs; i++) {
       const a = (i / chairs) * PI * 2 + 0.4;
@@ -340,7 +354,8 @@ export function buildGreece(): World {
     B.add(mIron, cylG(0.12, 0.16, 0.3, x, y, z, 12));
     B.add(mIron, cylG(0.045, 0.055, 2.7, x, y, z, 10));
     B.add(mIron, place(new THREE.ConeGeometry(0.2, 0.18, 4), x, y + 3.3, z, PI / 4));
-    B.add(mLamp, box(0.2, 0.3, 0.2, x, y + 2.92, z));
+    B.add(mLamp, place(new THREE.LatheGeometry([[0.07, 0], [0.12, 0.05], [0.13, 0.22], [0.1, 0.3], [0.001, 0.3]].map(([a, b2]) => new THREE.Vector2(a, b2)), 6), x, y + 2.92, z, PI / 6));
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * PI * 2; B.add(mIron, box(0.012, 0.25, 0.012, x + Math.cos(a) * 0.125, y + 2.95, z + Math.sin(a) * 0.125)); }
     B.add(mIron, box(0.26, 0.04, 0.26, x, y + 2.9, z));
     k.collider(x - 0.16, x + 0.16, z - 0.16, z + 0.16, y, y + 3.3, false);
   }
@@ -805,13 +820,19 @@ export function buildGreece(): World {
     for (const [x, z] of [[16.0, -27.6], [19.0, -27.9], [21.9, -27.4], [16.9, -25.0], [20.4, -25.1]]) table(x, z, 0, R() < 0.5 ? 3 : 4);
     // menu board
     B.add(mWood, place(new THREE.BoxGeometry(0.7, 1.1, 0.05), 13.6, 0.95, -23.2, 0.2, -0.12));
-    B.add(mMenu, place(new THREE.PlaneGeometry(0.62, 1.0), 13.6, 0.95, -23.17, 0.2, -0.12));
+    void mMenu;
+    life.put(life.menu({ title: "Kafeneio Eleni", sub: "since 1974 - ask for Tom's special", items: [["Freddo espresso", "3.50"], ["Greek coffee", "2.50"], ["Frappe", "3.00"], ["Baklava", "4.00"], ["Greek salad", "9.00"], ["Souvlaki", "8.50"], ["Ouzo", "3.50"]], style: "chalk", px: [256, 400] }), 13.6 + Math.sin(0.2) * 0.03, 0.95, -23.2 + Math.cos(0.2) * 0.03, 0.62, { ry: 0.2, rx: -0.12, h: 1.0 });
     k.collider(13.2, 14.0, -23.5, -22.9, 0, 1.5, false);
   }
   lampPost(-8.0, -29.2);
   lampPost(26.5, -29.2);
   pot(28.4, -29.1, 1.0, 0, "ficus");
   bench(31.3, -29.2, 2.0, true);
+  // readable details on the promenade
+  life.wall(life.plate({ text: "AGIOS NIKOLAOS", sub: "chapel rebuilt 1956 - gift of the Kodner family", style: "white", px: [360, 110] }), -25.185, 1.7, -24.85, 0.8, PI / 2);
+  life.wall(life.label({ text: "ΟΔΟΣ ΚΟΝΤΝΕΡ", sub: "Kodner Street", bg: "#1f5fbf", fg: "#ffffff", border: "#ffffff", px: [300, 110] }), -25.185, 2.6, -25.6, 0.6, PI / 2);
+  life.wall(life.poster({ title: "SUNSET CRUISE", sub: "daily 18:00 from the old port", body: "volcano - hot springs - dinner\ntickets: Captain Tom Kodner", bg: "#1f5fbf", fg: "#ffffff", accent: "#ff9a5a", style: "retro", wear: 0.2 }), 33.9 - 0.305, 1.6, -28.5, 0.5, -PI / 2);
+  life.wall(life.note({ text: "Tom + Eleni 2026 \u2665", color: "#ffffff", ink: "#1f5fbf" }), 14.0 + 0.185, 1.5, -23.4, 0.14, PI / 2, 0.1);
   // east entrance: arch gate towards the old-port stair
   {
     const ax = 33.9;
@@ -1119,6 +1140,7 @@ export function buildGreece(): World {
   if (leaves.length) k.instances(new THREE.PlaneGeometry(0.42, 0.42), mLeaf, leaves);
   if (bougs.length) k.instances(new THREE.PlaneGeometry(0.42, 0.42), mBougC, bougs);
   if (petals.length) k.instances(new THREE.PlaneGeometry(0.07, 0.05), mPetal, petals, { noShadow: true });
+  life.finish();
   B.flush(k, noShadow);
 
   // ---------------- spawns ----------------

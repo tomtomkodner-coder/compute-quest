@@ -9,6 +9,7 @@ import { PAINTINGS, pickPainting, realPaintingTex } from "../paintings";
 import * as THREE from "three";
 import * as X from "./tex/mansion";
 import { Kit, type Mat, type World } from "./kit";
+import { Life, drawBalloons, drawChameleon } from "./tex/life";
 
 type V3 = [number, number, number];
 type PO = { rx?: number; ry?: number; rz?: number; s?: V3; q?: THREE.Quaternion; uv?: "tri" | "native"; uvs?: [number, number]; swap?: boolean; r?: number };
@@ -18,6 +19,17 @@ type Door = { c: number; w: number; h?: number; arch?: [number, number] };
 
 export function buildMansion(): World {
   const k = new Kit(8, 2.4);
+  // readable letters / notes / signs (one atlas, merged meshes); own rng so the layout stream is untouched
+  const life = new Life(k, 20260926);
+  const lr = X.rng(4711);
+  const boxLabels = [
+    life.label({ text: "FRAGILE", sub: "handle with care", bg: "#f4efe2", fg: "#c0231d", border: "#c0231d", px: [200, 110] }),
+    life.label({ text: "XMAS DECOR", sub: "T. Kodner - attic", bg: "#fbf8ee", fg: "#1f5a2e", stripe: "#c0231d", px: [200, 110] }),
+    life.label({ text: "THIS SIDE UP", sub: "\u2191  \u2191  \u2191", bg: "#efe6cf", fg: "#222", px: [200, 100] }),
+    life.label({ text: "PARTY SUPPLIES", sub: "balloons + streamers", bg: "#ffffff", fg: "#2a4fe0", border: "#2a4fe0", px: [200, 110] }),
+    life.label({ text: "BOOKS", sub: "Library - shelf 3", bg: "#f7f1e3", fg: "#5a3a1a", px: [200, 110] }),
+  ];
+  const canLabels = ["FLOUR", "SUGAR", "SALT", "RICE", "COFFEE", "TEA", "OATS", "COCOA"].map((t) => life.label({ text: t, bg: "#f3ead2", fg: "#3a2a18", border: "#9a2a20", font: "Georgia,serif", px: [128, 80] }));
   const rnd = X.rng(20260924);
   const pick = <V>(a: V[]) => a[Math.floor(rnd() * a.length)];
 
@@ -624,6 +636,7 @@ export function buildMansion(): World {
       box(mTapeBlue, 0.07, 0.004, d + 0.004, 0, h, 0);
       box(mTapeBlue, 0.07, 0.14, d + 0.006, 0, h - 0.14, 0);
       col(-w / 2, w / 2, -d / 2, d / 2, 0, h);
+      if (lr() < 0.6) { const [px, py, pz] = wp([(lr() - 0.5) * w * 0.3, h * 0.5, d / 2 + 0.004]); life.wall(boxLabels[Math.floor(lr() * boxLabels.length)], px, py, pz, Math.min(w * 0.45, 0.22), xfRy, (lr() - 0.5) * 0.12); }
     });
   }
   const boxStack = (x: number, z: number, n: number, seed: number) => {
@@ -1201,8 +1214,11 @@ export function buildMansion(): World {
     sph(mBrass, 0.06, 7.8, H.blue - 0.2, -18.5, undefined, {}, 8, 6);
     painting(7.3, 2.1, -22.83, 0, 1.5, 1.0, 0);
     for (const x of [4.2, 9.8]) { box(mWalnut, 0.3, H.blue, 0.3, x, 0, -21.3, { r: 0.02 }); col(x - 0.15, x + 0.15, -21.45, -21.15, 0, H.blue); }
-    box(mDarkTable, 1.4, 0.05, 0.8, 5.5, 0.75, -15.6, { r: 0.015 });
-    for (const a of [-1, 1]) for (const b of [-1, 1]) box(mDarkTable, 0.06, 0.75, 0.06, 5.5 + a * 0.62, 0, -15.6 + b * 0.32);
+    box(mDarkTable, 1.46, 0.045, 0.86, 5.5, 0.755, -15.6, { r: 0.02 });
+    box(mDarkTable, 1.3, 0.1, 0.7, 5.5, 0.655, -15.6);
+    box(mDarkTable, 0.5, 0.075, 0.02, 5.5, 0.668, -15.245, { r: 0.006 });
+    sph(mBrass, 0.018, 5.5, 0.705, -15.23, undefined, {}, 8, 6);
+    for (const a of [-1, 1]) for (const b of [-1, 1]) lathe(mDarkTable, [[0.022, 0], [0.028, 0.03], [0.02, 0.08], [0.026, 0.3], [0.036, 0.46], [0.03, 0.52], [0.038, 0.56], [0.038, 0.66], [0.001, 0.66]], 5.5 + a * 0.6, 0, -15.6 + b * 0.3, 10);
     col(4.8, 6.2, -16.0, -15.2, 0, 0.8);
   }
 
@@ -1244,6 +1260,15 @@ export function buildMansion(): World {
     for (const x of [17.5, 24]) { box(mPlasterW, 1.2, 0.06, 0.3, x, H.bath - 0.06, -18.5); box(mTube, 1.1, 0.03, 0.12, x, H.bath - 0.09, -18.5); }
   }
 
+  const libPages: number[][] = [];
+  {
+    const overdue = life.letter({ head: "KODNER MANOR LIBRARY", to: "Dear Tom Kodner,", body: "The books you borrowed, 'The Art of Camouflage' and 'Chameleons of the World', are now 3 weeks overdue. Kindly return them to shelf 3 before the next party.", sign: "- The Librarian", date: "Sept. 12" });
+    const news = life.news({ name: "The Daily Chameleon", headline: "KODNER MANSION HOSTS GRAND HIDE & SEEK", sub: "Guests vanish into the wallpaper; seekers baffled for hours", photo: (g, w, h) => { g.fillStyle = "#9a948a"; g.fillRect(0, 0, w, h); drawChameleon(g, w * 0.5, h * 0.55, h * 0.7, "#5f5a52", "#d8d4cc"); } });
+    const ideas = life.letter({ to: "Hiding spots:", body: "1. behind the marble horse\n2. on top of a bookcase\n3. in the towel piles (paint white!)\n4. the piano?? - NO, too obvious\n5. dress up as a balloon", ruled: true, paper: "#fbfbf6", age: 0.1 });
+    const diary = life.letter({ date: "Sept. 26", body: "Nobody found me for 12 minutes today. The trick is to stand still next to something of the same colour. I think Tom Kodner designed this house for hide and seek.", sign: "- J.", paper: "#f3ecd9" });
+    const postcard = life.letter({ to: "Dear Tom Kodner,", body: "Greetings from the seaside! The chameleons here change colour faster than yours. See you at the party.", sign: "Aunt Rose", px: [300, 200], size: 15, paper: "#f7f3e8" });
+    libPages.push([overdue, news, ideas], [diary, news, postcard], [ideas, overdue, diary]);
+  }
   // ================= LIBRARY (arched wooden niches) =================
   {
     /** a false wall 0.5 m deep with arched niches; content: 'shelf' | 'window' | 'poster' | 'door' */
@@ -1326,13 +1351,14 @@ export function buildMansion(): World {
           seg(mBrass, [lx, 0.81, 0.15], [lx, 1.08, 0.12], 0.012, 0.012, 5);
           put(mGreenShade, new THREE.CylinderGeometry(0.07, 0.09, 0.4, 12, 1, false, 0, Math.PI), [lx, 1.12, 0.12], { rz: Math.PI / 2, rx: -0.3 });
         }
-        let yy = 0.8;
-        for (let i = 0; i < 6; i++) { box(mPaper, 0.32, 0.05, 0.24, -0.3 + (rnd() - 0.5) * 0.04, yy, -0.1, { ry: (rnd() - 0.5) * 0.2 }); yy += 0.05; }
+        for (let i = 0; i < 6; i++) { rnd(); rnd(); } // keep the layout random stream identical
+        libDesk(cx, cz);
         col(-1.8, 1.8, -0.55, 0.55, 0, 0.8);
         for (const x of [-1.2, -0.4, 0.4, 1.2]) { foldingChair(x, -0.85, 0); foldingChair(x + (rnd() - 0.5) * 0.1, 0.85, Math.PI); }
       });
     }
     // globes on stands
+    box(mBrass, 0.56, 0.2, 0.03, -22.5, 1.5, -8.19 + 0.0, { r: 0.005 });
     const globeTex = tx("globe", () => X.limestone("#3a6a9a", 44));
     const mGlobe = M(globeTex, "#e8d8b0", 1, { roughness: 0.4, bump: 0.2 });
     for (const [x, z] of [[-26.3, -9.0], [-12.0, -16.0], [-26.2, -15.8]] as const) {
@@ -1422,6 +1448,18 @@ export function buildMansion(): World {
       cylC(i % 2 ? mSteel : mIron, 0.15, 0.13, 0.04, hx, 1.82, 5.0, 16, { rx: Math.PI / 2 });
       seg(i % 2 ? mSteel : mIron, [hx, 1.98, 5.0], [hx, 2.18, 5.0], 0.012, 0.012, 5);
     }
+    /** enamel/tin kitchen canister with a lid, knob and a readable label (local frame of the shelf) */
+    function canister(lid: Mat, x: number, y: number, z: number, h: number) {
+      const tin = lr() < 0.5 ? mCanWhite : mCanTin;
+      lathe(tin, [[0.001, 0], [0.062, 0], [0.066, 0.008], [0.066, h - 0.03], [0.06, h - 0.022], [0.001, h - 0.022]], x, y, z, 14);
+      lathe(lid, [[0.001, h - 0.026], [0.07, h - 0.026], [0.071, h - 0.008], [0.05, h], [0.001, h]], x, y, z, 14);
+      sph(lid, 0.016, x, y + h + 0.008, z, [1, 0.7, 1], {}, 8, 5);
+      const [px, py, pz] = wp([x, y + h * 0.45, z + 0.068]);
+      life.wall(canLabels[Math.floor(lr() * canLabels.length)], px, py, pz, 0.085, xfRy);
+    }
+    const mCanWhite = M(null, "#f1eee6", 1, { roughness: 0.25 });
+    const mCanTin = M(tx("steel", () => X.brushed("#b8bdc2")), "#e8e2d0", 0.9, { metalness: 0.8, roughness: 0.32, bump: 0.08 });
+    const canLids = [plastic[1], plastic[2], plastic[4], M(null, "#1d1d1d", 1, { roughness: 0.4 })];
     // wall shelves with food & pots; bread posters; towel rail
     for (const [x, z, ry, len] of [[-19.5, -2.0, 0, 6.5], [-27.95, 9.0, Math.PI / 2, 3.2], [-16.5, 12.95, Math.PI, 4.4]] as const) {
       grp(x, 1.7, z, ry, () => {
@@ -1433,7 +1471,7 @@ export function buildMansion(): World {
             const t = rnd();
             if (t < 0.3) plates(cx, sy + 0.025, 0.17, 6 + Math.floor(rnd() * 8), 0.12);
             else if (t < 0.55) pot(cx + 0.05, sy + 0.025, 0.17, 0.1, 0.14);
-            else if (t < 0.8) box(pick(plastic), 0.14, 0.2 + rnd() * 0.1, 0.12, cx, sy + 0.025, 0.17, { r: 0.01 });
+            else if (t < 0.8) canister(pick(canLids), cx, sy + 0.025, 0.17, 0.2 + rnd() * 0.1);
             cx += 0.25 + rnd() * 0.1;
           }
         }
@@ -1569,7 +1607,7 @@ export function buildMansion(): World {
     grp(26.4, 0, 12.5, 0.6, () => { lathe(mRedPlastic, [[0.001, 0], [0.3, 0], [0.32, 0.45], [0.3, 0.9], [0.001, 0.9]], -0.45, 0.32, 0, 16, { rz: -Math.PI / 2 }); col(-0.5, 0.5, -0.33, 0.33, 0, 0.64); });
     lathe(mTerracotta, [[0.001, 0], [0.18, 0], [0.26, 0.45], [0.28, 0.48], [0.25, 0.48], [0.001, 0.1]], 25.2, 0, 10.6, 14);
     col(24.9, 25.5, 10.3, 10.9, 0, 0.48);
-    box(mPaper, 1.0, 0.004, 0.6, 22.0, 0, 13.0, { ry: 0.3 });
+    { const np = life.news({ name: "The Daily Chameleon", headline: "WHERE IS TOM KODNER?", sub: "Mansion owner has been hiding since Tuesday", date: "TUESDAY, SEPTEMBER 22, 2026", age: 0.7 }); life.flat(np, 22.0, 0.004, 13.0, 0.5, 0.3); life.flat(np, 22.35, 0.006, 13.25, 0.5, 1.1, 0.01); }
     poster(22.5, 2.6, 22.83, Math.PI, 0.7, 1.0, 2, null);
     poster(24.0, 2.5, 22.83, Math.PI, 0.7, 1.0, 3, null);
     poster(27.83, 2.8, 16.0, -Math.PI / 2, 0.7, 1.0, 2, null);
@@ -1583,6 +1621,70 @@ export function buildMansion(): World {
     for (const [hy, hr] of [[0.1, 0.305], [0.8, 0.3]]) torus(mIron, hr, 0.012, x, y + hy, z, { rx: Math.PI / 2 }, Math.PI * 2, 4, 20);
     col(x - 0.35, x + 0.35, z - 0.35, z + 0.35, y, y + 0.9);
   }
+
+  // ================= LIFE: letters, notes, signs, graffiti =================
+  function libDesk(cx: number, cz: number) {
+    const ry = cz < -15 ? 0 : Math.PI;
+    life.stack(cx - 0.3, 0.8, cz - 0.1, 0.3, 0.22, 0.12 + lr() * 0.08, (lr() - 0.5) * 0.2);
+    life.stack(cx + 0.35, 0.8, cz + 0.05, 0.3, 0.22, 0.03, 0.4);
+    const ids = libPages[Math.floor(lr() * 100) % libPages.length];
+    life.flat(ids[0], cx - 0.3, 0.92 + 0.08, cz - 0.1, 0.2, ry + (lr() - 0.5) * 0.3);
+    life.flat(ids[1], cx + 0.35, 0.83, cz + 0.05, 0.26, ry + 0.4);
+    life.flat(ids[2], cx - 1.05, 0.8, cz + (ry ? -0.2 : 0.2), 0.2, ry - 0.25, 0.006);
+  }
+  {
+    const lW = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    // --- entrance hall: brass nameplate, party poster, letter on the console
+    box(mWalnut, 0.6, 0.22, 0.02, 2.2, 1.39, 22.84, { r: 0.005 });
+    lW(life.plate({ text: "KODNER MANOR", sub: "Tom Kodner  \u00b7  est. 1887", style: "brass" }), 2.2, 1.5, 22.825, 0.54, Math.PI);
+    lW(life.poster({ title: "HIDE & SEEK", sub: "PARTY TONIGHT!", body: "Grand Ballroom - 8 pm\nhosted by Tom Kodner", bg: "#1e2a6a", fg: "#ffd84a", accent: "#e8262a", style: "event", art: (g, w, h, r) => drawBalloons(g, w, h, r), wear: 0.2 }), -4.6, 1.75, 22.835, 0.6, Math.PI, 0.02);
+    life.flat(life.letter({ to: "Dear Tom Kodner,", body: "Thank you for opening the old manor for tonight's hide-and-seek party. Guests have been told: no hiding inside the piano, and the chandeliers are strictly off limits. The paint buckets are in the storage room.", sign: "- Margaret, housekeeper", date: "Sept. 26" }), 9.55, 0.84, 16.15, 0.21, -Math.PI / 2 - 0.12);
+    life.flat(life.custom(256, 160, (g, w, h, r) => { g.fillStyle = "#efe4c8"; g.fillRect(0, 0, w, h); g.strokeStyle = "rgba(120,90,40,0.5)"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, 0); g.lineTo(w / 2, h * 0.55); g.lineTo(w, 0); g.stroke(); g.fillStyle = "#1d2a66"; g.font = "italic 20px 'Comic Sans MS',cursive"; g.fillText("Mr. Tom Kodner", 60, 110); g.font = "15px 'Comic Sans MS',cursive"; g.fillText("Kodner Manor, Hill Road 1", 60, 132); g.fillStyle = "#c0392b"; g.fillRect(w - 50, 14, 34, 40); g.strokeStyle = "#fff"; g.strokeRect(w - 47, 17, 28, 34); g.fillStyle = "#8a1a1a"; g.beginPath(); g.arc(w / 2, h * 0.55, 12, 0, Math.PI * 2); g.fill(); }), 9.62, 0.845, 16.45, 0.2, -Math.PI / 2 + 0.3);
+    // --- ballroom: reserved place card (tent) on a round table
+    { const card = life.plate({ text: "RESERVED", sub: "Mr. Tom Kodner", style: "white", px: [256, 128] }); life.put(card, 6.8, 0.83, -4.25, 0.14, { rx: -0.35 }); life.put(card, 6.8, 0.83, -4.35, 0.14, { ry: Math.PI, rx: -0.35 }); }
+    // --- library: "silence" plaque on a pillar
+    lW(life.plate({ text: "SILENCE PLEASE", sub: "by order of T. Kodner", style: "brass" }), -22.5, 1.6, -8.155, 0.5, 0);
+    // --- blue room: framed certificate on the wall + a letter on the table
+    box(mGold, 0.62, 0.46, 0.03, 13.34, 1.57, -20.8, { r: 0.008, ry: Math.PI / 2 });
+    lW(life.certificate({ title: "CERTIFICATE OF EXCELLENCE", name: "Tom Kodner", body: "for outstanding achievement in the noble\nart of hiding in plain sight\n(found only once in 1,000 rounds)", sign: "The Chameleon Club" }), 13.315, 1.8, -20.8, 0.54, -Math.PI / 2);
+    life.flat(life.letter({ to: "Dear Tom,", body: "I found the perfect blue paint for this room. Nobody will ever find you against this wallpaper! Leave the door open for me.", sign: "Yours, Eleanor", paper: "#eef2fa", ink: "#1a2a6a" }), 5.35, 0.8, -15.62, 0.21, Math.PI + 0.15);
+    // --- east hallway: cork notice board
+    { const bx = 13.33, bz = 16.0;
+      box(mWalnut, 0.04, 0.92, 1.36, bx - 0.02, 1.24, bz, { r: 0.01 });
+      box(M(tx("cork", () => X.limestone("#b07f4a", 71)), "#c89464", 0.6, { roughness: 0.95, bump: 0.6 }), 0.02, 0.8, 1.24, bx - 0.04, 1.3, bz);
+      const f = bx - 0.052, ry = -Math.PI / 2;
+      lW(life.poster({ title: "HOUSE RULES", body: "1. No hiding in the piano.\n2. No climbing the chandeliers.\n3. Paint is for hiders only.\n4. Seekers wait in the lobby.\n5. Have fun!  - T. Kodner", bg: "#fbf7ea", fg: "#2a1d10", accent: "#1f5a2e", style: "notice", wear: 0.1 }), f, 1.72, bz - 0.36, 0.34, ry, 0.03);
+      lW(life.photo({ caption: "Tom & the gang, 2024" }), f, 1.52, bz + 0.12, 0.2, ry, -0.08);
+      lW(life.calendar({ month: "SEPTEMBER", marks: [[26, "PARTY!"], [12, "books"], [19, "paint"]] }), f, 1.52, bz + 0.44, 0.24, ry, 0.02);
+      lW(life.note({ text: "LOST: one red balloon. Answers to 'Bob'.", color: "#ffd1dc", pin: "#2a4fe0" }), f, 1.25 + 0.24, bz - 0.02, 0.13, ry, 0.1);
+      lW(life.note({ text: "Chess club moved to the Library - Thu 7pm", color: "#c9f2c7", pin: "#e8262a" }), f, 1.62 + 0.12, bz + 0.46, 0.12, ry, -0.12);
+    }
+    // --- kitchen: order tickets on a rail, chalk menu, sticky notes on the hood
+    cylC(mChrome, 0.01, 0.01, 1.6, -16.9, 1.52, -1.82, 6, { rz: Math.PI / 2 });
+    const tickets: [string, [string, string][]][] = [["ORDER #27  TABLE 4", [["2x Roast Ham", ""], ["1x Pea Soup", ""], ["3x Lemonade", ""], ["guest: T. Kodner", ""]]], ["ORDER #28  TABLE 7", [["4x Pumpkin Pie", ""], ["2x Tea", ""], ["NO ONIONS!", ""]]], ["ORDER #29  BALLROOM", [["Chameleon Cake", "x1"], ["Candles", "x30"], ["Balloons", "x99"]]], ["ORDER #30  TABLE 2", [["1x Soup", ""], ["1x Ham", ""], ["extra gravy", ""]]]];
+    tickets.forEach(([t, ls], i) => lW(life.receipt({ title: t, lines: ls, foot: "chef: M.", px: [150, 220] }), -17.55 + i * 0.36, 1.42, -1.835, 0.11, 0, (lr() - 0.5) * 0.08));
+    box(mWalnut, 0.04, 1.02, 0.78, -10.13, 1.38, 5.6, { r: 0.01 });
+    lW(life.menu({ title: "Tonight's Menu", sub: "Kodner Manor Kitchen", items: [["Roast Ham", "12"], ["Pea Soup", "6"], ["Pumpkin Pie", "5"], ["Chameleon Cake", "8"], ["Lemonade", "3"], ["Hot Tea", "2"]], style: "chalk" }), -10.155 - 0.0, 1.89, 5.6, 0.7, -Math.PI / 2);
+    lW(life.note({ text: "DO NOT touch the ham!! - Chef", color: "#fff27a", tape: true }), -26.88, 2.56, 1.7, 0.16, Math.PI / 2, 0.06);
+    lW(life.note({ text: "Mr. Kodner: no onions, extra gravy", color: "#aee4ff", tape: true }), -26.88, 2.5, 2.9, 0.16, Math.PI / 2, -0.08);
+    // --- cold storage: warning sign + inventory clipboard
+    lW(life.label({ text: "COLD ROOM", sub: "KEEP DOOR CLOSED  -18\u00b0C", bg: "#1f5fa8", fg: "#ffffff", border: "#ffffff", px: [300, 130] }), -24.4, 2.0, 12.835, 0.6, Math.PI);
+    box(mWalnutL, 0.02, 0.34, 0.24, -10.165, 1.36, 15.5, { r: 0.006 });
+    lW(life.letter({ head: "INVENTORY", body: "Hams ........ 14\nSausages ... 60\nTurkeys ...... 3\nIce cream .. 12\nChecked by: T. Kodner", hand: true, ruled: true, paper: "#fbfbf6", age: 0.1, px: [220, 300] }), -10.18, 1.52, 15.5, 0.21, -Math.PI / 2);
+    // --- storage room: clipboard on the pillar
+    lW(life.letter({ head: "STOCK LIST", body: "Paint buckets: 24\nBalloons: 400\nStreamers: 60 rolls\nParty hats: 35\n\nMore balloons for Tom's party!!", ruled: true, age: 0.2, px: [220, 300] }), -6.5, 1.5, -19.05, 0.2, 0, 0.05);
+    // --- laundry: sign, a note on the towels, broken washer
+    lW(life.label({ text: "LAUNDRY", sub: "please sort your colours", bg: "#f7f4ea", fg: "#1f3f8a", border: "#1f3f8a" }), 13.67, 1.9, -4.5, 0.7, Math.PI / 2);
+    life.flat(life.note({ text: "Mr. Kodner's shirts: light starch, no bleach!", color: "#fff27a" }), 21.3, 0.86, -3.78, 0.14, 0.2);
+    lW(life.note({ text: "OUT OF ORDER", color: "#ffffff", ink: "#c0231d", size: 22, tape: true }), 27.215, 0.66, -2.14, 0.15, -Math.PI / 2, 0.1);
+    // --- bathroom: hand-washing sign, out-of-order note
+    lW(life.label({ text: "PLEASE WASH", sub: "YOUR HANDS - thank you!", bg: "#ffffff", fg: "#1a6a4a", border: "#1a6a4a" }), 27.8, 2.62, -19.9, 0.55, -Math.PI / 2);
+    lW(life.note({ text: "out of order - use the next one", color: "#fff27a", tape: true }), 15.5, 0.66, -22.645, 0.13, 0, 0.1);
+    // --- brick basement: graffiti
+    lW(life.graffiti({ text: "TOM KODNER", sub: "was here", color: "#f4d020", outline: "#e8262a", style: "bubble" }), 27.83, 1.9, 11.4, 2.3, -Math.PI / 2);
+    lW(life.graffiti({ text: "hide here \u2192", color: "#f2f2f2", style: "chalk", px: [256, 100] }), 13.67, 1.15, 10.6, 0.9, Math.PI / 2, -0.05);
+  }
+  life.finish();
 
   // ================= flush batches =================
   for (const [m, b] of info) {

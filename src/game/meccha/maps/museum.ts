@@ -8,12 +8,15 @@ import * as THREE from "three";
 import * as X from "./tex/museum";
 import { Art, type Side, type Style, type V3 } from "./tex/museum";
 import { Kit, type Mat, type World } from "./kit";
+import { Life, drawChameleon } from "./tex/life";
 
 type Face = "+x" | "-x" | "+z" | "-z";
 
 export function buildMuseum(): World {
   const k = new Kit(7.5, 3.2);
   const a = new Art(k);
+  const life = new Life(k, 4104);
+  a.life = life; // readable wall labels (title / artist) under every painting
   const R = X.rng(4104);
   const H = 7.5;
   const M = a.M.bind(a);
@@ -256,7 +259,32 @@ export function buildMuseum(): World {
     a.box(black, 0.5, 0.32, 0.04, dx0 + 0.8, 1.2, dz0 + 0.1, { ry: Math.PI });
     a.box(black, 0.08, 0.14, 0.08, dx0 + 0.8, 1.07, dz0 + 0.12);
     const brochure = M(T("broch", () => X.sign("#c96d4a", "#fff", "ART", 128, 160, "bold 40px Georgia")), "#fff", 0, { bump: 0 });
-    for (let i = 0; i < 4; i++) a.box(brochure, 0.2, 0.28, 0.01, dx0 - 1.2 + i * 0.25, 1.07, dz0 - 0.2, { rx: -0.25, sharp: true });
+    void brochure;
+    const covers = [
+      life.poster({ title: "MASTERS", sub: "OF LIGHT", body: "Van Gogh - Vermeer - Monet\nuntil 31 December", bg: "#1d2a33", fg: "#e8dcc0", accent: "#c96d4a", style: "event", px: [200, 280], wear: 0 }),
+      life.poster({ title: "MUSEUM MAP", sub: "floor guide", body: "Grand Hall - Galleries\nMeccha Exhibit - Miniatures", bg: "#efebe3", fg: "#2a2420", accent: "#8a6428", style: "notice", px: [200, 280], wear: 0 }),
+      life.poster({ title: "MECCHA!", sub: "the exhibit", body: "curated by Tom Kodner", bg: "#f1efea", fg: "#d6412f", accent: "#2f6fe0", style: "notice", art: (g, w, h) => drawChameleon(g, w * 0.5, h * 0.55, h * 0.7), px: [200, 280], wear: 0 }),
+      life.poster({ title: "KIDS", sub: "art workshop", body: "Saturdays 10:00\npaint like a chameleon!", bg: "#ffd166", fg: "#1d2a33", accent: "#ef476f", style: "retro", px: [200, 280], wear: 0 }),
+    ];
+    const brStand = M(null, "#2a2622", 0, { roughness: 0.4 });
+    a.box(brStand, 1.1, 0.03, 0.14, dx0 - 0.83, 1.07, dz0 - 0.18);
+    for (let i = 0; i < 4; i++) {
+      const bxp = dx0 - 1.2 + i * 0.25;
+      a.box(brStand, 0.22, 0.3, 0.012, bxp, 1.07, dz0 - 0.2, { rx: 0.25, sharp: true });
+      life.put(covers[i], bxp, 1.222, dz0 - 0.2 - 0.008, 0.2, { ry: Math.PI, rx: -0.25, h: 0.28 });
+    }
+    // guest book (open) facing the visitors, a letter for the curator on the staff side
+    const gb = life.custom(400, 280, (g, w, h) => {
+      g.fillStyle = "#f5efdf"; g.fillRect(0, 0, w, h);
+      const gr = g.createLinearGradient(w / 2 - 20, 0, w / 2 + 20, 0); gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.5, "rgba(0,0,0,0.25)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr; g.fillRect(w / 2 - 20, 0, 40, h);
+      g.fillStyle = "#6a4a2a"; g.font = "bold 18px Georgia,serif"; g.fillText("VISITORS' BOOK", 20, 30);
+      const rows = ["Wonderful! - A. Monet", "The chameleon statue waved at me - Lily, 7", "Tom Kodner, you did it again!", "Could not find my friend for an hour...", "Starry Night <3 - K.", "Best museum in town - T.K.", "Is the white statue alive??", "Merci! - Claude"];
+      g.fillStyle = "#1d2a66"; g.font = "italic 14px 'Comic Sans MS',cursive";
+      rows.forEach((t, i) => { const x0 = i < 4 ? 16 : w / 2 + 16, y = 64 + (i % 4) * 54; g.fillText(t.slice(0, 26), x0, y); if (t.length > 26) g.fillText(t.slice(26), x0 + 8, y + 18); });
+    });
+    life.flat(gb, dx0 + 0.15, 1.07, dz0 - 0.12, 0.44, Math.PI);
+    life.flat(life.letter({ head: "ART MUSEUM", to: "Dear Tom Kodner,", body: "The Van Gogh loan arrives on Monday. Please keep the white chameleon statue away from the paint buckets this time - the cleaners are still recovering.", sign: "- The Director", date: "26 Sept." }), dx0 + 1.4, 1.07, dz0 + 0.12, 0.2, 0.2);
     // stools behind desk
     for (const sx of [-0.8, 0.8]) {
       a.cyl(a.chrome, 0.03, 0.2, 0.66, dx0 + sx, 0, dz0 + 1.0, 14);
@@ -278,6 +306,7 @@ export function buildMuseum(): World {
     const exh = signMat("exh", "#efebe3", "#2a2420", "NOW SHOWING · MASTERS OF LIGHT", 512, 64, "bold 26px Georgia, serif");
     a.plane(exh, 2.6, 0.32, 6.3, 1.25, 12.17, {});
     // lockers along the south-east
+    const lockNo = Array.from({ length: 10 }, (_, n) => life.label({ text: String(n + 1), bg: "#f3efe6", fg: "#1d2a33", border: "#1d2a33", px: [96, 64] }));
     const locker = M(PL, lit("#6f8591"), 1, { metalness: 0.5, roughness: 0.4, bump: 0.2 });
     for (let i = 0; i < 5; i++) {
       const lx = 3.1 + i * 0.62;
@@ -285,6 +314,7 @@ export function buildMuseum(): World {
       for (const ly of [0.55, 1.5]) {
         a.box(a.chrome, 0.12, 0.03, 0.03, lx + 0.18, ly, 19.29);
         a.box(tBase, 0.4, 0.01, 0.01, lx, ly + 0.25, 19.29, { sharp: true });
+        life.wall(lockNo[i * 2 + (ly > 1 ? 0 : 1)], lx - 0.12, ly + 0.14, 19.283, 0.08, Math.PI);
       }
     }
     a.bench(0, 13.3, 0, 2.0);
@@ -797,6 +827,12 @@ export function buildMuseum(): World {
     // Lobby: donation box, sculpture, extra benches
     a.box(a.glass, 0.4, 0.5, 0.4, 3.0, 1.0, 13.4, { sharp: true });
     a.box(tWains, 0.45, 1.0, 0.45, 3.0, 0, 13.4, { solid: true });
+    a.box(a.brass, 0.42, 0.02, 0.42, 3.0, 1.49, 13.4, { sharp: true });
+    a.box(black, 0.14, 0.021, 0.02, 3.0, 1.491, 13.4, { sharp: true });
+    { const bill = M(null, "#7fae78", 0, { roughness: 0.9 }), coin = M(null, "#c9a24a", 0, { metalness: 0.9, roughness: 0.3 });
+      for (let i = 0; i < 9; i++) a.box(i % 3 ? bill : coin, i % 3 ? 0.15 : 0.03, 0.004, i % 3 ? 0.07 : 0.03, 2.88 + (i % 4) * 0.07, 1.004 + Math.floor(i / 4) * 0.005, 13.3 + ((i * 37) % 5) * 0.04, { ry: i * 0.7, sharp: true }); }
+    { const don = life.label({ text: "DONATIONS", sub: "thank you for supporting the arts", bg: "#1d2a33", fg: "#e8dcc0", border: "#b08a3a", px: [256, 110] });
+      life.wall(don, 3.0, 0.72, 13.4 + 0.228, 0.36, 0); life.wall(don, 3.0, 0.72, 13.4 - 0.228, 0.36, Math.PI); }
     a.bench(-6.2, 13.3, 0, 2.0);
     vase(-9.0, 13.0, 1, 1.1);
     // World Paintings: vitrine table with ceramics + busts
@@ -849,6 +885,18 @@ export function buildMuseum(): World {
     vase(23.1, 5.1, 1);
   }
 
+  // ================= LIFE: museum signs & notes =================
+  {
+    const L = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    L(life.plate({ text: "Tom Kodner, 2026", sub: "Carrara marble, a little paint", style: "brass" }), 0, 0.24, -3.2 + 1.402, 0.72, 0);
+    L(life.label({ text: "PLEASE DO NOT TOUCH", sub: "the artworks are shy", bg: "#f5f1e8", fg: "#8a1a1a", border: "#8a1a1a", px: [300, 110] }), 0, 0.64, 0.14, 0.34, 0);
+    L(life.plate({ text: "NO FLASH PHOTOGRAPHY", sub: "thank you", style: "white" }), -3.3, 1.65, 12.17, 0.6, 0);
+    L(life.poster({ title: "GUIDED TOUR", sub: "today 14:00", body: "Meet your guide, curator Tom Kodner, by the white chameleon. Free with your ticket. Duration: 45 minutes.", footer: "Art Museum - Masters of Light", bg: "#efebe3", fg: "#2a2420", accent: "#8a6428", style: "notice", wear: 0.05 }), 9.83, 1.75, 15.8, 0.6, -Math.PI / 2);
+    L(life.poster({ title: "MECCHA", sub: "CHAMELEON", body: "a game by Tom Kodner\npaint yourself - hide - survive", bg: "#f1efea", fg: "#d6412f", accent: "#2f6fe0", style: "retro", art: (g, w, h) => drawChameleon(g, w * 0.5, h * 0.6, h * 0.9, "#4cbf4c"), wear: 0.05 }), 12.4, 1.9, 5.84, 0.66, Math.PI);
+    L(life.label({ text: "STAFF ONLY", sub: "restoration in progress", bg: "#2a2622", fg: "#e8dcc0", border: "#e8dcc0", px: [300, 110] }), -23.83, 1.7, -14.0, 0.5, Math.PI / 2);
+    L(life.note({ text: "Tom - the night paintings need more varnish. Don't turn on the lights! - R.", color: "#fff27a", tape: true }), -23.83, 1.38, -13.8, 0.14, Math.PI / 2, 0.06);
+  }
+  life.finish();
   a.flush();
 
   // ================= spawns / rooms =================

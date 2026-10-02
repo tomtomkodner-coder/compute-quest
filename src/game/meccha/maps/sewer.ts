@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import * as S from "./tex/sewer";
 import { Kit, type Mat, type World } from "./kit";
+import { Life, drawChameleon } from "./tex/life";
 
 // ---------------------------------------------------------------------------------------------
 // Local batching helper: every piece is pre-transformed and merged per material (few draw calls).
@@ -89,6 +90,16 @@ export function buildSewer(): World {
   const H = new Batch(k); // high (ceilings, vaults, upper walls)
   const rnd = S.rng(777);
   const FY = 0.44; // walkway level
+  // readable signs / notes / labels — own rng so the layout stream stays identical
+  const life = new Life(k, 8008);
+  const lr = S.rng(31337);
+  const cardLabels = [
+    life.label({ text: "KEEP DRY", sub: "\u2602  this side up", bg: "#f4efe2", fg: "#222", border: "#222", px: [200, 110] }),
+    life.label({ text: "SPARE BOLTS", sub: "M12 x 400", bg: "#ffffff", fg: "#1a4a8a", stripe: "#1a4a8a", px: [200, 120] }),
+    life.label({ text: "T. KODNER", sub: "inspector - private", bg: "#fbf6e6", fg: "#8a1a1a", border: "#8a1a1a", px: [200, 110] }),
+    life.label({ text: "FRAGILE", sub: "lamp bulbs", bg: "#f4efe2", fg: "#c0231d", border: "#c0231d", px: [200, 110] }),
+  ];
+  const tapeM = k.mat(null, "#c9a867", [1, 1], { roughness: 0.35 });
   const WY = 0.12; // water surface
   const BX0 = -25, BX1 = 18, BZ0 = -24, BZ1 = 24;
 
@@ -447,8 +458,12 @@ export function buildSewer(): World {
     for (const lz of [-0.5, 0, 0.5]) { const [px, pz] = L(x, z, ry, 0, lz); B.geo(woodM, new THREE.BoxGeometry(1.2, 0.1, 0.1), px, y + 0.06, pz, { ry, uv: 0.5 }); }
     rotBox(x, z, ry, 0.6, 0.6, y, y + 0.145);
   };
+  const cardTints = [cardM, k.mat(cardM.ptex, "#e2d2b8", [1, 1], { roughness: 0.95, bump: 0 }), k.mat(cardM.ptex, "#c8b49a", [1, 1], { roughness: 0.95, bump: 0 })];
   const cardBox = (x: number, y: number, z: number, w: number, h: number, d: number, ry: number) => {
-    B.geo(cardM, new RoundedBoxGeometry(w, h, d, 1, 0.015), x, y + h / 2, z, { ry });
+    B.geo(cardTints[Math.floor(lr() * 3)], new RoundedBoxGeometry(w, h, d, 1, 0.015), x, y + h / 2, z, { ry });
+    B.geo(tapeM, new THREE.BoxGeometry(0.07, 0.004, d + 0.006), x, y + h + 0.002, z, { ry, flat: true });
+    for (const s of [-1, 1]) { const [px, pz] = L(x, z, ry, 0, s * (d / 2 + 0.003)); B.geo(tapeM, new THREE.BoxGeometry(0.07, 0.14, 0.004), px, y + h - 0.07, pz, { ry, flat: true }); }
+    if (lr() < 0.75) { const [px, pz] = L(x, z, ry, w * 0.18, d / 2 + 0.005); life.wall(cardLabels[Math.floor(lr() * cardLabels.length)], px, y + h * 0.45, pz, Math.min(0.22, w * 0.4), ry, (lr() - 0.5) * 0.1); }
     rotBox(x, z, ry, w / 2, d / 2, y, y + h);
   };
   const tetrapod = (x: number, y: number, z: number, s: number, ry: number) => {
@@ -488,12 +503,16 @@ export function buildSewer(): World {
     rotBox(x, z, ry, 0.46, 0.33, y, y + 1.02);
   };
   const cabinet = (x: number, y: number, z: number, ry: number, drawers = 4, h = 1.32) => {
-    B.box(metalGrey, 0.5, h, 0.62, x, y, z, { ry, uv: 1 });
+    B.box(metalGrey, 0.5, h, 0.6, x, y, z, { ry, uv: 1 });
+    const dh = (h - 0.06) / drawers;
     for (let i = 0; i < drawers; i++) {
-      const [px, pz] = L(x, z, ry, 0, 0.315);
-      B.box(steel, 0.44, 0.012, 0.012, px, y + ((i + 1) * h) / drawers - 0.02, pz, { ry, flat: true });
-      B.box(galv, 0.14, 0.025, 0.03, px, y + ((i + 0.6) * h) / drawers, pz, { ry, flat: true });
+      const [px, pz] = L(x, z, ry, 0, 0.305);
+      B.geo(metalGrey, new RoundedBoxGeometry(0.46, dh - 0.02, 0.025, 1, 0.006), px, y + 0.04 + dh * (i + 0.5), pz, { ry, uv: 1 });
+      const [hx, hz] = L(x, z, ry, 0, 0.322);
+      B.box(galv, 0.16, 0.022, 0.025, hx, y + 0.04 + dh * (i + 0.62), hz, { ry, flat: true });
+      B.box(steel, 0.09, 0.05, 0.006, hx, y + 0.04 + dh * (i + 0.78) - 0.025, hz, { ry, flat: true });
     }
+    B.box(steel, 0.52, 0.03, 0.62, x, y + h - 0.01, z, { ry, flat: true });
     rotBox(x, z, ry, 0.25, 0.31, y, y + h);
   };
   const shelf = (x: number, y: number, z: number, ry: number, w = 1.6, h = 2.3) => {
@@ -688,7 +707,10 @@ export function buildSewer(): World {
   for (let i = 0; i < 4; i++) {
     const g = new THREE.SphereGeometry(0.34, 12, 9);
     g.scale(1, 0.8 + rnd() * 0.3, 0.9);
-    B.geo(trashM, g, -4.5 + (i % 2) * 0.45, FY + 0.28 + (i > 1 ? 0.32 : 0), -10.5 + (i % 3) * 0.4, { ry: i });
+    const bx = -4.5 + (i % 2) * 0.45, by = FY + 0.28 + (i > 1 ? 0.32 : 0), bz = -10.5 + (i % 3) * 0.4;
+    B.geo(trashM, g, bx, by, bz, { ry: i });
+    B.geo(trashM, new THREE.ConeGeometry(0.06, 0.14, 8), bx, by + 0.3, bz, { rz: 0.3 });
+    B.geo(trashM, new THREE.TorusGeometry(0.05, 0.018, 6, 10), bx + 0.02, by + 0.39, bz, { rx: 1.2 });
   }
   k.collider(-4.95, -3.9, -10.9, -9.5, FY, FY + 0.9, true);
   cabinet(-4.6, FY, -1.2 + 5.5, Math.PI / 2);
@@ -988,10 +1010,16 @@ export function buildSewer(): World {
     floorLamp(-23.3, 0.3, 11.8);
     floorLamp(-22.0, 0.3, 18.4);
     // washing machine + detergent, leaning ladder
-    B.box(washM, 0.62, 0.85, 0.62, -23.6, 0.3, 17.9, { uv: 1 });
-    B.geo(glassDark, new THREE.CircleGeometry(0.2, 24), -23.28, 0.72, 17.9, { ry: Math.PI / 2 });
-    B.geo(galv, new THREE.TorusGeometry(0.22, 0.03, 8, 24), -23.28, 0.72, 17.9, { ry: Math.PI / 2 });
-    B.box(whiteM, 0.2, 0.3, 0.13, -23.6, 1.15, 17.8, { uv: 0.5 });
+    B.geo(washM, new RoundedBoxGeometry(0.62, 0.85, 0.62, 3, 0.04), -23.6, 0.3 + 0.425, 17.9, { uv: 1 });
+    B.geo(whiteM, new RoundedBoxGeometry(0.03, 0.14, 0.58, 1, 0.01), -23.29, 1.03, 17.9);
+    for (const dz of [-0.18, 0.12, 0.2]) B.geo(steel, new THREE.CylinderGeometry(0.028, 0.028, 0.025, 14), -23.27, 1.03, 17.9 + dz, { rz: Math.PI / 2 });
+    B.geo(glassDark, new THREE.BoxGeometry(0.01, 0.05, 0.12), -23.27, 1.04, 17.9 - 0.02, { flat: true });
+    B.geo(glassDark, new THREE.CircleGeometry(0.2, 24), -23.28, 0.66, 17.9, { ry: Math.PI / 2 });
+    B.geo(galv, new THREE.TorusGeometry(0.22, 0.03, 8, 24), -23.28, 0.66, 17.9, { ry: Math.PI / 2 });
+    B.geo(steel, new THREE.BoxGeometry(0.03, 0.08, 0.03), -23.27, 0.66, 17.66, { flat: true });
+    B.geo(whiteM, new THREE.LatheGeometry([[0.001, 0], [0.09, 0], [0.1, 0.02], [0.1, 0.24], [0.06, 0.3], [0.035, 0.31], [0.035, 0.35], [0.001, 0.35]].map(([a, b]) => new THREE.Vector2(a, b)), 14), -23.62, 1.15, 17.78);
+    B.geo(plasticB, new THREE.CylinderGeometry(0.04, 0.04, 0.04, 12), -23.62, 1.52, 17.78);
+    life.wall(life.label({ text: "SUDS", sub: "pink blossom", bg: "#ffd6ea", fg: "#c0186a", px: [128, 96] }), -23.52, 1.26, 17.78, 0.1, Math.PI / 2);
     k.collider(-23.95, -23.28, 17.58, 18.22, 0.3, 1.15, true);
     ladder(-17.2, 0.3, 18.5, Math.PI, 2.6, 0.3);
     k.collider(-17.5, -16.9, 17.6, 18.9, 0.3, 2.6, false);
@@ -1036,6 +1064,41 @@ export function buildSewer(): World {
     hangLamp(0, 3.8, 19.5, 6);
     decal(grafA, 4.0, 2.0, 3.0, 2.0, 22.97, Math.PI);
   }
+
+  // =============================== LIFE: signs, letters, stencils ===============================
+  {
+    const W = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    // entrance: authorised personnel sign next to the steel door, shift roster, locker name tags
+    B.box(steel, 0.74, 0.5, 0.02, 1.4, FY + 1.3, 22.97, { flat: true });
+    W(life.label({ text: "AUTHORISED", sub: "PERSONNEL ONLY - City Sewer Dept.", bg: "#f2f0e6", fg: "#b01818", border: "#b01818", wear: 0.6, px: [300, 130] }), 1.4, FY + 1.55, 22.955, 0.7, Math.PI);
+    W(life.letter({ head: "NIGHT SHIFT ROSTER", body: "Mon - M. Rat\nTue - J. Pipes\nWed - Tom Kodner\nThu - Tom Kodner\nFri - ???\nNOTE: check the pink room, someone lives there", hand: true, ruled: true, paper: "#fbfbf4", age: 0.4, px: [220, 300] }), 7.42, 1.95, 21.5, 0.22, -Math.PI / 2, 0.03);
+    ["M. RAT", "J. PIPES", "T. KODNER", "K. MUD", "SPARE", "L. DRAIN"].forEach((t, i) => W(life.label({ text: t, bg: "#f4f1e4", fg: "#222", border: "#555", px: [160, 64], wear: 0.3 }), -7.72 + 0.253, FY + 1.72, 19 - (i - 2.5) * 0.46, 0.13, Math.PI / 2));
+    W(life.label({ text: "SECTOR 7", sub: "\u2191 MAIN CHANNEL - BASIN 400 m", bg: "#1d6b3a", fg: "#ffffff", border: "#ffffff", px: [300, 120] }), -2.4, FY + 2.1, 22.97, 0.9, Math.PI);
+    // main channel: stencils, no-swimming sign, spray tag
+    W(life.graffiti({ text: "BASIN \u2191", color: "#e8e2d0", style: "stencil", px: [300, 110], drip: false }), -4.99 + 0.012, 1.2, -11.8, 1.1, Math.PI / 2);
+    W(life.graffiti({ text: "OUTFALL 7B", color: "#e8e2d0", style: "stencil", px: [360, 110], drip: false }), 4.99 - 0.012, 1.25, 4.0, 1.2, -Math.PI / 2);
+    W(life.label({ text: "NO SWIMMING", sub: "raw sewage - no, really", bg: "#ffffff", fg: "#b01818", border: "#b01818", wear: 0.7 }), 4.97 - 0.012, 1.55, -6.0, 0.6, -Math.PI / 2);
+    W(life.graffiti({ text: "TOM KODNER", sub: "was here", color: "#35e0ff", outline: "#1a1a6a", style: "bubble" }), -4.99 + 0.014, 0.97, 2.8, 2.3, Math.PI / 2);
+    // flood basin: painted depth gauge on the pool wall + pipe label
+    W(life.custom(96, 512, (g, w, h) => {
+      g.fillStyle = "#f2efe4"; g.fillRect(0, 0, w, h);
+      for (let i = 0; i <= 30; i++) { const y = h - 8 - i * ((h - 16) / 30); g.fillStyle = i % 10 === 0 ? "#b01818" : "#222"; g.fillRect(0, y - 1.5, i % 5 === 0 ? w * 0.6 : w * 0.3, 3); if (i % 10 === 0 && i) { g.font = "bold 22px Arial,sans-serif"; g.fillText(`${i / 10}m`, w * 0.55, y + 8); } }
+      g.fillStyle = "rgba(90,70,40,0.35)"; g.fillRect(0, h * 0.6, w, h * 0.4);
+    }), 16.97 - 0.005, 1.4, -18.0, 0.3, -Math.PI / 2);
+    W(life.label({ text: "STORM MAIN 3", sub: "\u2192 flow  -  do not weld", bg: "#e0b21a", fg: "#111", px: [300, 110], wear: 0.6 }), 1.0, 3.4, -22.4 + 0.56, 0.7, 0);
+    // brick hall: notice on the lockers, newspaper on the crate, work order on the cabinet
+    W(life.poster({ title: "LOST", sub: "rubber boot (left)", body: "size 44, yellow. last seen near\nthe Flood Basin. please return\nto T. Kodner, locker 3", bg: "#fbf6e6", fg: "#222", accent: "#e0b21a", style: "notice", tape: true, wear: 0.4 }), -23.45 + 0.02, 1.65, 3.8, 0.32, Math.PI / 2, 0.04);
+    life.flat(life.news({ name: "The City Echo", headline: "GIANT CHAMELEON SEEN IN SEWERS", sub: "Inspector Tom Kodner: 'it was painted like the bricks'", photo: (g, w, h) => { g.fillStyle = "#7a5040"; g.fillRect(0, 0, w, h); drawChameleon(g, w * 0.5, h * 0.55, h * 0.7, "#9a6a58", "#e8d8c8"); }, age: 0.6 }), -17.9, 0.55 + 0.75, -9.3, 0.36, 0.15);
+    W(life.letter({ head: "WORK ORDER #7731", body: "Location: Brick Hall\nTask: replace hanging lamps\nPriority: low\nNote: somebody painted the lockers AGAIN.", hand: false, size: 13, paper: "#fbfbf4", age: 0.3, px: [220, 280] }), -10.70, 1.25, 6.0, 0.2, -Math.PI / 2);
+    // east culvert: IBC & drum labels
+    W(life.label({ text: "NON-POTABLE", sub: "DO NOT DRINK", bg: "#ffffff", fg: "#b01818", border: "#b01818", wear: 0.5 }), 16.35 - 0.58, FY + 0.6, 19.9, 0.36, -Math.PI / 2);
+    W(life.graffiti({ text: "DRAIN 14", color: "#e8e2d0", style: "stencil", px: [300, 110], drip: false }), 11.01 + 0.012, 1.1, 6.5, 1.0, Math.PI / 2);
+    // pink room: letter on the red table, home sweet home poster, calendar
+    life.flat(life.letter({ to: "Dear Tom Kodner,", body: "Thank you for not telling the city about my pink room. The pipes sing at night and the porthole glows. Please knock before you come in!", sign: "Love, Rat", paper: "#ffeef6", ink: "#8a1050", date: "Sept. 26" }), -21.2, 1.21, 15.0, 0.22, -Math.PI / 2 + 0.2);
+    W(life.poster({ title: "HOME SWEET HOME", sub: "(under the city)", bg: "#ffd6ea", fg: "#c0186a", accent: "#ff5cae", style: "retro", wear: 0.2 }), -18.5, 1.8, 18.95, 0.55, Math.PI, 0.02);
+    W(life.calendar({ month: "SEPTEMBER", marks: [[26, "party"], [14, "flood?"]], art: "#e0186a" }), -16.03, 1.55, 17.2, 0.3, -Math.PI / 2, -0.03);
+  }
+  life.finish();
 
   B.flush();
   H.flush();

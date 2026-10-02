@@ -11,6 +11,7 @@ import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferG
 import * as T from "../textures";
 import { Kit, boxGeo, type World, type Mat } from "./kit";
 import * as OT from "./tex/onsen";
+import { Life, JP, JPS } from "./tex/life";
 
 type V3 = [number, number, number];
 type Inst = { pos: V3; rotX?: number; rotY?: number; rotZ?: number; scale?: V3; color?: string };
@@ -63,6 +64,7 @@ export function buildOnsen(): World {
   // ---------------- batching ----------------
   const batches = new Map<Mat, THREE.BufferGeometry[]>();
   const units = new Map<Mat, number>();
+  const life = new Life(k, 2611);
   const put = (m: Mat, g: THREE.BufferGeometry, unit?: number) => {
     const u = unit ?? units.get(m) ?? 0;
     if (u > 0) worldUV(g, u);
@@ -634,6 +636,17 @@ export function buildOnsen(): World {
     f.cy(brassM, 0.04, 0.05, 0.05, 0.6, 1.15, 0.1, 16);
     f.sph(brassM, 0.03, 0.6, 1.21, 0.1);
     f.bx(whiteM, 0.35, 0.03, 0.25, -0.2, 1.15, 0.12);
+    // open guest register (宿帳) on top of the book block + price list on the counter front
+    life.flat(life.custom(400, 280, (g, w, h) => {
+      g.fillStyle = "#f5efdf"; g.fillRect(0, 0, w, h);
+      const gr = g.createLinearGradient(w / 2 - 18, 0, w / 2 + 18, 0); gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.5, "rgba(0,0,0,0.25)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(w / 2 - 18, 0, 36, h);
+      g.fillStyle = "#8a1a1a"; g.font = `bold 24px ${JP}`; g.fillText("宿帳", 24, 36); g.fillText("九月", w / 2 + 24, 36);
+      g.strokeStyle = "rgba(140,40,40,0.35)"; for (let x = 40; x < w - 10; x += 34) if (Math.abs(x - w / 2) > 20) { g.beginPath(); g.moveTo(x, 50); g.lineTo(x, h - 12); g.stroke(); }
+      const names = ["トム・コドナー様", "山田 花子", "佐藤 一郎", "Tom Kodner", "鈴木 次郎", "田中 美咲", "高橋 健", "伊藤 さくら", "トム・コドナー様", "渡辺 翔"];
+      g.fillStyle = "#1a1a1a"; g.font = `18px ${JP}`;
+      names.forEach((n, i) => { const x0 = i < 5 ? w / 2 - 44 - i * 34 : w - 30 - (i - 5) * 34; [...n].slice(0, 9).forEach((ch, j) => g.fillText(ch, x0, 72 + j * 21)); });
+    }), f.wx(-0.2, 0.12), 1.181, f.wz(-0.2, 0.12), 0.36, -PI / 2 + PI);
+    life.wall(life.menu({ title: "入浴料金", sub: "湯の宿 月見荘", items: [["大人", "800円"], ["子供", "400円"], ["貸切風呂", "2000円"], ["タオル", "200円"], ["浴衣", "無料"]], style: "paper", font: JP, px: [256, 330] }), 4.89, 2.1, 14.35, 0.6, -PI / 2);
     f.lat(andonM, [[0, 0], [0.1, 0], [0.12, 0.2], [0.08, 0.3], [0, 0.3]], -0.8, 1.15, 0, 16);
     // maneki-neko
     f.lat(ceramicM, [[0, 0], [0.09, 0], [0.1, 0.05], [0.09, 0.13], [0.06, 0.18], [0, 0.19]], 0.2, 1.15, -0.05, 16);
@@ -683,6 +696,10 @@ export function buildOnsen(): World {
     shelf(-11.6, 11.6, PI / 2, 2.4, 5);
     shelf(-8.0, 12.6, 0, 2.2, 7);
     shelf(-8.0, 13.45, PI, 2.2, 9);
+    // price tags + a shop sign
+    const tags = ["温泉まんじゅう 800円", "手ぬぐい 600円", "ゆず石けん 450円", "木のお箸 1200円"].map((t) => life.label({ text: t, bg: "#fffaf0", fg: "#8a1a1a", border: "#8a1a1a", font: JPS, px: [200, 64] }));
+    tags.forEach((id, i) => { const zz = 15.6 - 0.23, xx = -8.5 - 1.2 + i * 0.8; life.wall(id, xx, 0.1 + 0.44 * (i % 3) + 0.035, zz, 0.2, PI, 0); });
+    life.wall(life.plate({ text: "おみやげ", sub: "トム・コドナーおすすめ", style: "wood", font: JP, px: [300, 110] }), -5.29, 1.55, 11.4, 0.6, PI / 2);
     // counter + register + daruma
     bx(darkWoodM, 0.6, 0.95, 1.6, -5.6, 0, 11.4, { solid: true, round: true, unit: 0 });
     bx(blackM, 0.3, 0.15, 0.3, -5.6, 0.95, 11.2, { round: true });
@@ -1327,6 +1344,11 @@ export function buildOnsen(): World {
     sky.castShadow = false; sky.receiveShadow = false;
     k.group.add(sky);
   }
+
+  // ======================= LIFE: notices =======================
+  life.wall(life.poster({ title: "入浴の心得", body: "一、かけ湯をしてから入りましょう\n二、タオルを湯船に入れないで\n三、お湯の中で泳がないで\n四、かくれんぼは禁止です\n    (トム・コドナーさん、あなたです)", bg: "#f5efdf", fg: "#1a1a1a", accent: "#1a3a6a", style: "notice", font: JP, wear: 0.1 }), 23.87, 1.7, 12.0, 0.55, -PI / 2);
+  life.wall(life.label({ text: "ゆ", sub: "天然温泉 かけ流し", bg: "#1a3a6a", fg: "#ffffff", font: JP, px: [200, 160] }), -23.88, 1.9, 4.0, 0.4, PI / 2);
+  life.finish();
 
   // ======================= FLUSH =======================
   for (const [m, list] of batches) k.merged(list, m);

@@ -9,6 +9,7 @@ import * as THREE from "three";
 import * as T from "../textures";
 import * as E from "./tex/egypt";
 import { Kit, boxGeo, grid, type Mat, type World } from "./kit";
+import { Life, HAND, SERIF } from "./tex/life";
 
 type G = THREE.BufferGeometry;
 type V3t = [number, number, number];
@@ -115,6 +116,30 @@ export function buildEgypt(): World {
   let seed = 23;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const rr = (a: number, c: number) => a + rnd() * (c - a);
+  const life = new Life(k, 1922);
+  /** papyrus sheet with painted hieroglyph columns (+ optional English note by the Kodner expedition) */
+  const papyrus = (seed: number, note?: string) => life.custom(320, 220, (g, w, h, r) => {
+    g.fillStyle = "#e3d3a4"; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "rgba(120,90,40,0.25)"; for (let x = 0; x < w; x += 7) { g.beginPath(); g.moveTo(x + r() * 2, 0); g.lineTo(x + r() * 2, h); g.stroke(); }
+    g.fillStyle = "rgba(120,80,30,0.25)"; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(r() * w, r() * h, 20 + r() * 30, 0, Math.PI * 2); g.fill(); }
+    const cols = note ? 4 : 8, cw = (note ? w * 0.5 : w - 20) / cols;
+    for (let c = 0; c < cols; c++) {
+      g.strokeStyle = "rgba(60,40,20,0.5)"; g.beginPath(); g.moveTo(10 + c * cw, 12); g.lineTo(10 + c * cw, h - 12); g.stroke();
+      for (let y = 20; y < h - 24; y += 24) {
+        const x = 10 + c * cw + cw / 2, t = Math.floor(r() * 6);
+        g.fillStyle = t === 2 ? "#a02a1a" : "#2a1c10"; g.strokeStyle = g.fillStyle; g.lineWidth = 2;
+        g.beginPath();
+        if (t === 0) { g.ellipse(x, y + 6, 8, 5, 0, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(x, y + 6, 2.5, 0, Math.PI * 2); g.fill(); } // eye
+        else if (t === 1) { g.moveTo(x - 7, y + 12); g.quadraticCurveTo(x, y - 4, x + 7, y + 12); g.stroke(); } // bread
+        else if (t === 2) { g.arc(x, y + 6, 6, 0, Math.PI * 2); g.fill(); } // sun
+        else if (t === 3) { g.moveTo(x - 7, y + 2); g.lineTo(x - 2, y + 2); g.lineTo(x + 7, y + 12); g.moveTo(x - 2, y + 2); g.lineTo(x - 3, y + 12); g.stroke(); } // bird
+        else if (t === 4) { for (let i = 0; i < 3; i++) { g.moveTo(x - 7, y + 3 + i * 4); g.lineTo(x + 7, y + 3 + i * 4); } g.stroke(); } // water
+        else { g.moveTo(x, y); g.lineTo(x, y + 13); g.moveTo(x - 5, y + 4); g.arc(x, y + 4, 5, Math.PI, 0); g.stroke(); } // ankh
+      }
+    }
+    if (note) { g.fillStyle = "#1d2a66"; g.font = `15px ${HAND}`; let y = 30; for (const l of note.split("\n")) { g.fillText(l, w * 0.54, y); y += 20; } }
+    void seed;
+  });
 
   // ---------------- materials ----------------
   const tx = (key: string, f: () => T.PaintTex) => k.tex("eg-" + key, f);
@@ -627,7 +652,7 @@ export function buildEgypt(): World {
   /** chest with painted sides, gold trim, optional curved lid and carrying poles */
   const chest = (x: number, y: number, z: number, w: number, h: number, d: number, ry: number, curved = false, poles = false, m = mChest) => {
     const f = new Frame(x, z, ry, y, 1);
-    b.add(m, f.put(new THREE.BoxGeometry(w, h, d), 0, h / 2 + 0.06, 0));
+    b.add(m, f.put(boxGeo(w, h, d), 0, h / 2 + 0.06, 0));
     for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) b.add(mGold, f.put(new THREE.BoxGeometry(0.06, 0.08, 0.06), lx * (w / 2 - 0.05), 0.03, lz * (d / 2 - 0.05)));
     b.add(mGold, f.put(new THREE.BoxGeometry(w + 0.03, 0.04, d + 0.03), 0, h + 0.06, 0));
     b.add(mGold, f.put(new THREE.BoxGeometry(w + 0.03, 0.04, d + 0.03), 0, 0.08, 0));
@@ -902,6 +927,8 @@ export function buildEgypt(): World {
   // ======================================================================
   k.room("Scribes' Gallery", 13.5, 21, -9.5, 6.5);
   {
+    const scribeSheets = [papyrus(1), papyrus(2, "Kodner Expedition\nday 12: this line\nseems to say\n'the cat hides\nin the shadow'\n- T.K."), papyrus(3)];
+    let scribeN = 0;
     // papyrus scroll pigeonholes along the east wall
     const scrolls: Inst[] = [];
     for (const z of [-6.5, -2.2, 2.4]) {
@@ -922,12 +949,14 @@ export function buildEgypt(): World {
       b.add(mMat, f.put(new THREE.BoxGeometry(2.2, 0.02, 1.6), 0, 0.01, 0));
       b.add(mCedar, f.put(boxGeo(1.2, 0.06, 0.6), 0, 0.42, 0));
       for (const [lx, lz] of [[-0.5, -0.22], [0.5, -0.22], [-0.5, 0.22], [0.5, 0.22]] as const) b.add(mCedar, f.put(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8), lx, 0.2, lz));
-      b.add(mFood, f.put(new THREE.PlaneGeometry(0.5, 0.34), 0.1, 0.455, 0, -Math.PI / 2, 0, 0.1));
+      { const [px, pz] = f.pt(0.1, 0); life.flat(scribeSheets[scribeN++ % 3], px, 0.452, pz, 0.5, ry + 0.1); }
       b.add(mEbony, f.put(boxGeo(0.3, 0.04, 0.07), -0.4, 0.47, 0.1));
       { const [px, pz] = f.pt(0.45, -0.15); pot(px, 0.45, pz, 0.35, 3, mClay, false); }
       f.col(k, -0.6, 0.6, -0.3, 0.3, 0, 0.46, true);
       const [sx, sz] = f.pt(0, 0.7);
-      b.add(mCedar, place(boxGeo(0.45, 0.3, 0.4), sx, 0.15, sz), 1);
+      b.add(mCedar, place(boxGeo(0.42, 0.05, 0.38), sx, 0.3, sz, 0, ry, 0), 1);
+      b.add(mMat, place(new THREE.CylinderGeometry(0.19, 0.19, 0.03, 14), sx, 0.34, sz, 0, 0, 0, [1, 1, 0.9]), 1);
+      for (const [lx, lz] of [[-0.17, -0.15], [0.17, -0.15], [-0.17, 0.15], [0.17, 0.15]] as const) { const [qx, qz] = f.pt(lx, 0.7 + lz); b.add(mCedar, beam([qx, 0, qz], [qx * 0.9 + sx * 0.1, 0.3, qz * 0.9 + sz * 0.1], 0.02)); }
     }
     // seated scribe statue (cross-legged, painted limestone) on a plinth
     boxAt(mBlock, 14.3, 15.3, 0, 0.6, 5.1, 6.0, 2);
@@ -1124,6 +1153,16 @@ export function buildEgypt(): World {
       boxAt(mBlock, 14.0, 15.5, H.side + 0.4, H.side + 0.4 + i * 0.3875, z2 - 0.45, z2, 2);
     }
   }
+
+  // ---------------- LIFE: the Kodner expedition's traces ----------------
+  {
+    life.wall(life.graffiti({ text: "T. KODNER 1922", color: "rgba(70,45,20,0.8)", style: "chalk", px: [420, 110], font: SERIF }), 5.2, 1.55, 7.13, 1.4, 0, 0.02);
+    life.wall(life.label({ text: "HYPOSTYLE HALL", sub: "18 columns - please do not climb (you will anyway)", bg: "#efe3c4", fg: "#5a3a18", border: "#8a6a2a", px: [360, 120], wear: 0.5 }), -12.99, 1.7, 1.4, 0.8, Math.PI / 2);
+    life.wall(life.label({ text: "TREASURY", sub: "catalogued by the Kodner Expedition", bg: "#efe3c4", fg: "#5a3a18", border: "#8a6a2a", px: [360, 120], wear: 0.5 }), 14.0, 1.6, -9.5 - 0.51, 0.7, Math.PI);
+    life.wall(life.letter({ head: "KODNER EXPEDITION", to: "Dear Tom Kodner,", body: "We have opened the burial chamber at last. The coffin is gilded, the jars are sealed, and the cat statues seem to follow us with their eyes. Do not touch the throne!", sign: "- Prof. H. Carter-ish", hand: true, paper: "#eadfbe", age: 0.8, date: "Nov. 4, 1922" }), -10.02 - 0.012, 1.55, -12.1, 0.24, -Math.PI / 2, 0.03);
+    life.wall(life.poster({ title: "WANTED", sub: "THE CAT THIEF", body: "stole 3 golden cats from the Treasury\nlast seen hiding as a statue", footer: "reward: 100 gold deben", bg: "#e3d3a4", fg: "#2a1c10", accent: "#8a1a1a", style: "wanted", art: (g, w, h) => { g.fillStyle = "#d6c496"; g.fillRect(0, 0, w, h); g.fillStyle = "#2a1c10"; g.beginPath(); g.ellipse(w / 2, h * 0.65, w * 0.2, h * 0.3, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.arc(w / 2, h * 0.3, h * 0.16, 0, Math.PI * 2); g.fill(); g.beginPath(); g.moveTo(w * 0.4, h * 0.22); g.lineTo(w * 0.43, h * 0.05); g.lineTo(w * 0.48, h * 0.18); g.moveTo(w * 0.6, h * 0.22); g.lineTo(w * 0.57, h * 0.05); g.lineTo(w * 0.52, h * 0.18); g.fill(); } }), -14.02, 1.8, -5.5, 0.45, -Math.PI / 2, 0.02);
+  }
+  life.finish();
 
   // ---------------- sky dome + sun disk (render only, not paintable) ----------------
   {

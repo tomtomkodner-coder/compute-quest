@@ -11,6 +11,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import * as T from "../textures";
 import * as A from "./tex/amusement";
 import { Kit, type Mat, type World } from "./kit";
+import { Life, drawChameleon, drawBalloons } from "./tex/life";
 
 type G = THREE.BufferGeometry;
 type V3t = [number, number, number];
@@ -127,6 +128,7 @@ type Inst = { pos: V3t; rotY?: number; rotX?: number; rotZ?: number; scale?: V3t
 export function buildAmusement(): World {
   const k = new Kit(6, 3);
   const B = new Batch(k);
+  const life = new Life(k, 3030);
   const rnd = A.rng(2024);
   const X0 = -27.5, X1 = 27.5, Z0 = -25.5, Z1 = 25.5;
   const tx = (key: string, f: () => T.PaintTex) => k.tex("am-" + key, f);
@@ -340,10 +342,12 @@ export function buildAmusement(): World {
     B.col(-0.9, 0.9, 0, 0.92, -0.33, -0.2, true);
     B.xf = null;
   };
+  const binSticker = life.label({ text: "THANK YOU!", sub: "keep Chameleon Land clean", bg: "#ffffff", fg: "#2a7a3a", px: [200, 100] });
   const bin = (x: number, z: number, m: Mat) => {
     B.lathe(m, [[0, 0], [0.26, 0], [0.3, 0.05], [0.3, 0.85], [0.33, 0.88], [0.33, 0.92], [0, 0.92]], x, 0, z, { seg: 18 });
     B.lathe(iron, [[0.34, 0], [0.34, 0.06], [0.2, 0.2], [0.1, 0.26], [0, 0.27]], x, 0.92, z, { seg: 18 });
     for (const y of [0.25, 0.6]) B.cyl(white, 0.305, 0.305, 0.05, x, y, z, { seg: 18, open: true });
+    for (const a of [0, PI]) life.wall(binSticker, x + Math.sin(a) * 0.307, 0.44, z + Math.cos(a) * 0.307, 0.2, a);
     k.collider(x - 0.33, x + 0.33, z - 0.33, z + 0.33, 0, 1.18, true);
   };
   const lamp = (x: number, z: number, twin = true) => {
@@ -1175,6 +1179,32 @@ export function buildAmusement(): World {
     k.instances(bottleGeo, M(null, "#ffffff", { roughness: 0.15, metalness: 0.2 }), bottles);
   }
 
+  // ================= LIFE: notices, tickets, a height sign =================
+  {
+    const L = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    const special = life.poster({ title: "TODAY", sub: "TOM KODNER DAY", body: "all rides half price\nfree balloon for every hider!", bg: "#ffe14a", fg: "#c0141b", accent: "#1d5fe0", style: "retro", art: (g, w, h, r) => drawBalloons(g, w, h, r), wear: 0.05 });
+    const prices = life.menu({ title: "TICKETS", sub: "Chameleon Land", items: [["Day pass", "25"], ["Kids (<1.2 m)", "15"], ["Ferris wheel", "5"], ["Coaster", "6"], ["Carousel", "3"]], style: "dark" });
+    for (const s2 of [-1, 1]) { L(special, s2 * 6.7 + 0.62, 1.7, 22.615, 0.42, 0, 0.02); L(prices, s2 * 6.7 - 0.62, 1.72, 22.615, 0.42, 0); }
+    // stub tickets dropped in the forecourt
+    const stub = life.label({ text: "ADMIT ONE", sub: "Chameleon Land - 27 Sept", bg: "#1d5fe0", fg: "#ffffff", border: "#ffffff", px: [200, 90] });
+    for (const [x, z, a] of [[2.4, 23.6, 0.4], [-3.1, 25.2, 2.1], [5.2, 24.4, -0.8], [-0.4, 20.2, 1.3]] as V3t[]) life.flat(stub, x, 0.012, z, 0.12, a);
+    // "you must be this tall" chameleon standee on the avenue
+    { const x = 3.4, z = 20.2;
+      B.box(ironGreen, 0.08, 1.7, 0.08, x, 0, z, { flat: true });
+      B.box(white, 0.62, 1.3, 0.04, x, 0.45, z - 0.06);
+      k.collider(x - 0.32, x + 0.32, z - 0.1, z + 0.06, 0, 1.75, false);
+      life.put(life.custom(200, 420, (g, w, h) => {
+        g.fillStyle = "#fff8e8"; g.fillRect(0, 0, w, h);
+        g.fillStyle = "#c0141b"; g.font = "bold 26px Impact,'Arial Black',sans-serif"; g.textAlign = "center"; g.fillText("YOU MUST BE", w / 2, 36); g.fillText("THIS TALL", w / 2, 66);
+        drawChameleon(g, w * 0.45, h * 0.52, 120, "#4cbf4c"); g.fillStyle = "#1d5fe0"; g.fillRect(0, h * 0.2, w, 8);
+        g.fillStyle = "#222"; g.font = "16px Arial,sans-serif"; g.fillText("to ride the coaster (1.2 m)", w / 2, h - 44); g.fillText("- Tom Kodner, park director", w / 2, h - 20); g.textAlign = "left";
+      }), x, 1.1, z - 0.085, 0.6, { ry: PI, h: 1.26 });
+    }
+    // lost & found poster on the park-map board back
+    L(life.poster({ title: "LOST", sub: "a white hider", body: "painted in stripes, answers to 'Tom'.\nLast seen near the carousel.", footer: "ask at the ticket booth", bg: "#ffffff", fg: "#222", accent: "#e8262a", style: "notice", wear: 0.1 }), -8.7, 1.45, 24.245, 0.5, 0, 0.03);
+    life.flat(life.news({ name: "Park Gazette", headline: "FERRIS WHEEL TURNS 20", sub: "director Tom Kodner cuts the ribbon with giant scissors" }), -17.3 + 0.3, 0.46, 24.4 - 0.05, 0.32, PI + 0.3);
+  }
+  life.finish();
   B.flush();
 
   // ---------------- spawns & lighting ----------------

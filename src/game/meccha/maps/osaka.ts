@@ -10,6 +10,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import * as T from "../textures";
+import { Life } from "./tex/life";
 import * as O from "./tex/osaka";
 import { Kit, type Mat, type World } from "./kit";
 
@@ -135,6 +136,25 @@ export function buildOsaka(): World {
   const tx = (key: string, f: () => T.PaintTex) => k.tex("os-" + key, f);
   type MO = Parameters<Kit["mat"]>[3];
   const M = (t: T.PaintTex | null, col: string, o: MO = {}) => k.mat(t, col, [1, 1], o);
+  // readable posters / menus / labels (one atlas); own rng so the layout stream stays identical
+  const life = new Life(k, 1970);
+  const lr = O.rng(8128);
+  /** world position + yaw of a point in the current `within` frame */
+  const wpt = (lx: number, ly: number, lz: number, lry = 0): [number, number, number, number] => {
+    const v = new V3(lx, ly, lz);
+    if (!B.xf) return [v.x, v.y, v.z, lry];
+    v.applyMatrix4(B.xf);
+    const e = B.xf.elements;
+    return [v.x, v.y, v.z, lry + Math.atan2(e[8], e[10])];
+  };
+  const boxLabels = [
+    life.label({ text: "ワレモノ", sub: "取扱注意 FRAGILE", bg: "#ffffff", fg: "#d01818", border: "#d01818", px: [200, 110] }),
+    life.label({ text: "大阪物産", sub: "トム・コドナー様", bg: "#f6f1e2", fg: "#1a2a6a", stripe: "#1a2a6a", px: [200, 120] }),
+    life.label({ text: "たこ焼粉", sub: "10kg  天地無用", bg: "#fff4d0", fg: "#b3101a", border: "#b3101a", px: [200, 110] }),
+    life.label({ text: "天地無用", sub: "\u2191 THIS SIDE UP", bg: "#f4efe2", fg: "#222", px: [200, 100] }),
+  ];
+  const crateStencil = [life.graffiti({ text: "大阪港", color: "#2a1a10", style: "stencil", px: [256, 110], drip: false }), life.graffiti({ text: "OSAKA 07", color: "#2a1a10", style: "stencil", px: [300, 110], drip: false })];
+  const tapeM = M(null, "#c9a867", { roughness: 0.35 });
 
   // ---------------- materials ----------------
   const setts = M(tx("setts", O.osSetts), "#ffffff", { roughness: 0.32, bump: 0.8 });
@@ -319,6 +339,9 @@ export function buildOsaka(): World {
   const cardSheet = (x: number, z: number, w: number, d: number, ry: number, y = 0.02) => B.box(cardboard, w, 0.012, d, x, y, z, { ry, flat: true, su: w / 1.2, sv: d / 1.2 });
   const cardBox = (x: number, y: number, z: number, w: number, h: number, d: number, ry = 0, solid = true) => {
     B.box(boxM, w, h, d, x, y, z, { ry });
+    B.box(tapeM, 0.07, 0.004, d + 0.006, x, y + h, z, { ry, flat: true });
+    for (const sd of [-1, 1]) B.box(tapeM, 0.07, 0.13, 0.004, x + Math.sin(ry) * sd * (d / 2 + 0.003), y + h - 0.13, z + Math.cos(ry) * sd * (d / 2 + 0.003), { ry, flat: true });
+    if (lr() < 0.85) life.wall(boxLabels[Math.floor(lr() * boxLabels.length)], x + Math.sin(ry) * (d / 2 + 0.005) + Math.cos(ry) * w * 0.15, y + h * 0.45, z + Math.cos(ry) * (d / 2 + 0.005) - Math.sin(ry) * w * 0.15, Math.min(0.2, w * 0.4), ry, (lr() - 0.5) * 0.1);
     const e = Math.max(w, d) / 2;
     if (solid) k.collider(x - e, x + e, z - e, z + e, y, y + h, true);
   };
@@ -348,6 +371,7 @@ export function buildOsaka(): World {
       B.box(woodCrate, t, b, L, s2 * (S / 2 + t / 2 - 0.005), S / 2 - b / 2, 0, { flat: true, uv: 0.8, rx: (s2 * PI) / 4 });
     }
     if (solid) lcol(-S / 2 - 0.03, S / 2 + 0.03, 0, S, -S / 2 - 0.03, S / 2 + 0.03);
+    for (const fz of [1, -1]) { const [px, py, pz, pry] = wpt(0, 0.5, fz * (S / 2 + 0.04), fz > 0 ? 0 : PI); life.wall(crateStencil[Math.floor(lr() * 2)], px, py, pz, 0.62 * s, pry, (lr() - 0.5) * 0.06); }
   });
   const pallet = (x: number, y: number, z: number, ry: number, w = 1.2, d = 1.0) => within(x, y, z, ry, 1, () => {
     for (const dz of [-1, 0, 1]) B.box(palletM, w, 0.1, 0.1, 0, 0, dz * (d / 2 - 0.05), { flat: true, uv: 0.8 });
@@ -967,6 +991,47 @@ export function buildOsaka(): World {
       for (const [a, b] of [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]]) B.rod(steel, 0.04, [x + a, y, z + b], [x + a, y + 0.7, z + b], 5);
     }
   }
+
+  // ===== LIFE: posters, menus, newspapers, stickers, graffiti =====
+  {
+    const L = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    const live = life.poster({ title: "ライブ!", sub: "トム・コドナー & THE CHAMELEONS", body: "9月26日(土) 道頓堀ホール\n前売 3000円 / 当日 3500円", bg: "#1a1030", fg: "#ffe14a", accent: "#ff3f8e", style: "band", tape: true, wear: 0.3 });
+    const lost = life.poster({ title: "迷子", sub: "タコを探しています", body: "名前: たこ吉 (8本足)\n最後に見た場所: 裏庭\n連絡先: トム・コドナー", footer: "お礼します!", bg: "#f2ead6", fg: "#2a1d10", accent: "#c0231d", style: "missing", art: (g, w, h) => { g.fillStyle = "#e9e2d2"; g.fillRect(0, 0, w, h); g.fillStyle = "#e0584a"; g.beginPath(); g.ellipse(w / 2, h * 0.4, w * 0.24, h * 0.3, 0, 0, Math.PI * 2); g.fill(); g.lineWidth = 7; g.strokeStyle = "#e0584a"; g.lineCap = "round"; for (let i = 0; i < 6; i++) { const x0 = w * (0.3 + i * 0.08); g.beginPath(); g.moveTo(x0, h * 0.6); g.quadraticCurveTo(x0 + (i % 2 ? 12 : -12), h * 0.8, x0 + (i % 2 ? -6 : 6), h * 0.95); g.stroke(); } g.fillStyle = "#fff"; for (const ex of [-1, 1]) { g.beginPath(); g.arc(w / 2 + ex * w * 0.08, h * 0.36, 7, 0, Math.PI * 2); g.fill(); } g.fillStyle = "#111"; for (const ex of [-1, 1]) { g.beginPath(); g.arc(w / 2 + ex * w * 0.08, h * 0.37, 3.5, 0, Math.PI * 2); g.fill(); } } });
+    const sale = life.poster({ title: "特売", sub: "ビタミンC 198円", body: "本日限り! お一人様 3点まで", bg: "#fff23a", fg: "#c0141b", accent: "#c0141b", style: "sale", wear: 0.2 });
+    // drugstore recess: posters on the shutters + price cards
+    L(live, -9.575, 1.62, -2.1, 0.5, PI / 2, 0.02);
+    L(lost, -9.575, 1.55, 3.3, 0.46, PI / 2, -0.03);
+    L(sale, -9.575, 1.6, 1.7, 0.42, PI / 2, 0.01);
+    L(life.label({ text: "湿布 580円", sub: "肩こりに!", bg: "#ffffff", fg: "#c0141b", border: "#c0141b", px: [200, 110] }), -6.9 - 0.012, 1.5, (6 - 0.9 + 6 - 0.5) / 2 - 0.0, 0.3, -PI / 2, 0.02);
+    // sign street: "no posters" plate... covered with posters anyway
+    L(life.plate({ text: "貼り紙禁止", sub: "NO POSTERS - 大阪市", style: "white", px: [300, 110] }), -5.965, 1.9, -15.0, 0.55, PI / 2);
+    L(live, -5.963, 1.3, -14.3, 0.46, PI / 2, -0.04);
+    L(lost, -5.963, 1.25, -15.75, 0.44, PI / 2, 0.05);
+    L(life.poster({ title: "大阪 夏祭り", sub: "花火大会", body: "8月の毎週土曜日\n道頓堀川 19:30〜", bg: "#1a2a6a", fg: "#ffffff", accent: "#ff5c8a", style: "retro", wear: 0.5 }), -5.963, 1.35, -17.2, 0.46, PI / 2, 0.02);
+    // izakaya: chalk A-frame menu on the street
+    { const x = -4.9, z = -8.9, ry = PI / 2;
+      within(x, 0, z, ry, 1, () => {
+        for (const s2 of [-1, 1]) { B.box(woodCrate, 0.62, 0.95, 0.03, 0, 0, s2 * 0.2, { rx: -s2 * 0.2, uv: 0.8 }); }
+        B.rod(steelDark, 0.008, [-0.28, 0.5, -0.1], [-0.28, 0.5, 0.1], 4); B.rod(steelDark, 0.008, [0.28, 0.5, -0.1], [0.28, 0.5, 0.1], 4);
+      });
+      const menu = life.menu({ title: "本日のおすすめ", sub: "居酒屋 トム", items: [["たこ焼き", "500円"], ["焼き鳥", "300円"], ["生ビール", "480円"], ["枝豆", "280円"], ["うに丼", "1800円"]], style: "chalk" });
+      life.put(menu, x + 0.227, 0.5, z, 0.52, { ry: PI / 2, rx: -0.2, h: 0.78 });
+      life.put(menu, x - 0.227, 0.5, z, 0.52, { ry: -PI / 2, rx: -0.2, h: 0.78 });
+      k.collider(x - 0.32, x + 0.32, z - 0.35, z + 0.35, 0, 0.95, false);
+    }
+    // takoyaki price board on the octopus building's shutters
+    L(life.menu({ title: "たこ焼", sub: "焼きたて! 名物", items: [["6個", "400円"], ["8個", "500円"], ["12個", "700円"], ["ネギ盛り", "+100円"]], style: "red" }), 5.965, 1.55, 11.7, 0.62, -PI / 2);
+    L(life.note({ text: "本日 トム・コドナー様 貸切 18時〜", color: "#ffffff", ink: "#1a1a1a", tape: true, px: [180, 160] }), 5.965, 1.55, 12.45, 0.2, -PI / 2, 0.05);
+    // newspaper on a bench
+    life.flat(life.news({ name: "大阪日報", headline: "道頓堀に巨大タコ現る", sub: "目撃者 トム・コドナー氏「壁を登っていた」", date: "2026年9月26日 (土)", body: "午後三時ごろ、道頓堀の商店街で巨大なタコのオブジェが動いたとの通報があった。警察は現在も調査中。", photo: (g, w, h) => { g.fillStyle = "#8f8a80"; g.fillRect(0, 0, w, h); g.fillStyle = "#4a4640"; g.beginPath(); g.ellipse(w * 0.5, h * 0.4, h * 0.3, h * 0.26, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#4a4640"; g.lineWidth = 6; for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(w * (0.36 + i * 0.07), h * 0.6); g.quadraticCurveTo(w * (0.3 + i * 0.1), h * 0.8, w * (0.34 + i * 0.08), h * 0.98); g.stroke(); } } }), 3.4 + 0.62, 0.475, 1.0 + 0.1, 0.34, -PI / 2 + 0.3);
+    // stickers on the utility poles (tangent planes on the street-facing side)
+    const stk = [life.label({ text: "トム参上", bg: "#111111", fg: "#ffe14a", px: [160, 70] }), life.label({ text: "たこ焼 \u2192", bg: "#ffe14a", fg: "#b3101a", px: [160, 70] }), life.label({ text: "KODNER", sub: "was here", bg: "#ff3f8e", fg: "#ffffff", px: [160, 80] })];
+    for (const [px, pz, dir] of [[-3.4, 12.2, 1], [3.4, 1.0, -1], [-3.4, -9.6, 1]] as const) stk.forEach((id, i) => L(id, px + dir * 0.156, 1.1 + i * 0.18, pz + (i - 1) * 0.02, 0.1, dir > 0 ? PI / 2 : -PI / 2, (lr() - 0.5) * 0.3));
+    // courtyard: big graffiti on the white brick wall
+    L(life.graffiti({ text: "トム・コドナー参上", sub: "OSAKA 2026", color: "#ff5ca8", outline: "#ffffff", style: "bubble", px: [640, 220] }), 8.4, 1.7, -5.025, 3.2, PI);
+    L(life.graffiti({ text: "たこ", color: "#35c0ff", style: "tag", px: [256, 128] }), 16.0, 1.1, -10.59, 0.9, 0);
+  }
+  life.finish();
 
   B.flush();
 

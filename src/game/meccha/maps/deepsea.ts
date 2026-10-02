@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import * as D from "./tex/deepsea";
 import { Kit, boxGeo, ring, type Mat, type World } from "./kit";
+import { Life, SERIF } from "./tex/life";
 
 type G = THREE.BufferGeometry;
 type V3t = [number, number, number];
@@ -230,6 +231,9 @@ export function buildDeepSea(): World {
   // ---------- layout ----------
   const X0 = -24, X1 = 24, Z0 = -20, Z1 = 20;
   const PX = 2, PZ = 1.5; // plaza / statue centre
+  const life = new Life(k, 1717);
+  const crateStencils = ["RUM", "GUNPOWDER", "KODNER & CO."].map((t) => life.graffiti({ text: t, color: "#1e140c", style: "stencil", px: [320, 110], drip: false, font: SERIF }));
+  let crateN = 0;
   const GX = 2, GZ = 17.6; // ruined gate (hunter entrance)
   const taken: [number, number, number][] = []; // keep-out circles for random scatter
   const keep = (x: number, z: number, r: number) => taken.push([x, z, r]);
@@ -635,7 +639,9 @@ export function buildDeepSea(): World {
     }
   };
   const crate = (x: number, z: number, s: number, ry: number, y = 0) => {
-    b.box(mDeck, s, s, s, x, y, z, { ry, uv: 0.9 });
+    b.box(mDeck, s - 0.04, s - 0.04, s - 0.04, x, y + 0.02, z, { ry, uv: 0.9 });
+    for (const cx of [-1, 1]) for (const cz of [-1, 1]) { const lx = cx * (s / 2 - 0.035), lz = cz * (s / 2 - 0.035); b.box(mTimber, 0.07, s, 0.07, x + lx * Math.cos(ry) + lz * Math.sin(ry), y, z - lx * Math.sin(ry) + lz * Math.cos(ry), { ry, uv: 0.8 }); }
+    { const id = crateStencils[crateN++ % crateStencils.length]; for (const f of [1, -1]) life.wall(id, x + Math.sin(ry) * f * (s / 2 + 0.035), y + s * 0.35, z + Math.cos(ry) * f * (s / 2 + 0.035), s * 0.62, ry + (f < 0 ? PI : 0), 0.04); }
     for (const dz of [-1, 1]) b.box(mTimber, s * 1.02, 0.08, 0.06, x + Math.sin(ry) * dz * s * 0.5, y + s * 0.5, z + Math.cos(ry) * dz * s * 0.5, { ry, rz: 0.78, uv: 0.8 });
     k.collider(x - s * 0.62, x + s * 0.62, z - s * 0.62, z + s * 0.62, y, y + s, true);
   };
@@ -1250,6 +1256,35 @@ export function buildDeepSea(): World {
     }
   }
   lap("inst");
+  // ---------- LIFE: the wreck's name, a captain's log, a message in a bottle ----------
+  {
+    const nm = life.graffiti({ text: "THE TOM KODNER", sub: "PORT OF LIVERPOOL", color: "#e8d9a0", style: "stencil", px: [512, 170], drip: false, font: SERIF });
+    const t = tOf(-18.4), side = hw(t, 2.15);
+    life.wall(nm, -18.4, 2.15, SZ + side + 0.05, 2.3, 0.08);
+    life.wall(nm, -18.4, 2.15, SZ - side - 0.05, 2.3, PI - 0.08);
+    // captain's log open on a barrel head inside the wreck
+    life.flat(life.letter({ head: "CAPTAIN'S LOG", body: "Day 41. The unicorn statue was right where Tom Kodner's map said. Storm tonight. We lost the mast. If anyone finds this ship, the gold is in the chest by the bow.", sign: "- Capt. Barnacle", hand: true, paper: "#d8c9a0", age: 0.9, date: "1717" }), -15.25, 1.8, SZ + 1.3, 0.22, PI / 2 + 0.2);
+    // treasure map pinned to the hull wall inside
+    life.wall(life.custom(300, 220, (g, w, h, r) => {
+      g.fillStyle = "#d9c38e"; g.fillRect(0, 0, w, h);
+      g.fillStyle = "rgba(120,80,30,0.3)"; for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(r() * w, r() * h, 20 + r() * 40, 0, Math.PI * 2); g.fill(); }
+      g.strokeStyle = "#5a3a18"; g.lineWidth = 3; g.beginPath(); g.moveTo(40, 170); g.bezierCurveTo(80, 60, 160, 200, 200, 90); g.bezierCurveTo(220, 60, 250, 70, 260, 50); g.setLineDash([8, 8]); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = "#a01818"; g.lineWidth = 6; g.beginPath(); g.moveTo(248, 38); g.lineTo(272, 62); g.moveTo(272, 38); g.lineTo(248, 62); g.stroke();
+      g.fillStyle = "#3a2410"; g.font = `bold 20px ${SERIF}`; g.fillText("KODNER'S MAP", 20, 30); g.font = `italic 14px ${SERIF}`; g.fillText("unicorn  \u2192  reef  \u2192  X", 20, 205);
+    }), -15.3, 1.6, SZ - hw(tOf(-15.3), 1.6) + 0.16, 0.5, 0, 0.05);
+    // message in a bottle on the sand near the gate + its letter
+    const glassB = k.mat(null, "#7fc8a0", [1, 1], { roughness: 0.08, metalness: 0.1 });
+    b.add(glassB, xf(lathe([[0.001, 0], [0.06, 0], [0.065, 0.02], [0.065, 0.2], [0.03, 0.26], [0.02, 0.33], [0.024, 0.34], [0.001, 0.34]], 14), -2.2, 0.065, 11.8, 0, 0, PI / 2));
+    life.flat(life.letter({ to: "Dear Tom Kodner,", body: "If you are reading this, you found the sunken city! Follow the unicorn's gaze to the reef. Beware of the jellyfish - they hide better than we do.", sign: "- a friend, 1717", hand: true, paper: "#e8dcb8", age: 0.7 }), -1.75, 0.02, 12.05, 0.2, 0.6, 0.006);
+    // diving club warning board at the gate
+    { const x = GX + 4.4, z = GZ - 0.9;
+      b.box(mTimber, 0.1, 1.5, 0.1, x, 0, z, { uv: 0.8 });
+      b.box(mDeck, 0.9, 0.6, 0.05, x, 1.1, z - 0.07, { uv: 0.8 });
+      k.collider(x - 0.1, x + 0.1, z - 0.1, z + 0.1, 0, 1.7, false);
+      life.wall(life.label({ text: "DIVERS", sub: "do not feed the jellyfish - T. Kodner Diving Club", bg: "#f2e8c8", fg: "#1a4a6a", border: "#1a4a6a", px: [320, 200], wear: 0.6 }), x, 1.4, z - 0.1, 0.84, PI);
+    }
+  }
+  life.finish();
   b.flush();
   lap("flush");
   console.warn("DSTIME " + TM.join(" "));

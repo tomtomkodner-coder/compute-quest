@@ -9,6 +9,7 @@ import * as THREE from "three";
 import * as T from "../textures";
 import { Kit, boxGeo, type World, type Mat } from "./kit";
 import * as KT from "./tex/kyoto";
+import { Life, JP, JPS } from "./tex/life";
 
 type V3 = [number, number, number];
 type Inst = { pos: V3; rotX?: number; rotY?: number; rotZ?: number; scale?: V3; color?: string };
@@ -45,6 +46,15 @@ function xf(g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, rx
 export function buildKyoto(): World {
   const k = new Kit(9, 3);
   const R = rng(20241);
+  const life = new Life(k, 20241);
+  const priceLists: Record<string, [string, string][]> = {
+    "たこ焼き": [["6個", "500円"], ["8個", "600円"], ["ネギ", "+100円"]], "りんご飴": [["りんご飴", "400円"], ["いちご飴", "500円"], ["ぶどう飴", "400円"]],
+    "かき氷": [["いちご", "300円"], ["メロン", "300円"], ["ブルーハワイ", "350円"]], "金魚すくい": [["1回", "300円"], ["3回", "800円"], ["ポイ", "おまけ"]],
+    "お面": [["お面", "800円"], ["狐面", "1200円"], ["子供", "500円"]], "焼きそば": [["並", "500円"], ["大盛", "700円"], ["目玉焼き", "+100円"]],
+    "みたらし団子": [["1本", "150円"], ["3本", "400円"], ["抹茶付", "600円"]], "射的": [["5発", "500円"], ["10発", "900円"], ["景品", "たくさん"]],
+    "甘酒": [["甘酒", "300円"], ["熱燗", "500円"], ["お茶", "150円"]], "焼き鳥": [["もも", "150円"], ["ねぎま", "150円"], ["つくね", "200円"]],
+    "わたあめ": [["わたあめ", "500円"], ["袋付", "600円"], ["虹色", "700円"]], "輪投げ": [["3回", "300円"], ["10回", "800円"], ["景品", "あり"]],
+  };
 
   // ---------------- batching: every static part is merged per material ----------------
   const batches = new Map<Mat, THREE.BufferGeometry[]>();
@@ -525,6 +535,29 @@ export function buildKyoto(): World {
     maple(20.6, 4, -14.6, 3.2, 2.0, true, 56);
   }
 
+  // ================= LIFE: ema wishing rack, festival poster, notices =================
+  {
+    const x = -21.6, z1 = 1.7, z2 = 3.7;
+    for (const z of [z1, z2]) bx(darkWoodM, 0.1, 1.9, 0.1, x, 0, z, { round: true });
+    for (const y of [1.15, 1.55]) bx(darkWoodM, 0.06, 0.05, z2 - z1 + 0.2, x, y, (z1 + z2) / 2);
+    bx(kawaraM, 0.5, 0.06, z2 - z1 + 0.5, x, 1.9, (z1 + z2) / 2, { unit: 1.2 });
+    k.collider(x - 0.1, x + 0.1, z1 - 0.1, z2 + 0.1, 0, 1.95, false);
+    const wishes = ["トム・コドナーが\n見つかりませんように", "かくれんぼで\n勝てますように", "家内安全", "合格祈願\nたろう", "ずっと隠れて\nいられますように", "Tom Kodner\nwas here!", "商売繁盛", "健康第一\nはなこ", "カメレオンに\nなりたい", "恋愛成就"];
+    wishes.forEach((w, i) => {
+      const id = life.custom(128, 110, (g, cw, ch) => {
+        g.fillStyle = "#d9b27a"; g.beginPath(); g.moveTo(0, 30); g.lineTo(cw / 2, 0); g.lineTo(cw, 30); g.lineTo(cw, ch); g.lineTo(0, ch); g.closePath(); g.fill();
+        g.strokeStyle = "#8a5a2a"; g.lineWidth = 3; g.stroke();
+        g.fillStyle = "#c8141e"; g.beginPath(); g.arc(cw / 2, 22, 5, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#1a1a1a"; g.textAlign = "center"; const ls = w.split("\n");
+        ls.forEach((l, j) => { let sz = 17; g.font = `bold ${sz}px ${JPS}`; const tw = g.measureText(l).width; if (tw > cw - 12) { sz = Math.floor(sz * (cw - 12) / tw); g.font = `bold ${sz}px ${JPS}`; } g.fillText(l, cw / 2, 58 + j * 22); });
+        g.textAlign = "left";
+      }, true);
+      life.wall(id, x + 0.045, i % 2 ? 1.02 : 1.42, z1 + 0.25 + Math.floor(i / 2) * 0.37, 0.2, Math.PI / 2, (R() - 0.5) * 0.25);
+    });
+    life.wall(life.poster({ title: "秋の夜祭", sub: "京都駅 大階段 特設会場", body: "十月一日〜十日  夕方五時から\n主催: トム・コドナー実行委員会", bg: "#1a1030", fg: "#f2d27a", accent: "#c8141e", style: "retro", font: JP, wear: 0.1 }), -21.935, 0.56, 5.2, 0.4, Math.PI / 2);
+    life.wall(life.label({ text: "お静かに", sub: "枯山水 - 立ち入り禁止", bg: "#f2ead8", fg: "#1a1a1a", border: "#1a1a1a", font: JP, px: [256, 120] }), -21.935, 0.62, 11.4, 0.44, Math.PI / 2);
+  }
+
   // ================= DOLLS =================
   const dollCols = ["#c8102e", "#e05a8a", "#2a4a8a", "#f0e6d0", "#7a2a8a", "#d8602a", "#1a6a5a"];
   const dPos: [number, number, number, boolean][] = [
@@ -559,6 +592,7 @@ export function buildKyoto(): World {
   if (shrubs.length) k.instances(new THREE.IcosahedronGeometry(1, 1), shrubM, shrubs);
   if (goodsBalls.length) k.instances(new THREE.SphereGeometry(1, 10, 8), k.mat(null, "#ffffff", [1, 1], { roughness: 0.25 }), goodsBalls, { noShadow: true });
   if (branchGeos.length) k.merged(branchGeos, barkM);
+  life.finish();
   for (const [m, list] of batches) k.merged(list, m);
 
   // ================= areas =================
@@ -787,6 +821,8 @@ export function buildKyoto(): World {
     bx(darkWoodM, 0.06, 0.3, 0.06, cx + 0.6, H + 0.4, fz(-D / 2 + 0.05));
     bx(glowStripM, W - 0.4, 0.04, 0.06, cx, H - 0.1, fz(D / 2 - 0.25));
     for (const s of [-1, 1]) chochin.push({ pos: [cx + s * (W / 2 + 0.05), H - 0.2, fz(D / 2 + 0.1)], scale: [0.85, 0.85, 0.85] });
+    // price board on the counter front
+    { const items = priceLists[sign]; if (items) { const id = life.menu({ title: sign, sub: "トム・コドナー商店", items, style: "paper", font: JP, px: [256, 200] }); life.wall(id, cx + 0.62, 0.45, fz(D / 2 - 0.075) + f * 0.006, 0.44, ry); } }
     // goods on the counter
     const gy = 0.9, gz = fz(D / 2 - 0.3);
     const rr = rng(Math.round(cx * 100 + cz * 7));

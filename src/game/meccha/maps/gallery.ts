@@ -7,12 +7,15 @@ import * as X from "./tex/museum";
 import * as GX from "./tex/gallery";
 import { Art, type Side, type Style } from "./tex/museum";
 import { Kit, type Mat, type World } from "./kit";
+import { Life } from "./tex/life";
 
 type Face = "+x" | "-x" | "+z" | "-z";
 
 export function buildGallery(): World {
   const k = new Kit(6, 3.2);
   const a = new Art(k);
+  const life = new Life(k, 8808);
+  a.life = life; // readable title / artist labels under the paintings
   const R = X.rng(8808);
   const M = a.M.bind(a);
   const T = (key: string, make: () => X.PaintTex) => k.tex("ga_" + key, make);
@@ -485,6 +488,17 @@ export function buildGallery(): World {
     for (const x of [-6, 6]) a.plant(x, 17.1, 1.0, potM, leaf, leaf2);
   }
 
+  // ================= LIFE: gallery signs, visitor notes =================
+  {
+    const L = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    L(life.plate({ text: "FOUNDED 1894", sub: "by the Kodner family - admission free", style: "brass", px: [360, 110] }), 0, 4.55, 17.64, 1.2, Math.PI);
+    L(life.poster({ title: "VISITOR RULES", body: "1. Do not touch the paintings.\n2. No flash photography.\n3. No hiding behind the statues\n   (we are looking at you, Tom Kodner).\n4. Please whisper.", bg: "#f5f1e8", fg: "#2a2420", accent: "#8a6428", style: "notice", wear: 0.05 }), -2.6, 1.7, 17.64, 0.55, Math.PI);
+    L(life.label({ text: "WET PAINT", sub: "restoration in progress", bg: "#fff4c8", fg: "#8a1a1a", border: "#8a1a1a", px: [256, 110], wear: 0.2 }), 2.6, 1.3, 17.64, 0.44, Math.PI, 0.03);
+    L(life.label({ text: "SALON ROUGE", sub: "18th-century salon hang \u2192", bg: "#2a2320", fg: "#d9c08a", border: "#d9c08a", px: [320, 110] }), -10, 3.95, -5.83, 0.9, 0);
+    L(life.label({ text: "SCULPTURE HALL", sub: "marble & bronze \u2192", bg: "#2a2320", fg: "#d9c08a", border: "#d9c08a", px: [320, 110] }), 10, 3.95, -5.83, 0.9, 0);
+    L(life.note({ text: "Tom - the Vermeer label is upside down. Fix before Monday! - curator", color: "#fff27a", tape: true }), 7.84, 1.45, 10.2, 0.14, -Math.PI / 2, 0.08);
+  }
+  life.finish();
   a.flush();
 
   // ================= spawns / rooms =================

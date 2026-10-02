@@ -8,6 +8,7 @@ import * as THREE from "three";
 import * as T from "../textures";
 import * as P from "./tex/penguin";
 import { Kit, grid, type Mat, type World } from "./kit";
+import { Life, drawChameleon } from "./tex/life";
 
 type G = THREE.BufferGeometry;
 type V3t = [number, number, number];
@@ -230,6 +231,17 @@ export function buildPenguin(): World {
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const pick = <X,>(a: X[]) => a[Math.floor(rnd() * a.length)];
+  // readable signs / letters / labels (own rng: the layout random stream stays identical)
+  const life = new Life(k, 5150);
+  let lseed = 99;
+  const lr = () => ((lseed = (lseed * 16807) % 2147483647) / 2147483647);
+  const boxLabels = [
+    life.label({ text: "PENGUIN HOTEL", sub: "LINENS - 2nd floor", bg: "#f4f1e8", fg: "#1a2a6a", stripe: "#1a2a6a", px: [200, 120] }),
+    life.label({ text: "FRAGILE", sub: "glass - handle with care", bg: "#f4efe2", fg: "#c0231d", border: "#c0231d", px: [200, 110] }),
+    life.label({ text: "PLUSH x 24", sub: "blue penguins, size L", bg: "#ffffff", fg: "#2464d8", border: "#2464d8", px: [200, 110] }),
+    life.label({ text: "T. KODNER", sub: "personal - do not open", bg: "#fbf6e6", fg: "#222", border: "#222", px: [200, 110] }),
+    life.label({ text: "BALLOONS", sub: "blue / silver / gold", bg: "#eaf3ff", fg: "#1d5fe0", px: [200, 110] }),
+  ];
 
   // ---------- materials ----------
   const tKnit = k.tex("ph-knit", () => P.knit());
@@ -295,6 +307,8 @@ export function buildPenguin(): World {
   const candles: Inst[] = [];
   const dice: Inst[] = [];
   const boxes: Inst[] = [];
+  const tapes: Inst[] = [];
+  const handles: Inst[] = [];
   const balusters: Inst[] = [];
   const flags: Inst[] = [];
 
@@ -618,6 +632,8 @@ export function buildPenguin(): World {
     b.add(mGold, f.put(new THREE.ConeGeometry(0.075 * s, 0.42 * s, 10), 0, y + 0.47 * s, 0.34 * s, Math.PI / 2 + 0.15, 0, 0));
     k.collider(x - 0.22 * s, x + 0.22 * s, z - 0.22 * s, z + 0.22 * s, y, y + 0.72 * s, true);
   };
+  const suitMats = [mSuitcase, k.mat(null, "#7a2430", [1, 1], { roughness: 0.5 }), k.mat(null, "#3d5a3a", [1, 1], { roughness: 0.55 }), k.mat(null, "#6b4a2a", [1, 1], { roughness: 0.6 }), mSuitcase];
+  const tagIds = ["T. KODNER", "ROOM 201", "ROOM 205", "M. PENGUIN"].map((t, i) => life.label({ text: t, sub: i ? "Penguin Hotel" : "Room 201 - VIP", bg: "#f6e9b8", fg: "#3a2a10", border: "#8a6a2a", px: [160, 96] }));
   const luggageCart = (x: number, z: number, ry: number, load = 2) => {
     const f = new Frame(x, z, ry);
     const L = 1.2, W = 0.65;
@@ -640,8 +656,12 @@ export function buildPenguin(): World {
     let y = 0.23;
     for (let i = 0; i < load; i++) {
       const h = 0.26 + rnd() * 0.08, w = W - 0.12 - rnd() * 0.08, l = 0.75 + rnd() * 0.25;
-      b.add(mSuitcase, f.put(boxGeo(w, h, l), 0, y + h / 2, (rnd() - 0.5) * 0.1));
-      b.add(mSuitTrim, f.put(new THREE.BoxGeometry(w + 0.01, 0.03, l + 0.01), 0, y + h - 0.03, 0));
+      const oz = (rnd() - 0.5) * 0.1;
+      b.add(suitMats[Math.floor(lr() * suitMats.length)], f.put(chamferGeo(w, h, l, 0.04), 0, y + h / 2, oz));
+      b.add(mSuitTrim, f.put(new THREE.BoxGeometry(w + 0.01, 0.03, l + 0.01), 0, y + h - 0.03, oz));
+      const [hx, hz] = f.pt(0, oz);
+      handles.push({ pos: [hx, y + h, hz], rotY: f.ry + Math.PI / 2 });
+      if (lr() < 0.45) { const [tx, tz] = f.pt(w / 2 + 0.005, oz + l * 0.3); life.wall(tagIds[Math.floor(lr() * tagIds.length)], tx, y + h * 0.5, tz, 0.09, f.ry + Math.PI / 2, (lr() - 0.5) * 0.3); }
       y += h + 0.005;
     }
     f.col(k, -W / 2, W / 2, -L / 2, L / 2, 0, y, true);
@@ -730,7 +750,10 @@ export function buildPenguin(): World {
     let y = 0;
     for (let i = 0; i < n; i++) {
       const w = 0.5 + rnd() * 0.25, h = 0.35 + rnd() * 0.2, d = 0.45 + rnd() * 0.2;
-      boxes.push({ pos: [x + (rnd() - 0.5) * 0.08, y + h / 2, z + (rnd() - 0.5) * 0.08], rotY: ry + (rnd() - 0.5) * 0.25, scale: [w, h, d] });
+      const bp: V3t = [x + (rnd() - 0.5) * 0.08, y + h / 2, z + (rnd() - 0.5) * 0.08], bry = ry + (rnd() - 0.5) * 0.25;
+      boxes.push({ pos: bp, rotY: bry, scale: [w, h, d], color: ["#ffffff", "#e9dcc6", "#f4e6cc", "#d9c7aa"][Math.floor(lr() * 4)] });
+      tapes.push({ pos: [bp[0], bp[1] + h / 2 + 0.002, bp[2]], rotY: bry, scale: [0.07, 0.004, d + 0.004] });
+      if (lr() < 0.7) life.wall(boxLabels[Math.floor(lr() * boxLabels.length)], bp[0] + Math.sin(bry) * (d / 2 + 0.004), bp[1] + (lr() - 0.5) * h * 0.2, bp[2] + Math.cos(bry) * (d / 2 + 0.004), Math.min(0.22, w * 0.45), bry, (lr() - 0.5) * 0.1);
       y += h;
     }
     k.collider(x - 0.4, x + 0.4, z - 0.4, z + 0.4, 0, y, true);
@@ -974,7 +997,11 @@ export function buildPenguin(): World {
   plushie(4.4, Y + 0.4, ZA + 0.7, 0.45, 0.2, PLUSH.green, false);
   diceAt(-7.2, Y, -9.4, 0.8, 0.2);
   diceAt(-8.9, Y, -8.3, 0.6, 0.7);
-  b.add(mWood, place(boxGeo(0.6, 0.95, 0.6), 8.5, Y + 0.475, -2.2), 0.8);
+  b.add(mWoodDark, place(chamferGeo(0.66, 0.12, 0.66, 0.02), 8.5, Y + 0.06, -2.2), 0.8);
+  b.add(mWood, place(chamferGeo(0.5, 0.7, 0.5, 0.015), 8.5, Y + 0.47, -2.2), 0.8);
+  b.add(mGold, place(new THREE.BoxGeometry(0.52, 0.03, 0.52), 8.5, Y + 0.16, -2.2));
+  b.add(mWoodDark, place(chamferGeo(0.64, 0.13, 0.64, 0.02), 8.5, Y + 0.885, -2.2), 0.8);
+  life.wall(life.plate({ text: "Sir Waddles I", sub: "founder of the Penguin Hotel", style: "brass" }), 8.5 - 0.252, Y + 0.5, -2.2, 0.36, -Math.PI / 2);
   k.collider(8.2, 8.8, -2.5, -1.9, Y, Y + 0.95, true);
   goldBust(8.5, Y + 0.95, -2.2, -Math.PI / 2, 1.2);
   vase(9.0, Y, -9.9, 1.0);
@@ -1191,6 +1218,76 @@ export function buildPenguin(): World {
     }
   });
 
+  // ---------- LIFE: readable signs, letters, notes ----------
+  {
+    const ryW = (sx: number) => (sx < 0 ? Math.PI / 2 : -Math.PI / 2); // on the hallway side of a room wall
+    // lobby: big hotel sign above the entrance doors
+    b.add(mWoodDark, place(chamferGeo(2.7, 0.62, 0.05, 0.015), 0, 3.35, ZS - 0.17), 1);
+    life.wall(life.plate({ text: "PENGUIN HOTEL", sub: "est. 1923  \u00b7  proprietor Tom Kodner", style: "enamel", px: [512, 128] }), 0, 3.35, ZS - 0.2, 2.5, Math.PI);
+    // reception: open guest book, bell sign, keys plate
+    { const f = new Frame(7.4, 10.2, -Math.PI / 2);
+      const gb = life.custom(400, 280, (g, w, h, r) => {
+        g.fillStyle = "#f5efdf"; g.fillRect(0, 0, w, h);
+        const gr = g.createLinearGradient(w / 2 - 20, 0, w / 2 + 20, 0); gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.5, "rgba(0,0,0,0.25)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = gr; g.fillRect(w / 2 - 20, 0, 40, h);
+        g.fillStyle = "#1a2a6a"; g.font = "bold 18px Georgia,serif"; g.fillText("GUEST BOOK", 20, 30); g.fillText("September", w / 2 + 20, 30);
+        g.strokeStyle = "rgba(60,90,160,0.35)"; for (let y = 52; y < h - 10; y += 26) { g.beginPath(); g.moveTo(14, y); g.lineTo(w / 2 - 14, y); g.moveTo(w / 2 + 14, y); g.lineTo(w - 14, y); g.stroke(); }
+        const rows = [["Tom Kodner", "201", "best penguins ever!"], ["M. Frost", "203", "cosy :)"], ["The Waddles", "205", "lost a sock"], ["A. Emperor", "Suite", "more fish pls"], ["J. Rockhopper", "204", "loved the atrium"], ["Tom Kodner", "201", "back again!"], ["K. Gentoo", "202", "10/10"], ["L. Adelie", "206", "balloons!"]];
+        g.fillStyle = "#1d2a66"; g.font = "italic 15px 'Comic Sans MS',cursive";
+        rows.forEach(([n, rm, c], i) => { const x0 = i < 4 ? 18 : w / 2 + 18, y = 48 + (i % 4) * 52; g.fillText(`${n}  - ${rm}`, x0, y); g.fillText(`"${c}"`, x0 + 10, y + 24); });
+      });
+      const [gx, gz] = f.pt(0.15, 0.05); life.flat(gb, gx, 1.06, gz, 0.42, Math.PI / 2 - 0.1);
+      const [sx0, sz0] = f.pt(-0.2, 0.395); life.wall(life.plate({ text: "RECEPTION", sub: "please ring the bell", style: "brass" }), sx0, 0.7, sz0, 0.5, -Math.PI / 2);
+      life.wall(life.plate({ text: "ROOM KEYS", style: "brass", px: [256, 64] }), XA - 0.24, 2.48, 10.8, 0.5, -Math.PI / 2);
+    }
+    // lobby: "please wait" sign for seekers (standing easel board)
+    { const x = -3.4, z = 7.2;
+      b.add(mWoodDark, beam([x - 0.3, 0, z + 0.25], [x - 0.25, 1.55, z], 0.035, 0.035, true, 5));
+      b.add(mWoodDark, beam([x + 0.3, 0, z + 0.25], [x + 0.25, 1.55, z], 0.035, 0.035, true, 5));
+      b.add(mWoodDark, beam([x, 0, z - 0.35], [x, 1.5, z - 0.02], 0.03, 0.03, true, 5));
+      b.add(mWoodDark, place(chamferGeo(0.7, 0.9, 0.03, 0.01), x, 1.1, z + 0.08, -0.12, 0, 0));
+      k.collider(x - 0.35, x + 0.35, z - 0.35, z + 0.3, 0, 1.55, false);
+      life.put(life.poster({ title: "WELCOME!", sub: "Seekers please wait here", body: "Hide & Seek tournament\nhosted by Tom Kodner\nAtrium - all day", bg: "#16244f", fg: "#ffffff", accent: "#f5a623", style: "notice", art: (g, w, h) => drawChameleon(g, w * 0.5, h * 0.5, h * 0.8, "#4cbf4c"), wear: 0.05 }), x, 1.1, z + 0.1, 0.62, { rx: -0.12, h: 0.84 });
+    }
+    // hallway door plates, EXIT signs, notices
+    const plates: Record<string, string> = { "-1,0": "201", "-1,1": "PLUSH ROOM", "-1,2": "203", "1,0": "STORAGE", "1,1": "LOUNGE", "1,2": "205" };
+    for (const sx of [-1, 1]) roomZ.forEach(([, , dz], ri) => {
+      const t = plates[`${sx},${ri}`];
+      life.wall(life.plate({ text: t, sub: /^\d/.test(t) ? "Room" : undefined, style: "brass", px: [200, 96] }), sx * (XH - 0.18), 1.62, dz + (ri === 2 ? -1.25 : 1.25), 0.24, ryW(sx));
+    });
+    const exitId = life.label({ text: "EXIT \u2192", bg: "#127a3a", fg: "#ffffff", px: [256, 96] });
+    for (const sx of [-1, 1]) { b.add(mWoodDark, place(new THREE.BoxGeometry(0.03, 0.2, 0.52), sx * (XA + 0.16), 2.72, 9.5), 1); life.wall(exitId, sx * (XA + 0.178), 2.72, 9.5, 0.5, sx < 0 ? Math.PI / 2 : -Math.PI / 2); }
+    life.wall(life.poster({ title: "MISSING", sub: "PLUSH PENGUIN", body: "Answers to 'Tom'. Blue, X eyes.\nLast seen near the atrium.\nReward: free breakfast!", footer: "ask at reception", bg: "#f2ead6", fg: "#2a1d10", accent: "#c0231d", style: "missing", art: (g, w, h) => { g.fillStyle = "#e9e2d2"; g.fillRect(0, 0, w, h); g.fillStyle = "#2b4fcf"; g.beginPath(); g.ellipse(w / 2, h * 0.6, w * 0.22, h * 0.36, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = "#f2f2f2"; g.beginPath(); g.ellipse(w / 2, h * 0.66, w * 0.13, h * 0.26, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#111"; g.lineWidth = 3; for (const ex of [-1, 1]) { const cx = w / 2 + ex * w * 0.08, cy = h * 0.36; g.beginPath(); g.moveTo(cx - 5, cy - 5); g.lineTo(cx + 5, cy + 5); g.moveTo(cx + 5, cy - 5); g.lineTo(cx - 5, cy + 5); g.stroke(); } g.fillStyle = "#f09a2a"; g.beginPath(); g.moveTo(w / 2 - 8, h * 0.44); g.lineTo(w / 2 + 8, h * 0.44); g.lineTo(w / 2, h * 0.52); g.fill(); } }), -5.2, 1.7, ZN + 0.18, 0.45, 0, 0.03);
+    life.wall(life.label({ text: "NO RUNNING", sub: "in the hallways - thank you!", bg: "#ffffff", fg: "#1a2a6a", border: "#1a2a6a" }), -(XA + 0.18), 1.7, -1.6, 0.5, -Math.PI / 2);
+    life.wall(life.note({ text: "Housekeeping: Room 201 - extra pillows for Mr. Kodner", color: "#fff27a", tape: true }), XH - 0.18, 1.45, -3.4, 0.15, -Math.PI / 2, 0.08);
+    // buffet: tent cards
+    for (const [x, t, sub] of [[-1.9, "BREAKFAST", "7 - 10 am"], [1.9, "FISH TACOS", "chef's special"]] as [number, string, string][]) {
+      const id = life.plate({ text: t, sub, style: "white", px: [256, 128] });
+      life.put(id, x, 0.87, ZA + 1.18, 0.16, { rx: -0.3 }); life.put(id, x, 0.87, ZA + 1.1, 0.16, { ry: Math.PI, rx: -0.3 });
+    }
+    // atrium sofa: newspaper
+    life.flat(life.news({ name: "Penguin Post", headline: "HOTEL WINS 'COSIEST HOTEL' AWARD", sub: "Owner Tom Kodner thanks his plush penguins", photo: (g, w, h) => { g.fillStyle = "#8f8a80"; g.fillRect(0, 0, w, h); g.fillStyle = "#3a3a3a"; g.beginPath(); g.ellipse(w * 0.5, h * 0.62, h * 0.25, h * 0.36, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = "#d8d4cc"; g.beginPath(); g.ellipse(w * 0.5, h * 0.7, h * 0.14, h * 0.24, 0, 0, Math.PI * 2); g.fill(); } }), XA - 0.55, 0.385, -5.25, 0.32, -Math.PI / 2 + 0.2);
+    // balcony suitcase stack: luggage tag
+    life.wall(tagIds[0], -8.6 + 0.2, Y + 0.14, -6.744, 0.1, 0, 0.2);
+    // bedrooms: welcome letter on the bedside table; lounge: room-service menu; storage: clipboard
+    for (const sx of [-1, 1]) roomZ.forEach(([z1r, z2r], ri) => {
+      const kind = kinds[`${sx},${ri}`];
+      const xo = sx * (XO - 0.15), u = (d: number) => xo - sx * d, ryIn = -sx * Math.PI / 2, zc = (z1r + z2r) / 2, zFar = ri === 0 ? 1 : -1;
+      const wallF = sx < 0 ? Math.PI / 2 : -Math.PI / 2;
+      if (kind === "bed" || kind === "bed2") {
+        const room = kind === "bed" ? "201" : "205";
+        life.flat(life.letter({ head: "PENGUIN HOTEL", to: kind === "bed" ? "Dear Tom Kodner," : "Dear Guest,", body: `Welcome to Room ${room}! Breakfast is served 7-10 in the Atrium. Please do not feed the plush penguins, and kindly return all balloons to the ceiling.`, sign: "- The Management", date: "Sept. 26" }), u(0.3), 0.6, zc - 1.0 * zFar - 1.12, 0.2, ryIn + 0.15);
+      } else if (kind === "lounge") {
+        life.wall(life.menu({ title: "Room Service", sub: "dial 0 - open all night", items: [["Fish & Chips", "9"], ["Herring Toast", "6"], ["Ice Cream", "4"], ["Hot Cocoa", "3"], ["Krill Salad", "7"], ["Kodner's Cake", "5"]], style: "dark" }), xo - sx * 0.02, 1.55, zc, 0.5, wallF);
+      } else if (kind === "storage") {
+        life.wall(life.letter({ head: "STOCK CHECK", body: "Balloons (blue): 300\nBalloons (silver): 120\nPlush penguins: 48\nBeach balls: 16\nDice (giant): 5\n- signed T. Kodner", hand: true, ruled: true, paper: "#fbfbf6", age: 0.1, px: [220, 300] }), sx * (XH + 0.17), 1.5, (z1r + z2r) / 2 + 1.6, 0.22, -wallF);
+      } else if (kind === "twin") {
+        life.wall(life.note({ text: "Do Not Disturb - napping penguins", color: "#ffd1dc", tape: true }), sx * (XH - 0.18), 1.3, 9 - 1.25, 0.14, ryW(sx), -0.1);
+      }
+    });
+  }
+  life.finish();
+
   // ---------- flush instances ----------
   plushStd.flush(k);
   plushStriped.flush(k);
@@ -1202,7 +1299,9 @@ export function buildPenguin(): World {
   bulbs.flush(k, mBulb);
   if (candles.length) k.instances(new THREE.CylinderGeometry(0.03, 0.03, 1, 6), mCandle, candles);
   if (dice.length) k.instances(chamferGeo(1, 1, 1, 0.06), mDice, dice);
-  if (boxes.length) k.instances(new THREE.BoxGeometry(1, 1, 1), mCard, boxes);
+  if (boxes.length) k.instances(chamferGeo(1, 1, 1, 0.025), mCard, boxes);
+  if (tapes.length) k.instances(new THREE.BoxGeometry(1, 1, 1), k.mat(null, "#c8a86a", [1, 1], { roughness: 0.35 }), tapes, { noShadow: true });
+  if (handles.length) k.instances(new THREE.TorusGeometry(0.07, 0.014, 5, 10, Math.PI), mBlackMetal, handles);
   if (balusters.length) k.instances(lathe([[0.04, 0], [0.04, 0.12], [0.028, 0.18], [0.05, 0.36], [0.03, 0.62], [0.035, 0.78], [0.04, 0.9]], 7), mWoodDark, balusters);
   if (flags.length) {
     const fg = new THREE.BufferGeometry();

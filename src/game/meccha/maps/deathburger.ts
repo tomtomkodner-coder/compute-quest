@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import * as T from "../textures";
 import * as D from "./tex/deathburger";
+import { Life } from "./tex/life";
 import { Kit, type Mat, type World } from "./kit";
 
 type G = THREE.BufferGeometry;
@@ -146,6 +147,21 @@ export function buildDeathBurger(): World {
   const B = new Batch(k);
   const rnd = D.dbRng(1234);
   const R = (a: number, b: number) => a + rnd() * (b - a);
+  // readable creepy signs / notes (one atlas); own rng keeps the layout stream intact
+  const life = new Life(k, 666);
+  const lr = D.dbRng(4242);
+  let stencils: number[] = [];
+  /** slatted wooden crate with corner posts, edge boards and a stencil; y = bottom */
+  const crate = (s: number, x: number, y: number, z: number, ry: number) => {
+    B.parent = place(x, y, z, ry);
+    B.box(mCrate, s - 0.04, s - 0.04, s - 0.04, 0, 0.02, 0, { flat: true });
+    for (const cx of [-1, 1]) for (const cz of [-1, 1]) B.box(mWoodDark, 0.07, s, 0.07, cx * (s / 2 - 0.035), 0, cz * (s / 2 - 0.035), { flat: true });
+    for (const yy of [0.01, s - 0.08]) for (const f of [-1, 1]) { B.box(mWoodDark, s, 0.07, 0.03, 0, yy, f * (s / 2 - 0.005), { flat: true }); B.box(mWoodDark, 0.03, 0.07, s, f * (s / 2 - 0.005), yy, 0, { flat: true }); }
+    B.parent = null;
+    const c = Math.abs(Math.cos(ry)), sn = Math.abs(Math.sin(ry)), e = (c + sn) * s / 2;
+    k.collider(x - e, x + e, z - e, z + e, y, y + s, true);
+    for (const f of [1, -1]) if (lr() < 0.75) { const d = s / 2 + 0.012; life.wall(stencils[Math.floor(lr() * stencils.length)], x + Math.sin(ry) * f * d, y + s * 0.5, z + Math.cos(ry) * f * d, s * 0.7, ry + (f < 0 ? PI : 0), (lr() - 0.5) * 0.08); }
+  };
 
   // ------------------------------------------------------------------------------------------- materials
   const tx = <T2 extends () => T.PaintTex>(key: string, f: T2) => k.tex("db_" + key, f);
@@ -239,6 +255,12 @@ export function buildDeathBurger(): World {
     k.instances(slab, mStone, list, { noShadow: true });
   }
 
+  stencils = [
+    life.graffiti({ text: "FROZEN PATTIES", color: "#2a1208", style: "stencil", px: [360, 110], drip: false }),
+    life.graffiti({ text: "HANDLE WITH FEAR", color: "#5a0a0a", style: "stencil", px: [380, 110], drip: false }),
+    life.graffiti({ text: "DB-666", color: "#2a1208", style: "stencil", px: [256, 110], drip: false }),
+  ];
+  const boxTags = [life.label({ text: "BUNS", sub: "best before 1987", bg: "#efe4c8", fg: "#5a1a0a", px: [160, 96], wear: 0.6 }), life.label({ text: "KETCHUP?", sub: "do not open", bg: "#efe4c8", fg: "#8a0a0a", px: [160, 96], wear: 0.6 }), life.label({ text: "MYSTERY MEAT", sub: "grade Z", bg: "#efe4c8", fg: "#3a2a1a", px: [160, 96], wear: 0.6 })];
   // ------------------------------------------------------------------------------------------- perimeter fence
   // red/white weathered board fence, with posts and top rail; gate gap at the south
   const fenceH = 3.2;
@@ -772,7 +794,7 @@ export function buildDeathBurger(): World {
     B.box(mBlack, 0.03, 1.5, 0.03, 2.45, 0.5, kz + 0.41, { flat: true });
     for (let j = 0; j < 3; j++) B.box(mWoodDark, 1.8, 0.05, 0.5, 5.6, 0.4 + j * 0.7, kz - 0.1, { flat: true });
     k.collider(4.7, 6.5, kz - 0.35, kz + 0.15, 0, 1.9, true);
-    for (let i = 0; i < 9; i++) B.box(mCrate, 0.45, 0.35, 0.4, 4.95 + (i % 3) * 0.6, 0.45 + Math.floor(i / 3) * 0.7, kz - 0.1, { ry: R(-0.1, 0.1) });
+    for (let i = 0; i < 9; i++) { const cry = R(-0.1, 0.1), cxp = 4.95 + (i % 3) * 0.6, cyp = 0.45 + Math.floor(i / 3) * 0.7; B.box(mCrate, 0.45, 0.35, 0.4, cxp, cyp, kz - 0.1, { ry: cry }); life.wall(boxTags[i % boxTags.length], cxp + Math.sin(cry) * 0.203, cyp + 0.17, kz - 0.1 + Math.cos(cry) * 0.203, 0.2, cry); }
     // hanging menu boards above the kitchen, facing the window
     for (const [mx, w] of [[-0.8, 3.0], [2.6, 3.0]] as [number, number][]) {
       B.box(mBlack, w + 0.12, 1.62, 0.08, mx, 2.35, zb + 0.35, { flat: true });
@@ -891,9 +913,9 @@ export function buildDeathBurger(): World {
     for (let i = 0; i <= 14; i++) addBulb(mBulb, [mx - 0.12, 3.45, mz - 1.75 + (3.5 * i) / 14]);
     k.collider(mx - 0.1, mx + 0.15, mz - 1.8, mz + 1.8, 0, 3.4, true);
     // crates and a barrel by the menu
-    B.box(mCrate, 0.8, 0.8, 0.8, 19.8, 0, 9.4, { solid: true, stand: true, ry: 0.1 });
-    B.box(mCrate, 0.7, 0.7, 0.7, 19.9, 0.8, 9.4, { solid: true, stand: true, ry: -0.2 });
-    B.box(mCrate, 0.8, 0.8, 0.8, 20.6, 0, 8.3, { solid: true, stand: true, ry: 0.05 });
+    crate(0.8, 19.8, 0, 9.4, 0.1);
+    crate(0.7, 19.9, 0.8, 9.4, -0.2);
+    crate(0.8, 20.6, 0, 8.3, 0.05);
     k.room("Menu Board", 17, 21.6, 8, 16);
   }
 
@@ -920,7 +942,7 @@ export function buildDeathBurger(): World {
   // ------------------------------------------------------------------------------------------- scattered clutter
   {
     // crates near the carousel and the wagon
-    for (const [x, z, s] of [[20.4, -3.4, 0.9], [20.5, -4.4, 0.7], [-14.2, -17.8, 0.9], [15.8, -18.6, 0.8], [17.8, 4.8, 0.8], [18.6, 4.4, 0.6], [-11.8, 9.6, 0.7], [-17.6, -9.2, 0.8], [-16.9, -9.6, 0.6]] as V3t[]) B.box(mCrate, s, s, s, x, 0, z, { solid: true, stand: true, ry: R(-0.3, 0.3) });
+    for (const [x, z, s] of [[20.4, -3.4, 0.9], [20.5, -4.4, 0.7], [-14.2, -17.8, 0.9], [15.8, -18.6, 0.8], [17.8, 4.8, 0.8], [18.6, 4.4, 0.6], [-11.8, 9.6, 0.7], [-17.6, -9.2, 0.8], [-16.9, -9.6, 0.6]] as V3t[]) crate(s, x, 0, z, R(-0.3, 0.3));
     // small balloon cluster tied to the entrance
     cluster(-14.5, 4.6, -9.5, 5, 0.24);
     cluster(18.5, 4.6, -6.5, 5, 0.24);
@@ -1016,6 +1038,35 @@ export function buildDeathBurger(): World {
     dome.position.y = -6;
     k.group.add(dome);
   }
+
+  // ------------------------------------------------------------------------------------------- LIFE: signs, notes, graffiti
+  {
+    const L = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    const missing = life.poster({ title: "MISSING", sub: "TOM KODNER", body: "Owner of Death Burger. Last seen\nordering a triple Death Burger\nwith extra eyeballs. Height 1.7 m.", footer: "if found DO NOT feed after midnight", bg: "#e6dcc2", fg: "#1a1210", accent: "#8a0a0a", style: "missing", art: (g, w, h) => { g.fillStyle = "#b8ae98"; g.fillRect(0, 0, w, h); g.fillStyle = "#3a302a"; g.beginPath(); g.arc(w / 2, h * 0.42, h * 0.22, 0, Math.PI * 2); g.fill(); g.fillRect(w * 0.28, h * 0.66, w * 0.44, h * 0.34); g.fillStyle = "#e8e0d0"; g.fillRect(w * 0.36, h * 0.38, w * 0.08, 4); g.fillRect(w * 0.56, h * 0.38, w * 0.08, 4); } });
+    // missing posters stapled to the fence and the diner
+    L(missing, -FX + 0.066, 1.55, -4.0, 0.5, PI / 2, 0.04);
+    L(missing, FX - 0.066, 1.6, 3.2, 0.5, -PI / 2, -0.05);
+    L(missing, 12.0, 1.5, FZ - 0.066, 0.5, PI, 0.03);
+    L(missing, 7.2, 1.62, -12.495, 0.46, 0, -0.02);
+    // graffiti
+    L(life.graffiti({ text: "DON'T EAT HERE", color: "#c81818", style: "tag", px: [512, 150] }), FX - 0.066, 1.3, -2.5, 3.0, -PI / 2);
+    L(life.graffiti({ text: "TOM KODNER", sub: "was here", color: "#7dff4a", outline: "#101010", style: "bubble" }), -12.0, 1.5, FZ - 0.066, 2.6, PI);
+    L(life.graffiti({ text: "they're watching", color: "#e8e0d0", style: "chalk", px: [400, 110] }), -FX + 0.066, 0.95, 4.5, 1.5, PI / 2, 0.06);
+    // ticket booth: closed sign + ticket stubs on the counter
+    L(life.label({ text: "CLOSED", sub: "forever - thank you for dying with us", bg: "#1a1210", fg: "#e8c24a", border: "#8a0a0a", px: [300, 130], wear: 0.7 }), 7.2, 1.5, 16.768, 0.8, PI);
+    const stub = life.label({ text: "ADMIT ONE", sub: "no refunds - no exits", bg: "#c83a2a", fg: "#fff2d0", border: "#fff2d0", px: [200, 90], wear: 0.3 });
+    for (let i = 0; i < 3; i++) life.flat(stub, 6.8 + i * 0.28, 1.112, 16.66, 0.14, PI + (lr() - 0.5) * 0.8);
+    // diner: health notice, employee of the month, letter + newspaper
+    L(life.poster({ title: "HEALTH INSPECTION", sub: "RESULT: FAILED", body: "Kitchen: the grill is breathing.\nFridge: something knocked back.\nInspector declined to comment.", footer: "Case #666 - City Health Dept.", bg: "#f2ecd8", fg: "#1a1a1a", accent: "#8a0a0a", style: "notice", wear: 0.7 }), -8.2, 1.55, -12.495, 0.5, 0, 0.02);
+    L(life.certificate({ title: "EMPLOYEE OF THE MONTH", name: "Tom Kodner", body: "for working 666 night shifts in a row\n(he never clocked out)", sign: "Management", px: [300, 362], border: "#8a0a0a" }), -4.6, 1.7, -12.495, 0.42, 0, -0.03);
+    life.flat(life.letter({ to: "Dear Tom Kodner,", body: "The clowns moved again last night. The big one is waving at the gate now. I am not opening the fryer tomorrow. Please come back.", sign: "- the night cook", paper: "#e8dfc8", age: 0.8, date: "Oct. 31" }), 1.0, 1.062, -13.05, 0.2, 0.15);
+    life.flat(life.news({ name: "The Night Herald", headline: "DEATH BURGER CLOSES AFTER STRANGE EVENTS", sub: "Owner Tom Kodner vanished; mascots 'keep changing places'", age: 0.9, photo: (g, w, h) => { g.fillStyle = "#3a3430"; g.fillRect(0, 0, w, h); g.fillStyle = "#e8e0d0"; g.beginPath(); g.arc(w * 0.5, h * 0.5, h * 0.3, 0, Math.PI * 2); g.fill(); g.fillStyle = "#8a0a0a"; g.beginPath(); g.arc(w * 0.5, h * 0.5, h * 0.12, 0, Math.PI * 2); g.fill(); g.fillStyle = "#000"; g.beginPath(); g.arc(w * 0.5, h * 0.5, h * 0.05, 0, Math.PI * 2); g.fill(); } }), -2.8, 0.772, -9.8, 0.34, 0.3);
+    L(life.receipt({ title: "DEATH BURGER", lines: [["Triple Death", "6.66"], ["Eyeball Fries", "2.66"], ["Blood Shake", "3.33"]], total: "12.65", foot: "order #666 - customer: T. Kodner - your soul is our pleasure" }), 5.5, 1.48, -12.495, 0.12, 0, 0.08);
+    // circus wagon + carousel warnings on the fence
+    L(life.label({ text: "DO NOT FEED", sub: "THE CLOWNS", bg: "#f2ecd8", fg: "#8a0a0a", border: "#8a0a0a", px: [256, 130], wear: 0.6 }), -FX + 0.066, 1.7, 11.5, 0.6, PI / 2);
+    L(life.label({ text: "RIDE CLOSED", sub: "the chickens bite", bg: "#e8c24a", fg: "#1a1210", border: "#1a1210", px: [256, 120], wear: 0.6 }), FX - 0.066, 1.7, -6.0, 0.6, -PI / 2);
+  }
+  life.finish();
 
   // ------------------------------------------------------------------------------------------- flush
   for (const [m, l] of bulbLists) k.instances(bulbGeo, m, l, { noShadow: true });

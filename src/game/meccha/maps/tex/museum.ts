@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { makeTex, type PaintTex } from "../../textures";
 import { PAINTINGS, pickPainting, realPaintingTex } from "../../paintings";
 import type { Kit, Mat } from "../kit";
+import type { Life } from "./life";
 
 export type { PaintTex };
 export type V3 = [number, number, number];
@@ -375,6 +376,8 @@ export class Art {
   // shared prop materials
   gold!: Mat; goldHi!: Mat; goldDark!: Mat; darkFrame!: Mat; bronzeFrame!: Mat; blackFrame!: Mat; liner!: Mat;
   brass!: Mat; chrome!: Mat; blackMetal!: Mat; lens!: Mat; velvet!: Mat; leather!: Mat; benchWood!: Mat; plinthWhite!: Mat;
+  life: Life | null = null;
+  labelIds = new Map<number, number>();
   placardM!: Mat; glass!: Mat; stoneWhite!: Mat; ceilMetal!: Mat; ceilLens!: Mat;
   glowMat: THREE.MeshBasicMaterial;
 
@@ -549,6 +552,26 @@ export class Art {
       if (o.label !== false) {
         const ly = Math.min(1.45 - y, -h / 2 - F - 0.25);
         this.box(this.placardM, 0.24, 0.15, 0.012, w / 2 + F + 0.3, ly - 0.075, 0.006, { sharp: true });
+        if (this.life) {
+          const L = this.life;
+          let id = this.labelIds.get(i);
+          if (id === undefined) {
+            const pt = PAINTINGS[i];
+            id = L.custom(256, 160, (g, cw, ch) => {
+              g.fillStyle = "#f5f1e8"; g.fillRect(0, 0, cw, ch);
+              g.fillStyle = "#1e1b18"; g.font = "bold 24px Georgia,serif";
+              let s2 = 24; while (s2 > 12 && g.measureText(pt.title).width > cw - 24) { s2--; g.font = `bold ${s2}px Georgia,serif`; }
+              g.fillText(pt.title, 12, 38);
+              g.font = "italic 19px Georgia,serif"; g.fillStyle = "#3a352f"; g.fillText(pt.artist, 12, 68);
+              g.font = "15px Georgia,serif"; g.fillStyle = "#5a554d"; g.fillText("Oil on canvas", 12, 96);
+              g.fillText(i % 3 === 0 ? "Gift of Tom Kodner" : "Museum collection", 12, 120);
+              g.fillStyle = "#b08a3a"; g.fillRect(12, 138, 60, 3);
+            });
+            this.labelIds.set(i, id);
+          }
+          const lx = w / 2 + F + 0.3, lz = 0.0135, c = Math.cos(ry), sn = Math.sin(ry);
+          L.wall(id, x + lx * c + lz * sn, y + ly, z - lx * sn + lz * c, 0.225, ry);
+        }
       }
       if (o.light) {
         const ty = h / 2 + F + 0.1;

@@ -9,6 +9,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import * as T from "../textures";
 import * as C from "./tex/country";
 import { Kit, type Mat, type World } from "./kit";
+import { Life, drawChameleon } from "./tex/life";
 
 // ---------------------------------------------------------------------------------------------
 // Local batching helper: every piece is pre-transformed and merged per material (few draw calls).
@@ -138,6 +139,8 @@ export function buildCountry(): World {
   (globalThis as unknown as { __ctM: unknown }).__ctM = __mt;
   const rnd = C.rng(2024);
   const X0 = -20, X1 = 20, Z0 = -15, Z1 = 15;
+  const life = new Life(k, 1952);
+  const lr = C.rng(5151);
 
   // ---------- materials ----------
   const grass = k.mat(k.tex("c-grass", C.grassStripes), "#fff", [1, 1], { roughness: 0.95, bump: 0.7 });
@@ -493,8 +496,16 @@ export function buildCountry(): World {
     for (let i = 0; i < 5; i++) { const [px, pz] = loc(x, z, ry, -0.5 + i * 0.25, 0); B.geo(palletM, new THREE.BoxGeometry(0.16, 0.025, 0.84), px, y + 0.095, pz, { ry, uv: 0.6 }); }
     for (let i = 0; i < 7; i++) { const [px, pz] = loc(x, z, ry, 0, -0.39 + i * 0.13); B.geo(palletM, new THREE.BoxGeometry(1.2, 0.02, 0.1), px, y + 0.118, pz, { ry, uv: 0.6 }); }
   };
+  const crateLabels = [0, 1, 2].map((i) => life.label({ text: ["KODNER FARM", "APPLES", "EGGS - FRAGILE"][i], sub: ["produce - grade A", "Red Delicious 18 kg", "handle with care"][i], bg: "#f6f1e2", fg: ["#1f5a2e", "#b01818", "#8a5a1a"][i], border: ["#1f5a2e", "#b01818", "#8a5a1a"][i], px: [200, 110] }));
   const crate = (x: number, y: number, z: number, ry: number, m = crateM, w = 0.6, h = 0.4, d = 0.45) => {
-    B.box(m, w, h, d, x, y, z, { ry, uv: 0.4 });
+    B.box(m, w - 0.03, h - 0.06, d - 0.03, x, y + 0.03, z, { ry, uv: 0.4 });
+    B.box(m, w, 0.06, d, x, y + h - 0.06, z, { ry, uv: 0.4 });
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) { const [px, pz] = loc(x, z, ry, lx * (w / 2 - 0.04), lz * (d / 2 - 0.04)); B.box(m, 0.07, 0.05, 0.07, px, y, pz, { ry, flat: true }); }
+    for (const sd of [-1, 1]) {
+      const [hx, hz] = loc(x, z, ry, sd * (w / 2 - 0.012), 0); B.box(darkSteel, 0.012, 0.05, Math.min(0.16, d * 0.35), hx, y + h - 0.13, hz, { ry, flat: true });
+      for (let r2 = 0; r2 < 3; r2++) { const [sx2, sz2] = loc(x, z, ry, 0, sd * (d / 2 - 0.012)); B.box(tableWood, w * 0.9, 0.03, 0.014, sx2, y + 0.1 + r2 * (h - 0.25) / 3, sz2, { ry, flat: true }); }
+    }
+    if (lr() < 0.8) { const [lx2, lz2] = loc(x, z, ry, 0, d / 2 + 0.003); life.wall(crateLabels[Math.floor(lr() * 3)], lx2, y + h - 0.19, lz2, Math.min(0.24, w * 0.4), ry); }
     rotCol(x, z, ry, w, d, y, y + h, true);
   };
   const bucket = (x: number, z: number, y = 0) => {
@@ -627,7 +638,11 @@ export function buildCountry(): World {
   cow(-17.2, 4.4, 2.9, 0.95);
   cow(-12.8, -1.8, 1.1, 1, { fallen: true });
   // trough + round bales + hay rack
-  B.box(galv, 2.2, 0.55, 0.7, -18.6, 0, 1.6, { ry: Math.PI / 2, uv: 0.9 });
+  B.geo(galv, new THREE.CylinderGeometry(0.35, 0.3, 2.2, 18, 1, false, 0, Math.PI), -18.6, 0.5, 1.6, { rx: Math.PI / 2, rz: Math.PI, uv: 0.9 });
+  B.geo(galv, new THREE.CylinderGeometry(0.35, 0.35, 0.02, 18, 1, false, 0, Math.PI), -18.6, 0.5, 0.5, { rx: Math.PI / 2, rz: Math.PI });
+  B.geo(galv, new THREE.CylinderGeometry(0.35, 0.35, 0.02, 18, 1, false, 0, Math.PI), -18.6, 0.5, 2.7, { rx: Math.PI / 2, rz: Math.PI });
+  for (const sx of [-1, 1]) B.geo(galv, new THREE.CylinderGeometry(0.025, 0.025, 2.24, 8), -18.6 + sx * 0.35, 0.5, 1.6, { rx: Math.PI / 2 });
+  for (const lz of [0.7, 2.5]) for (const sx of [-1, 1]) B.box(darkSteel, 0.04, 0.3, 0.04, -18.6 + sx * 0.2, 0, lz, { flat: true });
   B.box(water, 0.58, 0.02, 2.08, -18.6, 0.49, 1.6, { flat: true });
   k.collider(-18.95, -18.25, 0.5, 2.7, 0, 0.55, true);
   roundBale(-14.6, 6.0, 0.1, false, 0.8, 1.2);
@@ -669,7 +684,12 @@ export function buildCountry(): World {
   // wooden table with stacked pumpkins
   const TX = 7.4, TZ = 13.4;
   B.box(tableWood, 1.8, 0.08, 0.9, TX, 0.82, TZ, { uv: 0.8 });
-  for (const [lx, lz] of [[-0.8, -0.35], [0.8, -0.35], [-0.8, 0.35], [0.8, 0.35]]) B.box(tableWood, 0.08, 0.82, 0.08, TX + lx, 0, TZ + lz, { uv: 0.5 });
+  for (const s2 of [-1, 1]) {
+    for (const lz of [-1, 1]) B.geo(tableWood, new THREE.BoxGeometry(0.07, 0.9, 0.07), TX + s2 * 0.72, 0.41, TZ + lz * 0.22, { rx: lz * 0.28, uv: 0.5 });
+    B.box(tableWood, 0.07, 0.07, 0.8, TX + s2 * 0.72, 0.72, TZ, { uv: 0.5 });
+    B.box(tableWood, 0.07, 0.06, 0.62, TX + s2 * 0.72, 0.2, TZ, { uv: 0.5 });
+  }
+  B.box(tableWood, 1.5, 0.07, 0.07, TX, 0.2, TZ, { uv: 0.5 });
   k.collider(TX - 0.9, TX + 0.9, TZ - 0.45, TZ + 0.45, 0.8, 0.9, true);
   pumpkin(TX - 0.4, TZ, 0.36, pumpO, 0.9); pumpkin(TX + 0.45, TZ + 0.05, 0.3, pumpY, 0.9); pumpkin(TX - 0.38, TZ, 0.26, pumpO, 1.42);
   pumpkin(TX + 1.5, TZ + 0.2, 0.42, pumpO); pumpkin(TX - 1.4, TZ + 0.1, 0.36, pumpY);
@@ -693,6 +713,49 @@ export function buildCountry(): World {
   bucket(-5.0, 13.9); bucket(-4.6, 14.1);
   B.geo(blueSack, new RoundedBoxGeometry(1.0, 0.24, 0.65, 2, 0.1), -8.0, 0.12, 13.7, { ry: -0.2, uv: 0.5 });
   roundBale(4.4, 13.6, 0, true, 0.75, 1.15);
+
+  // ---------- LIFE: signs, letters, notes ----------
+  {
+    const L = (id: number, x: number, y: number, z: number, w: number, ry: number, tilt = 0) => life.wall(id, x, y, z, w, ry, tilt);
+    // barn name board in the gable of the closed barn + hay loft sign on the open barn
+    B.box(tableWood, 2.3, 0.62, 0.05, -6, 3.62, -10.0, { flat: true, uv: 0.8 });
+    L(life.plate({ text: "KODNER FARM", sub: "est. 1952 - fresh eggs & pumpkins", style: "wood", px: [420, 110] }), -6, 3.93, -9.97, 2.2, 0);
+    L(life.label({ text: "NO SMOKING", sub: "hay loft - fire risk", bg: "#ffffff", fg: "#b01818", border: "#b01818", wear: 0.4 }), 13.72, 2.0, -11.0, 0.55, Math.PI / 2);
+    L(life.graffiti({ text: "T.K. \u2665 Bessie", color: "#f2f2ea", style: "chalk", px: [300, 110] }), 7.28, 1.3, -12.2, 0.9, -Math.PI / 2, 0.05);
+    // welcome sign on two posts facing the entrance
+    { const x = -2.8, z = 8.6;
+      for (const s2 of [-1, 1]) B.box(tableWood, 0.1, 1.9, 0.1, x + s2 * 0.75, 0, z, { uv: 0.5 });
+      B.box(tableWood, 1.8, 0.62, 0.05, x, 1.2, z + 0.06, { uv: 0.8 });
+      k.collider(x - 0.85, x + 0.85, z - 0.08, z + 0.12, 0, 1.9, false);
+      L(life.plate({ text: "WELCOME TO", sub: "INDOOR COUNTRY - please close all gates", style: "wood", px: [420, 130] }), x, 1.51, z + 0.09, 1.7, 0);
+    }
+    // mailbox on a post near the entrance with a letter sticking out
+    { const x = 5.8, z = 10.8;
+      B.box(tableWood, 0.1, 1.05, 0.1, x, 0, z, { uv: 0.5 });
+      B.geo(redM, new THREE.CylinderGeometry(0.16, 0.16, 0.5, 16, 1, false, 0, Math.PI), x, 1.13, z, { rx: Math.PI / 2, rz: -Math.PI / 2 });
+      B.box(redM, 0.32, 0.12, 0.5, x, 1.02, z, { uv: 0.5 });
+      B.box(darkSteel, 0.02, 0.2, 0.05, x + 0.17, 1.12, z - 0.12, { flat: true });
+      k.collider(x - 0.17, x + 0.17, z - 0.26, z + 0.26, 0, 1.3, false);
+      L(life.label({ text: "T. KODNER", sub: "Kodner Farm", bg: "#ffffff", fg: "#222", px: [200, 90] }), x + 0.162, 1.03, z, 0.2, Math.PI / 2);
+      life.put(life.custom(256, 160, (g, w, h) => { g.fillStyle = "#efe4c8"; g.fillRect(0, 0, w, h); g.fillStyle = "#1d2a66"; g.font = "italic 22px 'Comic Sans MS',cursive"; g.fillText("Mr. Tom Kodner", 40, 90); g.font = "16px 'Comic Sans MS',cursive"; g.fillText("Kodner Farm, Indoor Country", 40, 116); g.fillStyle = "#c0392b"; g.fillRect(w - 52, 12, 36, 42); }), x, 1.26, z + 0.3, 0.16, { rx: -1.2 });
+    }
+    // pumpkin stand chalkboard on the table
+    B.box(tableWood, 0.62, 0.46, 0.04, TX + 0.2, 0.86, TZ - 0.36, { rx: 0.15, uv: 0.8 });
+    life.put(life.menu({ title: "PUMPKINS", sub: "picked this morning", items: [["small", "2.00"], ["big", "5.00"], ["3 for", "5.00"], ["giant", "ask Tom"]], style: "chalk", px: [256, 190] }), TX + 0.2, 1.09, TZ - 0.387, 0.56, { rx: 0.15, h: 0.4 });
+    // pasture: gate sign on the fence, notes on the IBC totes
+    L(life.label({ text: "COW PASTURE", sub: "please close the gate - T. Kodner", bg: "#f6f1e2", fg: "#1f5a2e", border: "#1f5a2e", wear: 0.3 }), -9.52, 0.82, 5.0, 0.6, Math.PI / 2);
+    L(life.note({ text: "WATER for cows only! do not drink", color: "#fff27a", tape: true }), -14.4, 0.7, 13.9 - 0.505, 0.16, Math.PI, 0.06);
+    // circus poster on a post near the tents
+    { const x = 12.6, z = 0.4;
+      B.box(tableWood, 0.1, 2.2, 0.1, x, 0, z, { uv: 0.5 });
+      B.box(tableWood, 0.66, 0.9, 0.03, x, 1.1, z + 0.065, { uv: 0.8 });
+      k.collider(x - 0.1, x + 0.1, z - 0.1, z + 0.1, 0, 2.2, false);
+      L(life.poster({ title: "CIRCUS!", sub: "TONIGHT 7 PM", body: "the amazing hiding chameleons\nring-master Tom Kodner", bg: "#b01818", fg: "#ffffff", accent: "#f2c230", style: "retro", art: (g, w, h) => drawChameleon(g, w * 0.5, h * 0.55, h * 0.7, "#f2c230"), wear: 0.3 }), x, 1.55, z + 0.082, 0.6, 0);
+    }
+    // farm newspaper on a hay bale + a note on the balloon pallets
+    life.flat(life.news({ name: "Farm Weekly", headline: "KODNER PUMPKIN WINS BLUE RIBBON", sub: "a 212 kg giant from the Indoor Country patch", photo: (g, w, h) => { g.fillStyle = "#9a948a"; g.fillRect(0, 0, w, h); g.fillStyle = "#5a554c"; g.beginPath(); g.ellipse(w * 0.5, h * 0.62, w * 0.3, h * 0.32, 0, 0, Math.PI * 2); g.fill(); g.fillRect(w * 0.48, h * 0.2, w * 0.04, h * 0.14); } }), HX - 0.3, 0.55, HZ + 1.35, 0.4, -0.06 + 0.2);
+    L(life.note({ text: "Balloon rides SAT 10am - ask Tom!", color: "#aee4ff", tape: true }), 15.3, 0.64, -8.4 + 0.255, 0.16, 0, -0.05);
+  }
 
   __t.push(["props", performance.now()]);
   // ---------- hanging cotton clouds ----------
