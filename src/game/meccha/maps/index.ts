@@ -33,7 +33,7 @@ export const MAPS: { id: string; name: string; build: () => World }[] = [
   { id: "sewer", name: "Sewer", build: buildSewer },
   { id: "backrooms", name: "Backrooms", build: buildBackrooms },
   { id: "penguin", name: "Penguin Hotel", build: buildPenguin },
-  { id: "sugarland", name: "Sugarland", build: buildSugarland },
+  { id: "sugarland", name: "Sugar Land", build: buildSugarland },
   { id: "osaka", name: "Osaka", build: buildOsaka },
   { id: "egypt", name: "Egypt", build: buildEgypt },
   { id: "deathburger", name: "Death Burger", build: buildDeathBurger },

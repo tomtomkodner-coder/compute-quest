@@ -682,82 +682,115 @@ const nums = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) 
 const onOff = [{ v: true, n: "ON" }, { v: false, n: "OFF" }];
 
 /** "Configure Map" — כמו במשחק: חוקים משמאל (ו־Start Game), פילטר וסוג גוף באמצע, תמונת מפה ורשימת מפות מימין */
+/** סדר המפות ברשימה כמו במשחק המקורי */
+const CFG_ORDER = ["mansion", "sewer", "backrooms", "country", "penguin", "sugarland"];
+/** Configure Map — משוכפל 1:1 מהמשחק: שלושה לוחות שקופים (חוקים / פילטר + סוג גוף / מפה) */
 function SettingsPanel({ hud, engine, onClose }: { hud: HudState; engine: Engine | null; onClose: () => void }) {
   const s = hud.settings;
   const dis = !hud.isHost;
   const set = (p: Partial<Settings>) => engine?.setSettings(p);
-  const solo = hud.net === "local";
-  const panel = "rounded-md bg-[#3a3a3a]/80 border border-white/10 backdrop-blur-[2px] p-3 min-h-0 overflow-auto";
-  const h = "text-[15px] font-bold mb-1.5 text-white";
-  const sec = (list: number[]) => list.map((v) => ({ v, n: String(v) }));
+  const u = (n: number) => `calc(var(--u) * ${n})`;
+  const panel: React.CSSProperties = { background: "rgba(28,28,28,0.62)", borderRadius: u(8), padding: `${u(26)} ${u(30)}` };
   const pic = s.map === "random" ? null : THUMBS[s.map];
-  const bodies: { id: BodyType; n: string }[] = [{ id: "normal", n: "Normal" }, { id: "cube", n: "Cube" }, { id: "plump", n: "Plump" }];
+  const bodies: { id: BodyType; n: string }[] = [{ id: "normal", n: "v1.0" }, { id: "cube", n: "v1.6" }, { id: "plump", n: "v1.7" }];
+  const onOffOpts = [{ v: true, n: "On" }, { v: false, n: "Off" }];
   return (
-    <div className="absolute inset-0 z-40 p-3 sm:p-6 flex items-center justify-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div dir={isRtl() ? "rtl" : "ltr"} className="relative w-full max-w-[1180px] h-full max-h-[700px] grid grid-cols-1 md:grid-cols-[1.05fr_0.85fr_1fr] gap-3 text-white">
-        {/* חוקים */}
-        <div className={`${panel} flex flex-col`}>
+    <div className="absolute inset-0 z-40 grid place-items-center" onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
+      <div className="relative" dir="ltr" style={{ width: "min(100vw, 177.78vh)", height: "min(56.25vw, 100vh)", ["--u" as string]: "calc(min(56.25vw, 100vh) / 1080)" }}
+        onPointerDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
+        {/* שמאל: חוקים */}
+        <div className="absolute flex flex-col" style={{ ...panel, left: u(57), top: u(66), width: u(585), height: u(886) }}>
           <div className="flex-1 min-h-0 overflow-auto">
-            <Opt label="Game Mode" value={s.mode} disabled={dis} options={MODES.map((m) => ({ v: m.id, n: m.name }))} onChange={(v) => set({ mode: v })} />
-            <Opt label="Number of Hunters" value={s.hunters} disabled={dis || s.mode === "double"} options={nums(1, 6)} onChange={(v) => set({ hunters: v })} />
-            <Opt label="Hunter Wait Time(sec)" value={s.hideTime} disabled={dis} options={sec([30, 45, 60, 75, 90, 120, 150, 180, 200, 240, 300])} onChange={(v) => set({ hideTime: v })} />
-            <Opt label="Search Time(sec)" value={s.huntTime} disabled={dis} options={sec([60, 90, 120, 150, 180, 200, 240, 300, 420, 600])} onChange={(v) => set({ huntTime: v })} />
-            <Opt label="Answer Check Time(sec)" value={s.checkTime} disabled={dis} options={sec([5, 15, 30, 45, 60, 90])} onChange={(v) => set({ checkTime: v })} />
-            <Opt label="Forced Taunt Interval(sec)" value={s.whistle} disabled={dis} options={sec([0, 5, 10, 15, 20, 30, 45, 60, 90, 120])} onChange={(v) => set({ whistle: v })} />
-            <Opt label="Show Missed-Spot Ranking to Hunters" value={s.missed} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ missed: v })} />
-            <Opt label="Ammo Limit" value={s.ammoLimit} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ ammoLimit: v })} />
-            {s.ammoLimit && <Opt label="Ammo" value={s.ammo} disabled={dis} options={nums(1, 99)} onChange={(v) => set({ ammo: v })} />}
-            <Opt label="Allow Petit Chameleon" value={s.allowPetit} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ allowPetit: v })} />
-            <Opt label="Hunter TPS" value={s.hunterTps} disabled={dis} options={[{ v: true, n: "On" }, { v: false, n: "Off" }]} onChange={(v) => set({ hunterTps: v })} />
-            {solo && <Opt label="Bots" value={s.bots} disabled={dis} options={nums(1, 8)} onChange={(v) => set({ bots: v })} />}
-            {solo && <Opt label="Bot Level" value={s.difficulty} disabled={dis} options={[{ v: 0 as const, n: "Easy" }, { v: 1 as const, n: "Normal" }, { v: 2 as const, n: "Hard" }]} onChange={(v) => set({ difficulty: v })} />}
-            {dis && <p className="text-[12px] text-white/60 mt-2">{t("Only the host can change the settings.")}</p>}
+            <CfgChoice u={u} label="Game Mode" value={s.mode} disabled={dis} options={MODES.map((m) => ({ v: m.id, n: m.name }))} onChange={(v) => set({ mode: v })} />
+            <CfgNum u={u} label="Number of Hunters" value={s.hunters} min={1} max={12} disabled={dis || s.mode === "double"} onChange={(v) => set({ hunters: v })} />
+            <CfgNum u={u} label="Hunter Wait Time(sec)" value={s.hideTime} min={10} max={600} disabled={dis} onChange={(v) => set({ hideTime: v })} />
+            <CfgNum u={u} label="Search Time(sec)" value={s.huntTime} min={30} max={1800} disabled={dis} onChange={(v) => set({ huntTime: v })} />
+            <CfgNum u={u} label="Answer Check Time(sec)" value={s.checkTime} min={5} max={300} disabled={dis} onChange={(v) => set({ checkTime: v })} />
+            <CfgNum u={u} label="Forced Taunt Interval(sec)" value={s.whistle} min={0} max={600} disabled={dis} onChange={(v) => set({ whistle: v })} />
+            <CfgChoice u={u} label="Show Missed-Spot Ranking to Hunters" value={s.missed} disabled={dis} options={onOffOpts} onChange={(v) => set({ missed: v })} />
+            {dis && <p className="text-white/60" style={{ fontSize: u(20), marginTop: u(8) }}>{t("Only the host can change the settings.")}</p>}
           </div>
-          <div className="flex items-end justify-between pt-2">
-            {hud.isHost ? (
-              <button onClick={() => { engine?.startCountdown(); onClose(); }} className="rounded-sm bg-[#1b1b1b] border-2 border-[#3ddc4a] px-5 py-1.5 text-[16px] font-bold hover:text-[#5dff5d]">{t("Start Game")}</button>
-            ) : <span />}
-            <button onClick={onClose} className="flex items-center gap-1 text-[12px] text-white/85"><KeyBox k="Esc" /> {t("Back")}</button>
-          </div>
+          {hud.isHost && (
+            <button onClick={() => { engine?.startCountdown(); onClose(); }} className="self-center font-bold text-white hover:text-[#5dff5d]"
+              style={{ fontSize: u(30), padding: `${u(6)} ${u(26)}`, marginTop: u(12), background: "#141414", border: `${u(3)} solid #36e03c` }}>{t("Start Game")}</button>
+          )}
         </div>
-        {/* פילטר + סוג גוף */}
-        <div className={panel}>
-          <div className={h}>{t("Filter")}</div>
+        {/* אמצע: פילטר + סוג גוף */}
+        <div className="absolute" style={{ ...panel, left: u(693), top: u(66), width: u(570), height: u(930) }}>
+          <div className="font-bold text-white" style={{ fontSize: u(40), marginBottom: u(6) }}>{t("Filter")}</div>
           {([["mono", "Monochrome"], ["horror", "Horror"], ["mosaic", "Mosaic"]] as const).map(([k, n]) => (
-            <Opt key={k} label={n} value={s.filters[k]} disabled={dis} options={[{ v: false, n: "Off" }, { v: true, n: "On" }]} onChange={(v) => set({ filters: { ...s.filters, [k]: v } })} />
+            <CfgChoice key={k} u={u} label={n} value={s.filters[k]} disabled={dis} options={[{ v: false, n: "Off" }, { v: true, n: "On" }]} onChange={(v) => set({ filters: { ...s.filters, [k]: v } })} />
           ))}
-          <div className={`${h} mt-4`}>{t("Body Type")}</div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="font-bold text-white" style={{ fontSize: u(40), margin: `${u(26)} 0 ${u(12)}` }}>{t("Body Type")}</div>
+          <div className="grid grid-cols-3" style={{ gap: u(12) }}>
             {bodies.map((b) => (
-              <button key={b.id} onClick={() => engine?.setMyBody(b.id)} className={`rounded border-2 p-1.5 flex flex-col items-center gap-1 ${hud.bodyType === b.id ? "border-[#3ddc4a] bg-white/10" : "border-white/15 hover:bg-white/10"}`}>
-                <svg viewBox="0 0 40 70" className="w-10 h-16" aria-hidden>
-                  {b.id === "cube" ? <g fill="#eee"><rect x="11" y="2" width="18" height="18" rx="3" /><rect x="9" y="22" width="22" height="24" rx="3" /><rect x="2" y="23" width="6" height="20" rx="2" /><rect x="32" y="23" width="6" height="20" rx="2" /><rect x="10" y="47" width="8" height="21" rx="2" /><rect x="22" y="47" width="8" height="21" rx="2" /></g>
-                    : <g fill="#eee"><circle cx="20" cy="11" r="9" /><rect x={b.id === "plump" ? 6 : 10} y="21" width={b.id === "plump" ? 28 : 20} height="26" rx={b.id === "plump" ? 13 : 9} /><rect x={b.id === "plump" ? 0 : 3} y="23" width="6" height="21" rx="3" /><rect x={b.id === "plump" ? 34 : 31} y="23" width="6" height="21" rx="3" /><rect x="11" y="44" width="8" height="24" rx="4" /><rect x="21" y="44" width="8" height="24" rx="4" /></g>}
+              <button key={b.id} onClick={() => engine?.setMyBody(b.id)} className="flex flex-col items-center justify-center"
+                style={{ height: u(150), background: hud.bodyType === b.id ? "linear-gradient(#26c22c,#159a1b)" : "rgba(0,0,0,0.55)", gap: u(6) }}>
+                <svg viewBox="0 0 40 60" style={{ width: u(46), height: u(70) }} aria-hidden>
+                  <g fill="#f2f2f2">{b.id === "cube" ? <><rect x="13" y="2" width="14" height="14" rx="2" /><rect x="11" y="18" width="18" height="22" rx="2" /><rect x="5" y="19" width="5" height="17" rx="2" /><rect x="30" y="19" width="5" height="17" rx="2" /><rect x="12" y="41" width="7" height="17" rx="2" /><rect x="21" y="41" width="7" height="17" rx="2" /></>
+                    : <><circle cx="20" cy="9" r="7" /><rect x={b.id === "plump" ? 8 : 12} y="17" width={b.id === "plump" ? 24 : 16} height="24" rx={b.id === "plump" ? 11 : 7} /><rect x={b.id === "plump" ? 3 : 6} y="19" width="5" height="18" rx="2.5" /><rect x={b.id === "plump" ? 32 : 29} y="19" width="5" height="18" rx="2.5" /><rect x="13" y="39" width="6" height="19" rx="3" /><rect x="21" y="39" width="6" height="19" rx="3" /></>}</g>
                 </svg>
-                <span className="text-[12px]">{t(b.n)}</span>
+                <span className="font-bold text-white" style={{ fontSize: u(20) }}>{b.n}</span>
               </button>
             ))}
           </div>
         </div>
-        {/* מפה */}
-        <div className={`${panel} flex flex-col`}>
-          <div className={h}>{t("Map")}</div>
-          <div className="aspect-[16/10] w-full rounded bg-[#222] grid place-items-center overflow-hidden mb-2 shrink-0">
-            {pic ? <img src={pic} alt="" className="w-full h-full object-cover" /> : <span className="text-[90px] font-black text-[#3ddc4a] leading-none">?</span>}
+        {/* ימין: מפה */}
+        <div className="absolute flex flex-col" style={{ ...panel, left: u(1307), top: u(66), width: u(573), height: u(886) }}>
+          <div className="font-bold text-white" style={{ fontSize: u(40), marginBottom: u(10) }}>{t("Map")}</div>
+          <div className="grid place-items-center overflow-hidden shrink-0" style={{ height: u(300), background: "#1b1b1b", marginBottom: u(10) }}>
+            {pic ? <img src={pic} alt="" className="w-full h-full object-cover" /> : <span className="font-black leading-none" style={{ fontSize: u(250), color: "#22e62a" }}>?</span>}
           </div>
-          <div className="flex-1 min-h-0 overflow-auto grid gap-1 content-start">
-            {[{ id: "random", name: "Random" }, ...MAP_LIST].map((m) => (
-              <div key={m.id} className={`flex items-center gap-2 rounded-sm px-2 py-1 border ${s.map === m.id ? "bg-[#2fb83a] border-[#5dff5d]" : "bg-black/30 border-white/10 hover:bg-white/10"}`}>
-                <button disabled={dis} onClick={() => set({ map: m.id })} className="flex-1 text-center text-[14px] font-bold truncate">{t(m.name)}</button>
-                {m.id !== "random" && (
-                  <input type="checkbox" title={t("Include in Random")} disabled={dis} checked={s.pool.includes(m.id)} className="w-3.5 h-3.5 accent-[#3ddc4a]"
-                    onChange={(ev) => set({ pool: ev.target.checked ? [...s.pool, m.id] : s.pool.filter((x) => x !== m.id) })} />
-                )}
-              </div>
+          <div className="flex-1 min-h-0 overflow-auto">
+            {[{ id: "random", name: "Random" }, ...[...MAP_LIST].sort((x, y) => (CFG_ORDER.indexOf(x.id) + 1 || 99) - (CFG_ORDER.indexOf(y.id) + 1 || 99))].map((m) => (
+              <button key={m.id} disabled={dis} onClick={() => set({ map: m.id })} className="w-full block font-bold text-white text-center truncate"
+                style={{ fontSize: u(26), height: u(50), marginBottom: u(4), background: s.map === m.id ? "linear-gradient(#3fe043,#22b828)" : "rgba(60,60,60,0.85)" }}>{t(m.name)}</button>
             ))}
           </div>
         </div>
+        <button onClick={onClose} className="absolute flex items-center text-white" style={{ left: u(24), top: u(1010), gap: u(8), fontSize: u(22) }}><KeyBox k="Esc" /> {t("Back")}</button>
       </div>
+    </div>
+  );
+}
+
+/** שורת בחירה של Configure Map: תווית מעל, ‹ ערך › ופס מיקום מתחת לערך */
+function CfgChoice<T>({ u, label, value, options, onChange, disabled }: { u: (n: number) => string; label: string; value: T; options: { v: T; n: string }[]; onChange: (v: T) => void; disabled?: boolean }) {
+  const i = Math.max(0, options.findIndex((o) => o.v === value));
+  const arrow = (d: number, ch: string) => (
+    <button disabled={disabled} onClick={() => onChange(options[(i + d + options.length) % options.length].v)} className="grid place-items-center text-white disabled:opacity-30 shrink-0"
+      style={{ width: u(40), height: u(40), fontSize: u(30), background: d < 0 ? "rgba(255,255,255,0.08)" : "#0d0d0d" }}>{ch}</button>
+  );
+  return (
+    <div style={{ marginBottom: u(16) }}>
+      <div className="text-white" style={{ fontSize: u(25) }}>{t(label)}</div>
+      <div className="flex items-center" style={{ gap: u(10), marginTop: u(4) }}>
+        {arrow(-1, "‹")}
+        <div className="flex-1 text-center">
+          <div className="font-bold text-white" style={{ fontSize: u(31) }}>{t(options[i]?.n ?? "")}</div>
+          <div className="flex" style={{ height: u(4), marginTop: u(2), background: "rgba(255,255,255,0.18)" }}>
+            {options.map((_, k) => <span key={k} className="flex-1" style={{ background: k === i ? "#fff" : "transparent" }} />)}
+          </div>
+        </div>
+        {arrow(1, "›")}
+      </div>
+    </div>
+  );
+}
+
+/** שדה מספר של Configure Map (כמו במשחק: מקלידים מספר; גלגלת = ±1) */
+function CfgNum({ u, label, value, min, max, onChange, disabled }: { u: (n: number) => string; label: string; value: number; min: number; max: number; onChange: (v: number) => void; disabled?: boolean }) {
+  const [txt, setTxt] = useState(String(value));
+  useEffect(() => setTxt(String(value)), [value]);
+  const commit = (v: number) => { const c = Math.max(min, Math.min(max, Math.round(v))); setTxt(String(c)); if (c !== value) onChange(c); };
+  return (
+    <div style={{ marginBottom: u(16) }}>
+      <div className="text-white" style={{ fontSize: u(25) }}>{t(label)}</div>
+      <input disabled={disabled} inputMode="numeric" value={txt} onChange={(ev) => setTxt(ev.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+        onBlur={() => commit(Number(txt) || 0)} onKeyDown={(ev) => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); ev.stopPropagation(); }}
+        onWheel={(ev) => { if (!disabled) commit(value + (ev.deltaY < 0 ? 1 : -1)); }}
+        className="w-full text-center font-bold text-white outline-none disabled:opacity-50 focus:bg-black/50"
+        style={{ fontSize: u(31), height: u(46), marginTop: u(4), background: "rgba(0,0,0,0.32)" }} />
     </div>
   );
 }
