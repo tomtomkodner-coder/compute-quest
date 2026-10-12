@@ -1,0 +1,18 @@
+import { launch, ctxFor, sleep, URL, offline, ev, until, endPhase, watch, errs } from "./lib.mjs";
+const lang = process.argv[2] || "ar";
+const b = await launch(); const ctx = await ctxFor(b, { viewport: { width: 1280, height: 720 } }, false);
+await ctx.addInitScript((l) => localStorage.setItem("meccha_lang2", l), lang);
+const p = await ctx.newPage(); watch(p, "R");
+await p.goto(URL); await sleep(4000);
+const hs = () => p.evaluate(() => [document.documentElement.scrollWidth > innerWidth + 1, [...document.querySelectorAll("button")].filter((e) => { const r = e.getBoundingClientRect(); return r.width && (r.right > innerWidth + 1 || r.left < -1); }).length]);
+console.log("menu", await hs()); await p.screenshot({ path: `rtl-${lang}-menu.png`, timeout: 240000 });
+await p.evaluate(() => document.querySelectorAll("button")[2].click()); await sleep(600); console.log("settings", await hs()); await p.screenshot({ path: `rtl-${lang}-settings.png`, timeout: 240000 });
+await offline(p); await sleep(2000);
+await ev(p, () => { const e = window.__meccha; const l = e.world.lobby; e.me.pos.set(l.play.x, 0, l.play.z + 1); }); await sleep(1500); await p.keyboard.press("KeyE"); await sleep(1000);
+console.log("config", await hs()); await p.screenshot({ path: `rtl-${lang}-config.png`, timeout: 240000 });
+await p.keyboard.press("Escape"); await sleep(500);
+await ev(p, () => { window.__meccha.setSettings({ map: "school", hideTime: 300 }); window.__meccha.startCountdown(); }); await sleep(1000); await endPhase(p);
+await until([p], () => window.__meccha.rs.ph === "hide" && (window.__meccha.worldId === "school" || window.__meccha.me.role === "hunter"), null, 300000); await sleep(3000);
+await p.keyboard.press("Tab"); await sleep(800);
+console.log("hide", await hs()); await p.screenshot({ path: `rtl-${lang}-hide.png`, timeout: 240000 });
+console.log(errs.slice(0, 5).join("\n")); await b.close();

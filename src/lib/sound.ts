@@ -10,12 +10,44 @@ function getCtx() {
   return ctx;
 }
 
+let masterVolume = 1;
+let bgmVolume = 1;
+let seVolume = 1;
+/** עוצמות נפרדות (לשונית Sound): מוזיקה / אפקטים */
+export function setBgmVolume(v: number) { bgmVolume = Math.max(0, Math.min(1, v)); }
+export function setSeVolume(v: number) { seVolume = Math.max(0, Math.min(1, v)); }
+/** עוצמה כללית 0..1 (מתפריט ההגדרות) */
+export function setVolume(v: number) {
+  masterVolume = Math.max(0, Math.min(1, v));
+}
+
+/** פרץ רעש מסונן (יריות, קליקים, התזות) */
+export function playNoise(duration = 0.2, volume = 0.2, freq = 2000, type: BiquadFilterType = "lowpass", delay = 0) {
+  if (masterMuted) return;
+  const ac = getCtx();
+  if (!ac) return;
+  const len = Math.max(1, Math.floor(ac.sampleRate * duration));
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const f = ac.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = freq;
+  const g = ac.createGain();
+  g.gain.value = volume * masterVolume * seVolume;
+  src.connect(f).connect(g).connect(ac.destination);
+  src.start(ac.currentTime + delay);
+}
+
 export function setMuted(v: boolean) {
   masterMuted = v;
   if (v) stopMusic();
 }
 
-export function playTone(freq: number, duration = 0.15, type: OscillatorType = "square", volume = 0.15) {
+export function playTone(freq: number, duration = 0.15, type: OscillatorType = "square", volume = 0.15, bus: "se" | "bgm" = "se") {
+  volume *= bus === "bgm" ? bgmVolume : seVolume;
   if (masterMuted) return;
   const ac = getCtx();
   if (!ac) return;
@@ -23,7 +55,7 @@ export function playTone(freq: number, duration = 0.15, type: OscillatorType = "
   const gain = ac.createGain();
   osc.type = type;
   osc.frequency.value = freq;
-  gain.gain.setValueAtTime(volume, ac.currentTime);
+  gain.gain.setValueAtTime(Math.max(0.0001, volume * masterVolume), ac.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + duration);
   osc.connect(gain).connect(ac.destination);
   osc.start();
@@ -76,8 +108,8 @@ export function startMusic() {
   const lead = [220, 277, 330, 415, 330, 277, 220, 277];
   musicInterval = window.setInterval(() => {
     if (masterMuted) return;
-    if (musicStep % 4 === 0) playTone(bass[(musicStep / 4) % bass.length], 0.3, "triangle", 0.04);
-    playTone(lead[musicStep % lead.length], 0.12, "square", 0.02);
+    if (musicStep % 4 === 0) playTone(bass[(musicStep / 4) % bass.length], 0.3, "triangle", 0.04, "bgm");
+    playTone(lead[musicStep % lead.length], 0.12, "square", 0.02, "bgm");
     musicStep++;
   }, 220);
 }
@@ -87,4 +119,61 @@ export function stopMusic() {
     clearInterval(musicInterval);
     musicInterval = null;
   }
+}
+
+// ---------- רחש מים מתמשך (ביוב, מעיינות, בריכה) ----------
+let water: { g: GainNode } | null = null;
+/** עוצמת רחש המים 0..1 (לפי המרחק מהמים הקרובים) — מים זורמים עם "גרגור" איטי */
+export function setWaterAmbience(level: number) {
+  const ac = getCtx();
+  if (!ac) return;
+  const target = masterMuted ? 0 : Math.max(0, Math.min(1, level)) * 0.2 * masterVolume * seVolume;
+  if (!water) {
+    if (target < 0.002) return;
+    const len = ac.sampleRate * 4;
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { last = (last + 0.035 * (Math.random() * 2 - 1)) / 1.035; d[i] = last * 3.2; } // רעש חום
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const bp = ac.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 520;
+    bp.Q.value = 0.8;
+    const lfo = ac.createOscillator();
+    lfo.frequency.value = 0.37;
+    const lg = ac.createGain();
+    lg.gain.value = 220;
+    lfo.connect(lg).connect(bp.frequency);
+    const hs = ac.createBiquadFilter();
+    hs.type = "highshelf";
+    hs.frequency.value = 2500;
+    hs.gain.value = 4;
+    const g = ac.createGain();
+    g.gain.value = 0;
+    src.connect(bp).connect(hs).connect(g).connect(ac.destination);
+    src.start();
+    lfo.start();
+    water = { g };
+  }
+  water.g.gain.setTargetAtTime(target, ac.currentTime, 0.25);
+}
+/** טיפה נופלת למים */
+export function playDrip(volume = 0.1) {
+  if (masterMuted) return;
+  const ac = getCtx();
+  if (!ac) return;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = "sine";
+  const t = ac.currentTime;
+  o.frequency.setValueAtTime(900 + Math.random() * 500, t);
+  o.frequency.exponentialRampToValueAtTime(2200 + Math.random() * 600, t + 0.06);
+  g.gain.setValueAtTime(Math.max(0.0001, volume * masterVolume * seVolume), t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  o.connect(g).connect(ac.destination);
+  o.start(t);
+  o.stop(t + 0.13);
 }
