@@ -1,0 +1,36 @@
+name: Chess pairing alerts
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [ccr-5f3b7a92-egcc1c]
+concurrency: chess-alert
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache/restore@v4
+        with:
+          path: chess-state.json
+          key: chess-state-${{ github.run_id }}
+          restore-keys: chess-state-
+      - run: node scripts/chess-alert.mjs
+        env:
+          PLAYER: ${{ vars.PLAYER || 'Kodner Tom' }}
+          FRIENDS: ${{ vars.FRIENDS }}
+          TOURNAMENTS: ${{ vars.TOURNAMENTS }}
+          TEST: ${{ github.event_name == 'push' && '1' || '' }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'tom-chess-073058fe38' }}
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: chess-state.json
+          key: chess-state-${{ github.run_id }}

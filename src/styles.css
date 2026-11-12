@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @source "../src";
+@source "../node_modules/liquid-glass-react/dist";
 @import "tw-animate-css";
 @import "@fontsource-variable/heebo/index.css";
 @import "@fontsource-variable/heebo/wght.css";
