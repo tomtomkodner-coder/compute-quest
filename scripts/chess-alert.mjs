@@ -131,8 +131,8 @@ async function push(msg) {
 const color = (w) => (w ? "⚪ לבן" : "⚫ שחור");
 const link = (id, href) => (href ? new URL(href, BASE).href : `${BASE}${tnr(id, "art=0")}`);
 
-const primed = existsSync(STATE_FILE);
 const state = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, "utf8")) : {};
+const primed = Object.keys(state).length > 0;
 let ids = EXTRA;
 try {
   ids = [...new Set([...(await findTournaments()), ...EXTRA])];
@@ -186,4 +186,4 @@ for (const id of ids) {
     console.error(id, e.message);
   }
 }
-writeFileSync(STATE_FILE, JSON.stringify(state, null, 1));
+if (process.env.TEST !== "1") writeFileSync(STATE_FILE, JSON.stringify(state, null, 1));
