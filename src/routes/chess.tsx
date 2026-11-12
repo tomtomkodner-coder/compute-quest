@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Bell, ChevronLeft, ExternalLink, Plus, RotateCw, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowClockwise, ArrowSquareOut, Bell, CaretLeft, MagnifyingGlass, Plus, SlidersHorizontal, Trash } from "@phosphor-icons/react";
+import NumberFlow from "@number-flow/react";
+import LiquidGlassModule from "liquid-glass-react";
+import { motion, useReducedMotion } from "motion/react";
 import { toast, Toaster } from "sonner";
 import { Drawer } from "vaul";
 import { checkPairings, getPage, matchName, searchPlayer, type Pairing, type Table } from "@/lib/chess-results";
@@ -86,14 +89,6 @@ transform:perspective(900px) rotateX(58deg) scale(2.2);transform-origin:50% 0;
 const rise = (i: number) => ({ "--i": i }) as CSSProperties;
 
 // ---------- primitives ----------
-function IconButton({ label, onClick, children, disabled }: { label: string; onClick: () => void; children: ReactNode; disabled?: boolean }) {
-  return (
-    <button aria-label={label} title={label} onClick={onClick} disabled={disabled} className="glass press grid size-11 place-items-center rounded-full disabled:opacity-50">
-      {children}
-    </button>
-  );
-}
-
 function Button({ children, onClick, kind = "plain", className, disabled }: { children: ReactNode; onClick?: () => void; kind?: "accent" | "plain"; className?: string; disabled?: boolean }) {
   return (
     <button
@@ -110,20 +105,47 @@ function Button({ children, onClick, kind = "plain", className, disabled }: { ch
   );
 }
 
+// liquid-glass-react ships CJS; unwrap the default export when bundled for SSR.
+const LiquidGlass = ((LiquidGlassModule as unknown as { default?: typeof LiquidGlassModule }).default ?? LiquidGlassModule) as typeof LiquidGlassModule;
+
+// Chess pieces: "cburnett" set by Colin M.L. Burnett, from lichess-org/lila (GPLv2+).
 function Piece({ c, size }: { c: "w" | "b"; size: number }) {
   return (
-    <span
-      aria-label={colorHe(c)}
-      style={{ width: size, height: size, fontSize: size * 0.6 }}
-      className={cn(
-        "grid shrink-0 place-items-center rounded-full leading-none",
-        c === "w"
-          ? "bg-[#f7f7f5] text-[#16181b] shadow-[inset_0_-2px_0_rgb(0_0_0/.08),0_0_0_1px_rgb(0_0_0/.08)]"
-          : "bg-[#16181b] text-[#f7f7f5] shadow-[inset_0_1px_0_rgb(255_255_255/.14),0_0_0_1px_rgb(255_255_255/.1)]",
-      )}
-    >
-      ♚
+    <span style={{ width: size, height: size }} className="grid shrink-0 place-items-center rounded-full bg-[var(--fill)] ring-1 ring-[var(--hair)]">
+      <img src={`/pieces/${c}K.svg`} alt={`מלך ${colorHe(c)}`} width={size * 0.72} height={size * 0.72} draggable={false} />
     </span>
+  );
+}
+
+/* Floating iOS-style tab bar. Refraction from rdev/liquid-glass-react (full effect in Chromium; Safari/Firefox get blur only). */
+function Dock({ items }: { items: { label: string; icon: ReactNode; onClick: () => void; spin?: boolean }[] }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return (
+    <LiquidGlass
+      cornerRadius={999}
+      padding="6px"
+      displacementScale={56}
+      blurAmount={0.08}
+      saturation={150}
+      aberrationIntensity={1.5}
+      elasticity={0.18}
+      style={{ position: "fixed", top: "calc(100dvh - 48px - env(safe-area-inset-bottom))", left: "50%", zIndex: 30 }}
+    >
+      <nav className="flex items-center gap-1" dir="rtl">
+        {items.map((it) => (
+          <button
+            key={it.label}
+            onClick={it.onClick}
+            className="press flex h-12 min-w-16 flex-col items-center justify-center gap-0.5 rounded-full px-3 text-[var(--ink)] hover:bg-[var(--fill)]"
+          >
+            <span className={cn("grid size-6 place-items-center", it.spin && "animate-spin")}>{it.icon}</span>
+            <span className="text-[11px] font-medium">{it.label}</span>
+          </button>
+        ))}
+      </nav>
+    </LiquidGlass>
   );
 }
 
@@ -162,19 +184,23 @@ function Segmented<T extends string>({ value, onChange, items }: { value: T; onC
         <button
           key={v}
           onClick={() => onChange(v)}
-          className={cn(
-            "flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition",
-            value === v ? "bg-[var(--bg)] font-semibold shadow-[0_1px_3px_rgb(0_0_0/.12)]" : "text-[var(--muted)]",
-          )}
+          className={cn("relative flex-1 rounded-full px-3 py-2 text-[15px] font-medium transition-colors", value === v ? "font-semibold" : "text-[var(--muted)]")}
         >
-          {label}
+          {value === v && (
+            <motion.span
+              layoutId={`seg-${items.map((i) => i[0]).join("")}`}
+              transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              className="absolute inset-0 rounded-full bg-[var(--bg)] shadow-[0_1px_3px_rgb(0_0_0/.12)]"
+            />
+          )}
+          <span className="relative">{label}</span>
         </button>
       ))}
     </div>
   );
 }
 
-const Muted = ({ children, className }: { children: ReactNode; className?: string }) => <p className={cn("text-[15px] text-[var(--muted)]", className)}>{children}</p>;
+const Muted = ({ children, className }: { children: ReactNode; className?: string }) => <p className={cn("text-[16px] text-[var(--muted)]", className)}>{children}</p>;
 const inputCls =
   "h-11 w-full rounded-full border border-[var(--hair)] bg-[var(--fill)] px-4 text-[15px] text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)]";
 
@@ -261,7 +287,7 @@ function ChessPage() {
   const next = s.tours.map((t) => ({ t, p: status[t.id]?.pairings[s.me] })).find((x) => x.p);
 
   return (
-    <div className="cq relative min-h-[100dvh] overflow-x-hidden antialiased [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Text','Heebo_Variable',sans-serif]" dir="rtl">
+    <div className="cq relative min-h-[100dvh] overflow-x-clip antialiased [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Text','Heebo_Variable',sans-serif]" dir="rtl">
       <style>{CSS}</style>
       <div aria-hidden className="board pointer-events-none fixed inset-x-0 top-0 h-[70dvh]" />
       <Toaster
@@ -269,29 +295,11 @@ function ChessPage() {
         toastOptions={{ className: "!rounded-[20px] !border-[var(--edge)] !bg-[var(--sheet)] !text-[var(--ink)] ![backdrop-filter:blur(30px)]" }}
       />
 
-      <main className="relative mx-auto max-w-xl px-4 pb-16 pt-[max(1.5rem,env(safe-area-inset-top))]">
-        <header className="rise flex items-center justify-between gap-3 pb-6" style={rise(0)}>
+      <main className="relative mx-auto max-w-xl px-4 pb-36 pt-[max(1.5rem,env(safe-area-inset-top))]">
+        <header className="rise pb-6" style={rise(0)}>
           <div>
-            <p className="text-[13px] font-semibold text-[var(--muted)]">{today || "\u00a0"}</p>
+            <p className="text-[14px] font-semibold text-[var(--muted)]">{today || "\u00a0"}</p>
             <h1 className="text-[34px] font-bold leading-tight tracking-tight">השחמט שלי</h1>
-          </div>
-          <div className="flex gap-2">
-            <IconButton
-              label="הפעל התראות"
-              onClick={async () => {
-                if (!("Notification" in window)) return toast.error("הדפדפן לא תומך בהתראות");
-                const p = await Notification.requestPermission();
-                toast(p === "granted" ? "התראות הופעלו" : "ההתראות חסומות בהגדרות הדפדפן");
-              }}
-            >
-              <Bell className="size-[18px]" strokeWidth={2} />
-            </IconButton>
-            <IconButton label="רענן" onClick={checkAll} disabled={busy}>
-              <RotateCw className={cn("size-[18px]", busy && "animate-spin")} strokeWidth={2} />
-            </IconButton>
-            <IconButton label="הגדרות" onClick={() => setPanel("settings")}>
-              <SlidersHorizontal className="size-[18px]" strokeWidth={2} />
-            </IconButton>
           </div>
         </header>
 
@@ -302,7 +310,7 @@ function ChessPage() {
             <h2 className="text-2xl font-bold tracking-tight">{s.tours.length ? "אין עדיין הגרלה" : "עוד לא עוקבים אחרי טורניר"}</h2>
             <Muted className="mt-1">{s.tours.length ? "כשתצא הגרלה לסיבוב הבא, היא תופיע כאן." : "מצא את הטורנירים שלך ב-chess-results והתחל לעקוב."}</Muted>
             <Button kind="accent" className="mt-5" onClick={() => setPanel("add")}>
-              <Plus className="size-4" strokeWidth={2.5} /> הוסף טורניר
+              <Plus size={18} weight="bold" /> הוסף טורניר
             </Button>
           </section>
         )}
@@ -327,6 +335,22 @@ function ChessPage() {
         </p>
       </main>
 
+      <Dock
+        items={[
+          { label: "רענון", icon: <ArrowClockwise size={22} weight="bold" />, onClick: checkAll, spin: busy },
+          { label: "הוספה", icon: <Plus size={22} weight="bold" />, onClick: () => setPanel("add") },
+          {
+            label: "התראות",
+            icon: <Bell size={22} weight="bold" />,
+            onClick: async () => {
+              if (!("Notification" in window)) return toast.error("הדפדפן לא תומך בהתראות");
+              const p = await Notification.requestPermission();
+              toast(p === "granted" ? "התראות הופעלו" : "ההתראות חסומות בהגדרות הדפדפן");
+            },
+          },
+          { label: "הגדרות", icon: <SlidersHorizontal size={22} weight="bold" />, onClick: () => setPanel("settings") },
+        ]}
+      />
       {panel === "add" && <AddSheet s={s} addTour={addTour} onClose={() => setPanel(null)} />}
       {panel === "settings" && (
         <SettingsSheet
@@ -346,18 +370,20 @@ function ChessPage() {
 }
 
 function Hero({ p, title, onOpen }: { p: P; title: string; onOpen: () => void }) {
-  const stats: [string, string][] = [
-    ["דירוג", p.opp.rating || "-"],
-    ["נקודות", p.opp.pts || "-"],
-    ["לוח", p.board || "-"],
+  const reduce = useReducedMotion();
+  const num = (v?: string) => (v && /^\d+([.,]5)?$/.test(v) ? Number(v.replace(",", ".")) : undefined);
+  const stats: [string, string | undefined][] = [
+    ["דירוג", p.opp.rating],
+    ["נקודות", p.opp.pts?.replace("½", ".5")],
+    ["לוח", p.board],
   ];
   return (
     <section className="glass rise rounded-[28px] p-6" style={rise(1)}>
-      <p className="text-[13px] font-semibold text-[var(--accent)]">המשחק הבא, סיבוב {p.round}</p>
+      <p className="text-[14px] font-semibold text-[var(--accent)]">המשחק הבא, סיבוב {p.round}</p>
       <div className="mt-4 flex items-center gap-4">
         <Piece c={p.color} size={64} />
         <div className="min-w-0">
-          <p className="text-[15px] text-[var(--muted)]">אתה {colorHe(p.color)}, נגד</p>
+          <p className="text-[16px] text-[var(--muted)]">אתה {colorHe(p.color)}, נגד</p>
           <h2 className="truncate text-[28px] font-bold leading-tight tracking-tight">{p.opp.name}</h2>
         </div>
       </div>
@@ -365,7 +391,9 @@ function Hero({ p, title, onOpen }: { p: P; title: string; onOpen: () => void })
         {stats.map(([k, v]) => (
           <div key={k} className="px-4">
             <dt className="text-xs text-[var(--muted)]">{k}</dt>
-            <dd className="text-xl font-semibold tabular-nums">{v}</dd>
+            <dd className="text-[22px] font-semibold tabular-nums">
+              {num(v) !== undefined ? <NumberFlow value={num(v)!} animated={!reduce} locales="en-US" /> : v || "-"}
+            </dd>
           </div>
         ))}
       </dl>
@@ -395,12 +423,12 @@ function TourRow({ t, s, st, onDetail, onView }: { t: Tour; s: Settings; st?: St
   return (
     <div>
       <button onClick={onView} className="press flex w-full items-center gap-3 px-4 py-3.5 text-right hover:bg-[var(--fill)]">
-        {mine ? <Piece c={mine.color} size={36} /> : <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--fill)] text-lg">♞</span>}
+        {mine ? <Piece c={mine.color} size={36} /> : <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--fill)]"><img src="/pieces/wN.svg" alt="" width={24} height={24} /></span>}
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[16px] font-semibold">{st?.title || t.name}</span>
           <span className={cn("block truncate text-[14px]", st?.error ? "text-red-500" : "text-[var(--muted)]")}>{sub}</span>
         </span>
-        <ChevronLeft className="size-5 shrink-0 text-[var(--muted)]" />
+        <CaretLeft size={18} weight="bold" className="shrink-0 text-[var(--muted)]" />
       </button>
       {friends.map(([f, p]) => (
         <button key={f} onClick={() => onDetail(p!, f)} className="press flex w-full items-center gap-3 py-2.5 pe-4 ps-[3.75rem] text-right text-[14px] hover:bg-[var(--fill)]">
@@ -437,7 +465,7 @@ function AddSheet({ s, addTour, onClose }: { s: Settings; addTour: (id: string, 
   return (
     <Sheet title="הוספת טורניר" onClose={onClose}>
       <Button kind="accent" onClick={search} disabled={busy} className="w-full">
-        <Search className="size-4" strokeWidth={2.5} /> {busy ? "מחפש" : "חפש את הטורנירים שלי"}
+        <MagnifyingGlass size={18} weight="bold" /> {busy ? "מחפש" : "חפש את הטורנירים שלי"}
       </Button>
       {res && !res.length && <Muted>לא נמצאו טורנירים עבור {s.me}</Muted>}
       {res && res.length > 0 && (
@@ -448,7 +476,7 @@ function AddSheet({ s, addTour, onClose }: { s: Settings; addTour: (id: string, 
               <div key={r.id + r.snr} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15px] font-semibold">{r.tournament}</div>
-                  <div className="truncate text-[13px] text-[var(--muted)]">{r.player}</div>
+                  <div className="truncate text-[14px] text-[var(--muted)]">{r.player}</div>
                 </div>
                 <button
                   disabled={on}
@@ -463,7 +491,7 @@ function AddSheet({ s, addTour, onClose }: { s: Settings; addTour: (id: string, 
         </div>
       )}
       <div className="space-y-2 pt-2">
-        <label htmlFor="cr-link" className="block text-[13px] font-semibold text-[var(--muted)]">
+        <label htmlFor="cr-link" className="block text-[14px] font-semibold text-[var(--muted)]">
           או הדבק קישור מ-chess-results
         </label>
         <div className="flex gap-2">
@@ -479,13 +507,13 @@ function SettingsSheet({ s, save, onRemove, onClose }: { s: Settings; save: (x: 
   return (
     <Sheet title="הגדרות" onClose={onClose}>
       <div className="space-y-2">
-        <label htmlFor="me" className="block text-[13px] font-semibold text-[var(--muted)]">
+        <label htmlFor="me" className="block text-[14px] font-semibold text-[var(--muted)]">
           השם שלי, כמו שהוא כתוב ב-chess-results
         </label>
         <input id="me" className={inputCls} value={s.me} onChange={(e) => save({ ...s, me: e.target.value, seen: {} })} />
       </div>
       <div className="space-y-2">
-        <label htmlFor="friends" className="block text-[13px] font-semibold text-[var(--muted)]">
+        <label htmlFor="friends" className="block text-[14px] font-semibold text-[var(--muted)]">
           חברים, מופרדים בפסיק
         </label>
         <input
@@ -497,20 +525,20 @@ function SettingsSheet({ s, save, onRemove, onClose }: { s: Settings; save: (x: 
         />
       </div>
       <div className="space-y-2">
-        <label htmlFor="every" className="block text-[13px] font-semibold text-[var(--muted)]">
+        <label htmlFor="every" className="block text-[14px] font-semibold text-[var(--muted)]">
           בדיקה כל כמה דקות
         </label>
         <input id="every" className={inputCls} type="number" min={1} value={s.every} onChange={(e) => save({ ...s, every: Number(e.target.value) || 2 })} />
       </div>
       {s.tours.length > 0 && (
         <div className="space-y-2 pt-2">
-          <p className="text-[13px] font-semibold text-[var(--muted)]">טורנירים במעקב</p>
+          <p className="text-[14px] font-semibold text-[var(--muted)]">טורנירים במעקב</p>
           <div className="divide-y divide-[var(--hair)] overflow-hidden rounded-[20px] bg-[var(--fill)]">
             {s.tours.map((t) => (
               <div key={t.id} className="flex items-center gap-3 px-4 py-3">
                 <span className="min-w-0 flex-1 truncate text-[15px]">{t.name}</span>
                 <button aria-label="הסר" onClick={() => onRemove(t.id)} className="press rounded-full p-2 text-red-500 hover:bg-[var(--fill)]">
-                  <Trash2 className="size-4" />
+                  <Trash size={18} />
                 </button>
               </div>
             ))}
@@ -565,7 +593,7 @@ function DetailSheet({ id, p, who, s, onClose }: { id: string; p: P; who: string
               {l}, {colorHe(c)}
             </span>
             <span className="w-full truncate text-[16px] font-semibold">{x.name}</span>
-            <span className="text-[13px] tabular-nums text-[var(--muted)]">{[x.rating, x.pts && `${x.pts} נק׳`].filter(Boolean).join(", ") || " "}</span>
+            <span className="text-[14px] tabular-nums text-[var(--muted)]">{[x.rating, x.pts && `${x.pts} נק׳`].filter(Boolean).join(", ") || " "}</span>
           </div>
         ))}
         <span className="order-2 self-center pt-2 text-sm font-semibold text-[var(--muted)]">נגד</span>
@@ -576,7 +604,7 @@ function DetailSheet({ id, p, who, s, onClose }: { id: string; p: P; who: string
       {d && <Tables tables={d.tables} s={s} />}
       {snr && (
         <a className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[var(--accent)]" href={CR(id, `art=9&snr=${snr}`)} target="_blank" rel="noreferrer">
-          פתח ב-chess-results <ExternalLink className="size-4" />
+          פתח ב-chess-results <ArrowSquareOut size={18} />
         </a>
       )}
     </Sheet>
@@ -626,7 +654,7 @@ function Viewer({ id, s, onClose }: { id: string; s: Settings; onClose: () => vo
         />
       )}
       <a className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[var(--accent)]" href={CR(id, "art=0")} target="_blank" rel="noreferrer">
-        פתח ב-chess-results <ExternalLink className="size-4" />
+        פתח ב-chess-results <ArrowSquareOut size={18} />
       </a>
     </Sheet>
   );
