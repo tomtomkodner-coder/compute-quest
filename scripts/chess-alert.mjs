@@ -146,6 +146,11 @@ for (const id of ids) {
     const { name, found } = await check(id);
     const p = found[PLAYER];
     const tUrl = `${BASE}${tnr(id, "art=0")}`;
+    console.log(id, name, p ? `R${p.round} ${p.white ? "W" : "B"} vs ${p.opp.name} (${p.opp.rating ?? "?"})` : "no pairing");
+    if (process.env.TEST === "1") {
+      if (p) await push({ title: `🧪 בדיקה · סיבוב ${p.round}: אתה ${color(p.white)}`, message: `נגד ${p.opp.name}${p.opp.rating ? ` (${p.opp.rating})` : ""}\n${name}`, click: link(id, p.opp.href), tags: ["test_tube"] });
+      continue;
+    }
     if (!state[id]) {
       // first run ever: remember current status silently
       state[id] = primed ? { round: 0, result: "" } : { round: p?.round ?? 0, result: p?.result ?? "" };
